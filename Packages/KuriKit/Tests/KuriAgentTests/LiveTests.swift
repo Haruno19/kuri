@@ -10,13 +10,17 @@ import Testing
 ///
 ///     KURI_LIVE_MODEL=ollama/qwen3.5:2b swift test --filter LiveTests
 ///
-/// `KURI_LIVE_BASE_URL` defaults to Ollama's (`http://localhost:11434/v1`).
+/// `KURI_LIVE_BASE_URL` defaults to Ollama's (`http://localhost:11434/v1`),
+/// `KURI_LIVE_FORMAT` to `open-responses` (Ollama also speaks
+/// `anthropic-messages`), and `KURI_LIVE_API_KEY` to none.
 /// Small models are not deterministic: these check that the plumbing works
 /// with a real server, and print each transcript for a human to read.
 enum Live {
     static let environment = ProcessInfo.processInfo.environment
     static let model = environment["KURI_LIVE_MODEL"].flatMap(ModelRef.init)
     static let baseURL = URL(string: environment["KURI_LIVE_BASE_URL"] ?? "http://localhost:11434/v1")!
+    static let format = environment["KURI_LIVE_FORMAT"].flatMap(WireFormat.init(rawValue:)) ?? .openResponses
+    static let apiKey = environment["KURI_LIVE_API_KEY"].map(SecretRef.literal)
 }
 
 @Suite(.serialized, .enabled(if: Live.model != nil, "set KURI_LIVE_MODEL to run"))
@@ -44,7 +48,7 @@ struct LiveTests {
         try home.prepare()
         let config = Config(
             defaultModel: model,
-            providers: [model.provider: ProviderConfig(format: .openResponses, baseURL: Live.baseURL,
+            providers: [model.provider: ProviderConfig(format: Live.format, baseURL: Live.baseURL, apiKey: Live.apiKey,
                                                        models: [ModelConfig(id: model.model, contextWindow: contextWindow)])],
             generateTitles: titles)
         let engine = Engine(home: home, store: try Store(url: home.database), config: config, mcpConfig: mcp)
@@ -171,7 +175,8 @@ struct LiveTests {
         let home = KuriHome(root: root)
         try home.prepare()
         try Data("""
-            { providers: { \(model.provider): { format: "open-responses", baseURL: "\(Live.baseURL.absoluteString)", discoverModels: true } } }
+            { providers: { \(model.provider): { format: "\(Live.format.rawValue)", baseURL: "\(Live.baseURL.absoluteString)", \
+            \(Live.apiKey == nil ? "" : "apiKey: \"env:KURI_LIVE_API_KEY\",") discoverModels: true } } }
             """.utf8).write(to: home.configFile)
         let engine = try await Engine.open(home: home)
         defer { Task { await engine.shutdown() } }

@@ -99,7 +99,7 @@ Policies (`allow`, `ask`, `deny`) can be set per tool in `config.json` and per M
 | Wire format | Used for |
 |---|---|
 | `open-responses` | OpenAI, Ollama, LM Studio, vLLM, and anything else speaking the Open Responses spec |
-| `anthropic-messages` | Anthropic's API *(planned)* |
+| `anthropic-messages` | Anthropic's API, and servers that copy it (Ollama among them) |
 | `gemini` | Google's native API *(planned)* |
 | `chat-completions` | Legacy fallback for servers that only speak `/v1/chat/completions` *(planned)* |
 | `apple-foundation-models` | Apple's on-device model (FoundationModels): offline and free, text only, a natural utility model |

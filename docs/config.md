@@ -42,6 +42,8 @@ Anywhere a secret is accepted (`apiKey`, `headers`, an MCP server's `env`), the 
     ollama: { format: "open-responses", baseURL: "http://localhost:11434/v1", discoverModels: true },
     openai: { format: "open-responses", baseURL: "https://api.openai.com/v1", apiKey: "keychain:openai",
               models: [{ id: "gpt-5", reasoningEffort: "medium", contextWindow: 400000 }] },
+    anthropic: { format: "anthropic-messages", apiKey: "keychain:anthropic",
+                 models: [{ id: "claude-sonnet-5-5", reasoningEffort: "medium", contextWindow: 1000000 }] },
   },
   tools: { memory: "deny", "github__*": "ask" },
   sandbox: { image: "docker.io/library/python:3-slim", memoryMiB: 2048 },
@@ -63,10 +65,10 @@ Anywhere a secret is accepted (`apiKey`, `headers`, an MCP server's `env`), the 
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `format` | string | required | The wire format: `open-responses` or `apple-foundation-models`. Recognized but not implemented yet: `anthropic-messages`, `gemini`, `chat-completions`. |
-| `baseURL` | URL | required for HTTP formats | E.g. `http://localhost:11434/v1`. Requests go to `<baseURL>/responses`, model discovery to `<baseURL>/models`. Not used by `apple-foundation-models`. |
-| `apiKey` | secret | none | Sent as `Authorization: Bearer <key>`. |
-| `headers` | object of secrets | none | Extra HTTP headers on every request. |
+| `format` | string | required | The wire format: `open-responses`, `anthropic-messages` or `apple-foundation-models`. Recognized but not implemented yet: `gemini`, `chat-completions`. |
+| `baseURL` | URL | required for `open-responses` | E.g. `http://localhost:11434/v1`. Requests go to `<baseURL>/responses` (`open-responses`) or `<baseURL>/messages` (`anthropic-messages`, where it defaults to `https://api.anthropic.com/v1`), model discovery to `<baseURL>/models`. Not used by `apple-foundation-models`. |
+| `apiKey` | secret | none | Sent as `Authorization: Bearer <key>`, or as `x-api-key` for `anthropic-messages`. |
+| `headers` | object of secrets | none | Extra HTTP headers on every request. For `anthropic-messages`, an `anthropic-version` here replaces Kuri's and an `anthropic-beta` is sent alongside Kuri's. |
 | `models` | array | `[]` | Registered models: bare ids (`"qwen3.5:2b"`) or objects (below). Settings › Models edits this list. |
 | `discoverModels` | bool | `false` | Also offer every model the provider lists at `<baseURL>/models`, without registering them. Refreshed at launch and on every reload. |
 
@@ -80,14 +82,26 @@ apple: { format: "apple-foundation-models", models: ["default"] },
 - It gets no tools, and its instructions don't mention any. Its context window is 4,096 tokens unless `contextWindow` says otherwise, so automatic compaction works without configuration.
 - A natural `utilityModel`: `"apple/default"`.
 
+### Anthropic
+
+```json5
+anthropic: { format: "anthropic-messages", apiKey: "keychain:anthropic", discoverModels: true },
+```
+
+- `baseURL` defaults to Anthropic's API. Ollama speaks the same format at `http://localhost:11434/v1`.
+- Every request turns on adaptive thinking with summaries, so the model decides how much to think and Kuri shows what it thought. That needs a Claude 4.6 model or later; `reasoningEffort` sets the effort (`low`, `medium`, `high`, `xhigh`, `max`).
+- The format requires an output cap: `maxOutputTokens` defaults to 32,000, which includes thinking.
+- Requests ask for automatic prompt caching, so resending the conversation each round costs a fraction of its input price.
+- Set `contextWindow` to the model's (1,000,000 for current models) for automatic compaction.
+
 ### Model objects
 
 | Key | Type | Meaning |
 |---|---|---|
 | `id` | string | The provider's model id. Required. |
 | `contextWindow` | int | Tokens. Enables automatic compaction at 75%, and the context meter's maximum. Set it to what the runtime actually uses, which for local runtimes may be less than the model supports. |
-| `maxOutputTokens` | int | Sent as `max_output_tokens`. |
-| `reasoningEffort` | string | Sent as `reasoning.effort` (e.g. `low`, `medium`, `high`), for models that support it. |
+| `maxOutputTokens` | int | Sent as `max_output_tokens` (`open-responses`) or `max_tokens` (`anthropic-messages`, default 32,000). |
+| `reasoningEffort` | string | Sent as `reasoning.effort` (`open-responses`) or `output_config.effort` (`anthropic-messages`), e.g. `low`, `medium`, `high`, for models that support it. |
 | `name` | string | A display name. Stored, not shown yet. |
 | `fallbacks` | array of model references | Models to try when this one fails. Accepted, not used yet. |
 

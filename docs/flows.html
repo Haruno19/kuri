@@ -125,15 +125,15 @@
     <h3>Inference events</h3>
     <p class="summary">What every provider adapter streams to <code>TurnRunner</code>, whatever its wire format. Deltas are for display only; <code>itemCompleted</code> is what gets stored.</p>
     <table>
-      <thead><tr><th>Event</th><th>Meaning</th><th>Open Responses source</th></tr></thead>
+      <thead><tr><th>Event</th><th>Meaning</th><th>Open Responses source</th><th>Anthropic Messages source</th></tr></thead>
       <tbody>
-        <tr><td><code>.textDelta</code></td><td>A piece of the answer</td><td><code>response.output_text.delta</code></td></tr>
-        <tr><td><code>.reasoningDelta</code></td><td>A piece of the reasoning</td><td><code>response.reasoning_text.delta</code>, <code>response.reasoning_summary_text.delta</code></td></tr>
-        <tr><td><code>.toolCallStarted</code></td><td>The model began a tool call</td><td><code>response.output_item.added</code> (function_call)</td></tr>
-        <tr><td><code>.toolCallArgumentsDelta</code></td><td>A piece of its arguments</td><td><code>response.function_call_arguments.delta</code></td></tr>
-        <tr><td><code>.itemCompleted</code></td><td>A finished message, reasoning or tool call</td><td><code>response.output_item.done</code></td></tr>
-        <tr><td><code>.usage</code></td><td>Token counts</td><td><code>response.completed</code> / <code>response.incomplete</code></td></tr>
-        <tr><td><code>.finished</code></td><td>Stop reason: end of turn, tool use, max tokens</td><td><code>response.completed</code> / <code>response.incomplete</code>; <code>response.failed</code> and <code>error</code> throw</td></tr>
+        <tr><td><code>.textDelta</code></td><td>A piece of the answer</td><td><code>response.output_text.delta</code></td><td><code>content_block_delta</code> (<code>text_delta</code>)</td></tr>
+        <tr><td><code>.reasoningDelta</code></td><td>A piece of the reasoning</td><td><code>response.reasoning_text.delta</code>, <code>response.reasoning_summary_text.delta</code></td><td><code>content_block_delta</code> (<code>thinking_delta</code>; <code>signature_delta</code> is kept, not shown)</td></tr>
+        <tr><td><code>.toolCallStarted</code></td><td>The model began a tool call</td><td><code>response.output_item.added</code> (function_call)</td><td><code>content_block_start</code> (<code>tool_use</code>)</td></tr>
+        <tr><td><code>.toolCallArgumentsDelta</code></td><td>A piece of its arguments</td><td><code>response.function_call_arguments.delta</code></td><td><code>content_block_delta</code> (<code>input_json_delta</code>)</td></tr>
+        <tr><td><code>.itemCompleted</code></td><td>A finished message, reasoning or tool call</td><td><code>response.output_item.done</code></td><td><code>content_block_stop</code></td></tr>
+        <tr><td><code>.usage</code></td><td>Token counts</td><td><code>response.completed</code> / <code>response.incomplete</code></td><td><code>message_start</code> and <code>message_delta</code>, sent at <code>message_stop</code></td></tr>
+        <tr><td><code>.finished</code></td><td>Stop reason: end of turn, tool use, max tokens</td><td><code>response.completed</code> / <code>response.incomplete</code>; <code>response.failed</code> and <code>error</code> throw</td><td><code>message_delta</code>'s <code>stop_reason</code>, sent at <code>message_stop</code>; <code>error</code> throws</td></tr>
       </tbody>
     </table>
   </div>
@@ -144,7 +144,8 @@
       <thead><tr><th>With</th><th>What Kuri uses</th></tr></thead>
       <tbody>
         <tr><td>Inference server</td><td><code>POST &lt;baseURL&gt;/responses</code> with <code>stream: true</code> and <code>store: false</code> (stateless: the whole history every time), <code>Authorization: Bearer</code> from the provider's <code>apiKey</code>; the answer is a server-sent event stream.</td></tr>
-        <tr><td>Inference server</td><td><code>GET &lt;baseURL&gt;/models</code> → <code>{ data: [{ id }] }</code>, for model discovery.</td></tr>
+        <tr><td>Inference server</td><td><code>POST &lt;baseURL&gt;/messages</code> (Anthropic Messages) with <code>stream: true</code>, the whole history every time, <code>x-api-key</code> from the provider's <code>apiKey</code>, <code>anthropic-version</code>, adaptive thinking with summaries and automatic prompt caching.</td></tr>
+        <tr><td>Inference server</td><td><code>GET &lt;baseURL&gt;/models</code> → <code>{ data: [{ id }] }</code>, for model discovery (Anthropic's pages with <code>has_more</code> and <code>after_id</code>).</td></tr>
         <tr><td>MCP server</td><td>JSON-RPC via the MCP Swift SDK. Client → server: <code>initialize</code>, <code>notifications/initialized</code>, <code>tools/list</code>, <code>tools/call</code>, <code>notifications/cancelled</code>. Server → client: <code>notifications/tools/list_changed</code>.</td></tr>
         <tr><td>MCP transport</td><td>stdio: newline-delimited JSON over the child's stdin/stdout, stderr kept as a log. Streamable HTTP: <code>POST</code> per message, <code>Mcp-Session-Id</code>, optional <code>GET</code> event stream, configured headers on every request.</td></tr>
         <tr><td>Kata Containers</td><td><code>GET</code> of the arm64 release tarball, once, for its kernel.</td></tr>
@@ -194,7 +195,7 @@ const P = {
   vm:        ["Linux VM", "Virtualization.framework", "external"],
   kata:      ["Kata release", "github.com", "external"],
   oci:       ["Image registries", "ghcr.io, Docker Hub", "external"],
-  llm:       ["Inference server", "Ollama, OpenAI…", "external"],
+  llm:       ["Inference server", "Ollama, OpenAI, Anthropic…", "external"],
   server:    ["MCP server", "stdio or HTTP", "external"],
   shell:     ["Login shell", "$SHELL", "external"],
   disk:      ["config.json", "~/.config/kuri", "external"],
@@ -279,6 +280,7 @@ const FLOWS = [
     ],
     notes: ["Before each request the runner estimates its size and compacts first if it would overflow the model's context; see Automatic compaction.",
             "Reasoning streams the same way (<code>.reasoningDelta</code>, then an item of kind <code>reasoning</code>).",
+            "Drawn with Open Responses. An <code>anthropic-messages</code> provider posts to <code>/messages</code> instead and maps its own events to the same <code>InferenceEvent</code>s (see the reference below).",
             "A provider error throws out of the stream: the turn is stored as failed and <code>.turnFinished(.failed)</code> carries the message."] },
 
   { group: "Turns", id: "tools", title: "A tool round",

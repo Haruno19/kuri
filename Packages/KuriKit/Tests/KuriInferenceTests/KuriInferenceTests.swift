@@ -119,7 +119,7 @@ final class ModelsStub: URLProtocol, @unchecked Sendable {
 
     @Test func saysWhenDiscoveryIsUnsupported() async {
         await #expect(throws: KuriError.self) {
-            try await ProviderFactory().discoverModels(name: "a", config: ProviderConfig(format: .anthropicMessages))
+            try await ProviderFactory().discoverModels(name: "g", config: ProviderConfig(format: .gemini))
         }
     }
 }

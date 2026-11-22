@@ -8,8 +8,9 @@ Done, the core: foundations (domain model, config, storage, Open Responses adapt
 2. **Apple's on-device model** as a provider (`apple-foundation-models`), offline and free, a natural utility model. *(done)*
 3. **Generated titles**, switchable in Settings. *(done)*
 4. **Read-only tool calls in parallel.** *(done)*
+5. **Anthropic Messages** as a provider (`anthropic-messages`), for Anthropic's API and the servers that copy it. *(done)*
 
-**Later, engine:** more providers (Anthropic Messages, Gemini, Chat Completions), fallback models, memory review, attachments in messages, sub-agents, `KuriServer` for the iOS client.
+**Later, engine:** more providers (Gemini, Chat Completions), fallback models, memory review, attachments in messages, sub-agents, `KuriServer` for the iOS client.
 
 **Then: the UI redesign.** Streaming Markdown renderer, theming and the style layer, mini panel and global hotkey, conversation management, editing providers and MCP servers from Settings.
 

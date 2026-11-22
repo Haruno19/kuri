@@ -87,6 +87,13 @@ public struct ConfigLoader: Sendable {
             //   apiKey: "keychain:openai",
             //   models: [{ id: "gpt-5", reasoningEffort: "medium" }],
             // },
+
+            // Anthropic's API (baseURL defaults to it). Ollama speaks this format too.
+            // anthropic: {
+            //   format: "anthropic-messages",
+            //   apiKey: "keychain:anthropic",
+            //   models: [{ id: "claude-sonnet-5-5", reasoningEffort: "medium", contextWindow: 1000000 }],
+            // },
           },
 
           // Tool policies: "allow", "ask" or "deny", by the name the model sees.

@@ -41,6 +41,8 @@ cd Packages/KuriKit && swift test
 
 # Live tests: real turns against a model (skipped unless KURI_LIVE_MODEL is set)
 cd Packages/KuriKit && KURI_LIVE_MODEL=ollama/qwen3.5:2b swift test --filter LiveTests
+# The same over the Anthropic format (Ollama speaks it too); KURI_LIVE_API_KEY for a hosted API
+cd Packages/KuriKit && KURI_LIVE_MODEL=ollama/qwen3.5:2b KURI_LIVE_FORMAT=anthropic-messages swift test --filter LiveTests
 
 # App
 xcodebuild -project Kuri.xcodeproj -scheme Kuri -configuration Debug build
