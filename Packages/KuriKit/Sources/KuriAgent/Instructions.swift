@@ -1,4 +1,5 @@
 import Foundation
+import KuriSandbox
 import KuriStore
 
 /// Builds the instructions (system prompt) for a request.
@@ -14,6 +15,7 @@ enum Instructions {
     static func build(
         conversation: Conversation,
         folders: [ConversationFolder],
+        mounts: [SandboxMount] = [],
         memories: [Memory],
         tools: Set<String>,
         now: Date = .now
@@ -29,9 +31,14 @@ enum Instructions {
 
         sections.append("Today is \(now.formatted(.dateTime.weekday(.wide).day().month(.wide).year())).")
 
-        if !folders.isEmpty {
+        if tools.contains("shell") {
+            sections.append(workspace(mounts))
+        } else if !folders.isEmpty {
             let list = folders.map { "- \($0.path)\($0.readOnly ? " (read-only)" : "")" }.joined(separator: "\n")
-            sections.append("Folders attached to this conversation:\n\(list)")
+            sections.append("""
+                Folders attached to this conversation (you can't open them: the sandbox isn't set up yet):
+                \(list)
+                """)
         }
 
         if tools.contains("memory") || !memories.isEmpty {
@@ -49,5 +56,16 @@ enum Instructions {
         }
 
         return sections.joined(separator: "\n\n")
+    }
+
+    /// Where things are inside the sandbox, for the `shell` tool.
+    static func workspace(_ mounts: [SandboxMount]) -> String {
+        let intro = "Your `shell` tool runs commands in a Linux sandbox with no network access, starting in /work."
+        if let scratch = mounts.first, mounts.count == 1, scratch.isScratch {
+            return intro + " /work is a scratch folder for this conversation: the user hasn't attached a folder of theirs. Files you create there persist, and the user can open them."
+        }
+        let list = mounts.map { "- \($0.guestPath) is \($0.hostPath) on the user's Mac\($0.readOnly ? " (read-only)" : "")" }
+            .joined(separator: "\n")
+        return intro + " The user's folders are mounted there, and changes you make are made to their files:\n" + list
     }
 }

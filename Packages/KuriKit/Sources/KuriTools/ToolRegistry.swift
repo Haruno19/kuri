@@ -64,6 +64,11 @@ public actor ToolRegistry {
         notify()
     }
 
+    public func removeAll(named name: String) {
+        guard entries.removeValue(forKey: name) != nil else { return }
+        notify()
+    }
+
     public func removeAll(from source: ToolSource) {
         replace(source: source, with: [])
     }

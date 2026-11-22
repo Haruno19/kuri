@@ -74,6 +74,16 @@ private struct ToolPresentation {
             title = result == nil ? "Updating memory" : "Updated memory"
             detail = AnyView(OutputText(text: output ?? ""))
 
+        case "shell":
+            let command = (try? JSONDecoder().decode([String: JSONValue].self, from: Data(call.arguments.utf8)))?["command"]?.stringValue ?? ""
+            let firstLine = command.split(whereSeparator: \.isNewline).first.map(String.init) ?? command
+            symbol = "terminal"
+            title = firstLine.count > 70 ? String(firstLine.prefix(67)) + "…" : firstLine
+            detail = AnyView(VStack(alignment: .leading, spacing: 6) {
+                if firstLine != command { OutputText(text: command) }
+                OutputText(text: output ?? "")
+            })
+
         case "conversation_search":
             let query = (try? JSONDecoder().decode([String: JSONValue].self, from: Data(call.arguments.utf8)))?["query"]?.stringValue
             symbol = "magnifyingglass"

@@ -131,6 +131,20 @@ public struct SandboxConfig: Codable, Sendable, Hashable {
     public var memoryMiB: Int?
     /// Minutes of inactivity before a conversation's container is stopped.
     public var idleMinutes: Int?
+    /// A Linux kernel (`vmlinux`) already on disk, instead of downloading one.
+    public var kernel: String?
+    /// A Kata Containers release tarball to take the kernel from.
+    public var kernelURL: URL?
+
+    public init(image: String? = nil, cpus: Int? = nil, memoryMiB: Int? = nil, idleMinutes: Int? = nil,
+                kernel: String? = nil, kernelURL: URL? = nil) {
+        self.image = image
+        self.cpus = cpus
+        self.memoryMiB = memoryMiB
+        self.idleMinutes = idleMinutes
+        self.kernel = kernel
+        self.kernelURL = kernelURL
+    }
 }
 
 /// The contents of `mcp.json`. Same `mcpServers` shape as other MCP clients.

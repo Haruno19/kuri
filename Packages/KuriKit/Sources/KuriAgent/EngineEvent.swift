@@ -1,6 +1,7 @@
 import Foundation
 import KuriCore
 import KuriMCP
+import KuriSandbox
 import KuriStore
 import KuriTools
 import Synchronization
@@ -28,6 +29,8 @@ public enum EngineEvent: Sendable {
     case toolsChanged
     case memoriesChanged
     case mcpServersChanged([MCPServerStatus])
+    case sandboxChanged(SandboxStatus)
+    case foldersChanged(conversationID: UUID, [ConversationFolder])
 }
 
 public enum TurnOutcome: Sendable, Hashable {

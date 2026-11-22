@@ -1,6 +1,7 @@
 import KuriConfig
 import KuriCore
 import KuriMCP
+import KuriSandbox
 import KuriStore
 import KuriTools
 import SwiftUI
@@ -11,6 +12,7 @@ struct SettingsView: View {
             Tab("General", systemImage: "gearshape") { GeneralSettings() }
             Tab("Models", systemImage: "cpu") { ModelsSettings() }
             Tab("Tools", systemImage: "wrench.and.screwdriver") { ToolsSettings() }
+            Tab("Sandbox", systemImage: "shippingbox") { SandboxSettingsView() }
             Tab("Memory", systemImage: "brain") { MemorySettings() }
         }
         .frame(width: 560, height: 460)
@@ -212,6 +214,68 @@ private struct ProviderModelsSection: View {
         draft = ""
         contextWindow = ""
         Task { await model.register(entry, provider: name) }
+    }
+}
+
+// MARK: - Sandbox
+
+private struct SandboxSettingsView: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Form {
+            Section {
+                switch model.sandboxStatus {
+                case .ready:
+                    Label("Ready. The model has a `shell` tool.", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                case .notInstalled:
+                    Label("Not set up yet.", systemImage: "shippingbox")
+                    Text("""
+                        Setup downloads a Linux kernel (about 680 MB once; about 50 MB is kept), Apple's init image \
+                        and the container image. After that the sandbox works offline.
+                        """)
+                    .font(.callout).foregroundStyle(.secondary)
+                    Button("Set Up Sandbox") { Task { await model.setUpSandbox() } }
+                case .installing(let step, let fraction):
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(step)
+                        if let fraction {
+                            ProgressView(value: fraction)
+                        } else {
+                            ProgressView().progressViewStyle(.linear)
+                        }
+                    }
+                case .failed(let message):
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .textSelection(.enabled)
+                    Button("Try Again") { Task { await model.setUpSandbox() } }
+                }
+            } header: {
+                Text("Linux sandbox")
+            } footer: {
+                Text("""
+                    Each conversation gets its own lightweight VM, started on its first command and stopped when \
+                    idle. Attached folders are mounted at /work; without one, a scratch folder is. No network.
+                    """)
+                .foregroundStyle(.secondary)
+            }
+
+            Section("Settings") {
+                let settings = SandboxSettings(model.config.sandbox)
+                LabeledContent("Image", value: settings.image)
+                LabeledContent("CPUs", value: "\(settings.cpus)")
+                LabeledContent("Memory", value: "\(settings.memoryMiB) MB")
+                LabeledContent("Stops after", value: "\(settings.idleMinutes) min idle")
+                if let home = model.engine?.home {
+                    LabeledContent("Change in") {
+                        Button("Open config.json") { NSWorkspace.shared.open(home.configFile) }
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

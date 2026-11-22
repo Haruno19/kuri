@@ -1,5 +1,6 @@
 import KuriAgent
 import KuriCore
+import KuriSandbox
 import KuriStore
 import KuriTools
 import SwiftUI
@@ -11,6 +12,7 @@ import SwiftUI
 struct ChatView: View {
     @Environment(AppModel.self) private var model
     @State private var draft = ""
+    @State private var choosingFolder = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,10 +52,15 @@ struct ChatView: View {
 
             TaskListPanel(entries: model.taskList)
 
+            FolderBar()
+
             composer
         }
         .navigationTitle(model.selectedConversation?.title.nilIfEmpty ?? "Kuri")
         .toolbar { modelPicker }
+        .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder], allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result { Task { await model.attach(urls) } }
+        }
     }
 
     private var composer: some View {
@@ -78,6 +85,10 @@ struct ChatView: View {
 
     @ToolbarContentBuilder
     private var modelPicker: some ToolbarContent {
+        ToolbarItem {
+            Button("Attach Folder", systemImage: "folder.badge.plus") { choosingFolder = true }
+                .help("Let Kuri work in a folder: it's mounted in the sandbox at /work")
+        }
         ToolbarItem {
             ContextMeter()
         }
@@ -181,6 +192,58 @@ private struct ItemView: View {
     static func inlineMarkdown(_ text: String) -> AttributedString {
         (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
             ?? AttributedString(text)
+    }
+}
+
+/// The folders attached to the conversation, above the composer.
+private struct FolderBar: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        if !model.folders.isEmpty {
+            let mounts = SandboxMounts.plan(folders: model.folders, scratch: URL(filePath: "/"))
+            VStack(alignment: .leading, spacing: 6) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(Array(zip(model.folders, mounts)), id: \.0.path) { folder, mount in
+                            chip(folder, mountedAt: mount.guestPath)
+                        }
+                    }
+                }
+                if model.sandboxStatus != .ready {
+                    Text("Set up the sandbox in Settings › Sandbox to let Kuri work in these folders.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 16).padding(.bottom, 8)
+        }
+    }
+
+    private func chip(_ folder: ConversationFolder, mountedAt guestPath: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: folder.readOnly ? "lock.fill" : "folder.fill")
+                .foregroundStyle(.secondary)
+            Text(URL(filePath: folder.path).lastPathComponent)
+            Text(guestPath).font(.caption.monospaced()).foregroundStyle(.tertiary)
+            Button {
+                Task { await model.detach(folder) }
+            } label: {
+                Image(systemName: "xmark").font(.caption2.weight(.bold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Detach")
+        }
+        .font(.callout)
+        .padding(.horizontal, 9).padding(.vertical, 4)
+        .background(.background.secondary, in: .capsule)
+        .help(folder.path)
+        .contextMenu {
+            Button(folder.readOnly ? "Allow Changes" : "Make Read-Only") { Task { await model.toggleReadOnly(folder) } }
+            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(filePath: folder.path)]) }
+            Divider()
+            Button("Detach", role: .destructive) { Task { await model.detach(folder) } }
+        }
     }
 }
 

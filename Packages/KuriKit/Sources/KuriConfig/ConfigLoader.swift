@@ -84,6 +84,9 @@ public struct ConfigLoader: Sendable {
           // Tool policies: "allow", "ask" or "deny", by the name the model sees.
           // "*" globs work; MCP tools are named "<server>__<tool>".
           // tools: { memory: "deny", "github__*": "ask" },
+
+          // The Linux sandbox behind the shell tool (set it up in Settings › Sandbox).
+          // sandbox: { image: "docker.io/library/python:3-slim", cpus: 4, memoryMiB: 2048, idleMinutes: 10 },
         }
 
         """

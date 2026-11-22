@@ -3,6 +3,7 @@ import KuriAgent
 import KuriConfig
 import KuriCore
 import KuriMCP
+import KuriSandbox
 import KuriStore
 import KuriTools
 import Observation
@@ -44,6 +45,9 @@ final class AppModel {
     private(set) var tools: [ToolInfo] = []
     private(set) var memories: [Memory] = []
     private(set) var mcpServers: [MCPServerStatus] = []
+    private(set) var sandboxStatus: SandboxStatus = .notInstalled
+    /// Folders attached to the selected conversation.
+    private(set) var folders: [ConversationFolder] = []
     var errorMessage: String?
 
     var selectedConversation: Conversation? {
@@ -76,6 +80,7 @@ final class AppModel {
             tools = await engine.toolCatalog()
             memories = try await engine.memories()
             mcpServers = await engine.mcpServers()
+            sandboxStatus = await engine.sandbox.status
             phase = .ready
             // Subscribe before resuming, so re-asked questions aren't missed.
             let events = engine.events()
@@ -164,9 +169,11 @@ final class AppModel {
             items = []
             lastTurn = nil
             contextUsage = nil
+            folders = []
             return
         }
         items = (try? await engine.store.items(of: id)) ?? []
+        folders = (try? await engine.folders(of: id)) ?? []
         await refreshTurnState()
     }
 
@@ -207,6 +214,53 @@ final class AppModel {
     func setDefaultModel(_ ref: ModelRef?) async {
         do {
             try await engine?.setDefaultModel(ref)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: Sandbox and folders
+
+    func setUpSandbox() async {
+        do {
+            try await engine?.setUpSandbox()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Adds folders to the selected conversation, creating one if needed.
+    func attach(_ urls: [URL]) async {
+        guard let engine else { return }
+        do {
+            if selection == nil { selection = try await engine.newConversation().id }
+            guard let id = selection else { return }
+            var updated = folders
+            for url in urls where !updated.contains(where: { $0.path == url.path(percentEncoded: false) }) {
+                updated.append(ConversationFolder(path: url.path(percentEncoded: false)))
+            }
+            try await engine.setFolders(updated, for: id)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func detach(_ folder: ConversationFolder) async {
+        await updateFolders { $0.removeAll { $0.path == folder.path } }
+    }
+
+    func toggleReadOnly(_ folder: ConversationFolder) async {
+        await updateFolders { folders in
+            if let index = folders.firstIndex(where: { $0.path == folder.path }) { folders[index].readOnly.toggle() }
+        }
+    }
+
+    private func updateFolders(_ change: (inout [ConversationFolder]) -> Void) async {
+        guard let engine, let id = selection else { return }
+        var updated = folders
+        change(&updated)
+        do {
+            try await engine.setFolders(updated, for: id)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -299,6 +353,15 @@ final class AppModel {
 
         case .mcpServersChanged(let servers):
             mcpServers = servers
+
+        case .sandboxChanged(let status):
+            sandboxStatus = status
+
+        case .foldersChanged(let id, let updated):
+            if id == selection {
+                folders = updated
+                Task { await refreshTurnState() }
+            }
         }
     }
 }

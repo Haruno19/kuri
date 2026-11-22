@@ -3,6 +3,7 @@ import KuriConfig
 import KuriCore
 import KuriInference
 import KuriMCP
+import KuriSandbox
 import KuriStore
 import KuriTools
 
@@ -20,6 +21,7 @@ public actor Engine {
 
     private let registry: ToolRegistry
     private let mcp: MCPManager
+    public nonisolated let sandbox: Sandbox
     private let broker: InteractionBroker
     private let broadcaster: EventBroadcaster
     private let factory: ProviderFactory
@@ -55,6 +57,10 @@ public actor Engine {
         self.mcpConfig = mcpConfig
         self.registry = registry
         self.mcp = MCPManager(registry: registry, onChange: { broadcaster.emit(.mcpServersChanged($0)) })
+        let sandbox = Sandbox(home: home, settings: SandboxSettings(config.sandbox), onStatus: { status in
+            broadcaster.emit(.sandboxChanged(status))
+        })
+        self.sandbox = sandbox
         self.broadcaster = broadcaster
         self.broker = InteractionBroker(emit: { broadcaster.emit($0) })
         self.factory = factory
@@ -67,6 +73,7 @@ public actor Engine {
         await applyToolPolicies()
         await mcp.apply(mcpConfig)
         refreshDiscoveredModels()
+        await syncShellTool(sandbox.refreshStatus())
         startWatching()
     }
 
@@ -76,6 +83,7 @@ public actor Engine {
         discovery?.cancel()
         for task in running.values { task.cancel() }
         await mcp.shutdown()
+        await sandbox.stopAll()
     }
 
     public nonisolated func events() -> AsyncStream<EngineEvent> {
@@ -105,6 +113,8 @@ public actor Engine {
             await applyToolPolicies()
             await mcp.apply(mcpConfig)
             refreshDiscoveredModels()
+            await sandbox.update(SandboxSettings(config.sandbox))
+            await syncShellTool(sandbox.status)
             broadcaster.emit(.configReloaded)
         } catch {
             broadcaster.emit(.configFailed(error.localizedDescription))
@@ -195,6 +205,45 @@ public actor Engine {
         await mcp.reconnect(name)
     }
 
+    // MARK: Sandbox and folders
+
+    /// Downloads what the sandbox needs (kernel, init image, container
+    /// image), then offers the `shell` tool. Progress arrives as
+    /// `.sandboxChanged` events.
+    public func setUpSandbox() async throws {
+        do {
+            try await sandbox.install()
+        } catch {
+            await syncShellTool(sandbox.status)
+            throw error
+        }
+        await syncShellTool(sandbox.status)
+    }
+
+    /// The model gets a shell only once the sandbox is ready.
+    private func syncShellTool(_ status: SandboxStatus) async {
+        if status == .ready {
+            if await registry.tool(named: ShellTool.name) == nil {
+                await registry.register(ShellTool(sandbox: sandbox, scratch: { [home] in home.scratchFolder(for: $0) }),
+                                        source: .builtIn)
+            }
+        } else if await registry.tool(named: ShellTool.name) != nil {
+            await registry.removeAll(named: ShellTool.name)
+        }
+    }
+
+    public func folders(of conversationID: UUID) async throws -> [ConversationFolder] {
+        try await store.folders(of: conversationID)
+    }
+
+    /// Changes the folders the model works in. The conversation's container
+    /// restarts with the new mounts on its next command.
+    public func setFolders(_ folders: [ConversationFolder], for conversationID: UUID) async throws {
+        try await store.setFolders(folders, of: conversationID)
+        await sandbox.stop(conversationID)
+        broadcaster.emit(.foldersChanged(conversationID: conversationID, folders))
+    }
+
     // MARK: Memory
 
     public func memories() async throws -> [Memory] {
@@ -226,6 +275,8 @@ public actor Engine {
 
     public func delete(_ conversationID: UUID) async throws {
         cancel(conversationID)
+        await sandbox.stop(conversationID)
+        try? FileManager.default.removeItem(at: home.scratchFolder(for: conversationID))
         try await store.deleteConversation(conversationID)
         broadcaster.emit(.conversationDeleted(conversationID))
     }
@@ -317,6 +368,7 @@ public actor Engine {
         let folders = try await store.folders(of: conversation.id)
         let modelConfig = config.modelConfig(for: turn.model)
         let toolNames = Set(await registry.specs().map(\.name))
+        let mounts = SandboxMounts.plan(folders: folders, scratch: home.scratchFolder(for: conversation.id))
         let runner = TurnRunner(
             conversationID: conversation.id,
             turn: turn,
@@ -324,7 +376,7 @@ public actor Engine {
             modelConfig: ModelConfigSnapshot(maxOutputTokens: modelConfig?.maxOutputTokens,
                                              reasoningEffort: modelConfig?.reasoningEffort,
                                              contextWindow: modelConfig?.contextWindow),
-            instructions: Instructions.build(conversation: conversation, folders: folders,
+            instructions: Instructions.build(conversation: conversation, folders: folders, mounts: mounts,
                                              memories: try await store.memories(), tools: toolNames),
             folders: folders,
             registry: registry,
@@ -388,8 +440,11 @@ public actor Engine {
         guard let conversation = try await store.conversation(conversationID) else { return (0, nil) }
         let items = try await store.items(of: conversationID)
         let model = conversation.model ?? config.defaultModel
-        let instructions = Instructions.build(conversation: conversation, folders: try await store.folders(of: conversationID),
-                                              memories: try await store.memories(), tools: Set(await registry.specs().map(\.name)))
+        let folders = try await store.folders(of: conversationID)
+        let instructions = Instructions.build(
+            conversation: conversation, folders: folders,
+            mounts: SandboxMounts.plan(folders: folders, scratch: home.scratchFolder(for: conversationID)),
+            memories: try await store.memories(), tools: Set(await registry.specs().map(\.name)))
         let request = InferenceRequest(model: model?.model ?? "", instructions: instructions,
                                        items: TurnRunner.history(from: items), tools: await registry.specs())
         return (ContextEstimate.tokens(request), model.flatMap { config.modelConfig(for: $0)?.contextWindow })
