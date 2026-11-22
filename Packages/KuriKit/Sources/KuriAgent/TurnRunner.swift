@@ -147,17 +147,57 @@ struct TurnRunner {
             reasoningEffort: modelConfig.reasoningEffort)
     }
 
-    /// Sequential for now. Read-only tools (`Tool.isReadOnly`) could run in
-    /// parallel; worth it once the shell lands.
+    /// Runs a round's calls. Consecutive calls to read-only tools that run
+    /// without asking go concurrently; everything else (anything that may
+    /// change something, or needs the user) runs alone, in order. Results
+    /// are stored in call order either way, so the history doesn't depend on
+    /// which call finished first.
     private func runCalls(_ calls: [ToolCall], counts: inout [String: Int], interaction: TurnInteraction) async throws {
-        for call in calls {
+        var index = 0
+        while index < calls.count {
             try Task.checkCancellation()
-            let signature = call.name + "\u{0}" + call.arguments
-            counts[signature, default: 0] += 1
-            let output = await execute(call, repeatCount: counts[signature]!, interaction: interaction)
-            try await append(.toolResult(ToolResult(callID: call.id, output: output.text, isError: output.isError)))
-            emit(.toolFinished(conversationID: conversationID, call: call, output: output))
+            var batch: [(call: ToolCall, repeatCount: Int)] = []
+            while index < calls.count, await runsInParallel(calls[index]) {
+                batch.append((calls[index], Self.bump(&counts, calls[index])))
+                index += 1
+            }
+            if batch.isEmpty {
+                let call = calls[index]
+                index += 1
+                batch = [(call, Self.bump(&counts, call))]
+            }
+
+            let outputs: [ToolOutput]
+            if batch.count == 1 {
+                outputs = [await execute(batch[0].call, repeatCount: batch[0].repeatCount, interaction: interaction)]
+            } else {
+                outputs = await withTaskGroup(of: (Int, ToolOutput).self) { group in
+                    for (position, entry) in batch.enumerated() {
+                        group.addTask {
+                            (position, await execute(entry.call, repeatCount: entry.repeatCount, interaction: interaction))
+                        }
+                    }
+                    var results = [ToolOutput](repeating: ToolOutput(""), count: batch.count)
+                    for await (position, output) in group { results[position] = output }
+                    return results
+                }
+            }
+            for (entry, output) in zip(batch, outputs) {
+                try await append(.toolResult(ToolResult(callID: entry.call.id, output: output.text, isError: output.isError)))
+                emit(.toolFinished(conversationID: conversationID, call: entry.call, output: output))
+            }
         }
+    }
+
+    private func runsInParallel(_ call: ToolCall) async -> Bool {
+        guard let tool = await registry.tool(named: call.name), tool.isReadOnly else { return false }
+        return await registry.policy(for: tool) == .allow
+    }
+
+    private static func bump(_ counts: inout [String: Int], _ call: ToolCall) -> Int {
+        let signature = call.name + "\u{0}" + call.arguments
+        counts[signature, default: 0] += 1
+        return counts[signature]!
     }
 
     private func execute(_ call: ToolCall, repeatCount: Int, interaction: TurnInteraction) async -> ToolOutput {

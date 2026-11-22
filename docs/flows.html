@@ -302,7 +302,8 @@ const FLOWS = [
       ["runner", "provider", "`stream(request)`"],
       ["provider", "llm", "`POST /responses` with\n`function_call`, `function_call_output`"],
     ],
-    notes: ["Repeats until a round has no tool calls, at most 40 rounds per turn.",
+    notes: ["Consecutive calls to read-only tools that need no approval run concurrently; their results are still stored in call order. Anything else runs alone.",
+            "Repeats until a round has no tool calls, at most 40 rounds per turn.",
             "The same call with the same arguments more than 3 times in a turn gets an error result instead. Output is capped at 30,000 characters.",
             "<code>tasklist</code> touches nothing: the app reads the current plan from the latest call's arguments. <code>memory</code> also triggers <code>.memoriesChanged</code>."] },
 

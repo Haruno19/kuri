@@ -21,7 +21,7 @@ Kuri is **stateless towards providers**: every request carries the history it ne
 1. The user's message is stored as an item and a `turn` row is opened.
 2. `TurnRunner` builds the request: instructions (base prompt, memories, attached folders, date) + the history (the latest summary, then everything it doesn't cover) + the specs of enabled tools. If that would overflow the model's context, it compacts first.
 3. The provider streams `InferenceEvent`s. Deltas go straight to the UI; completed items are persisted as they arrive.
-4. If the model called tools: each call is checked against its permission policy (`allow` / `ask` / `deny`), run, its output capped, and stored as a `toolResult`. Back to step 2.
+4. If the model called tools: each call is checked against its permission policy (`allow` / `ask` / `deny`), run, its output capped, and stored as a `toolResult`. Consecutive calls to read-only tools that run without asking go concurrently; anything that may change something, or needs the user, runs alone. Results are stored in call order either way. Back to step 2.
 5. Otherwise the turn closes with its stop reason and token usage.
 
 Guards against runaway turns: a round limit per turn, detection of identical repeated calls, and a cap on tool output size. Fallback models are planned.
