@@ -16,6 +16,33 @@
       "blur-material" : null,
       "layers" : [
         {
+          "fill" : {
+            "linear-gradient" : [
+              "display-p3:0.49804,0.30980,0.14118,1.00000",
+              "srgb:0.73333,0.58039,0.34118,1.00000"
+            ],
+            "orientation" : {
+              "start" : {
+                "x" : 0.5,
+                "y" : -0.11404662343938703
+              },
+              "stop" : {
+                "x" : 0.5,
+                "y" : 1.5329847555239198
+              }
+            }
+          },
+          "image-name" : "chestnut.svg",
+          "name" : "chestnut",
+          "position" : {
+            "scale" : 5,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        },
+        {
           "fill-specializations" : [
             {
               "value" : {
@@ -56,6 +83,7 @@
             }
           ],
           "glass" : true,
+          "hidden" : true,
           "image-name" : "text-to-svg-1795362628165.svg",
           "name" : "kuri",
           "position" : {
