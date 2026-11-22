@@ -106,6 +106,26 @@ Policies (`allow`, `ask`, `deny`) can be set per tool in `config.json` and per M
 
 Every adapter turns its wire format into the same item model and event stream; no official Swift SDK exists for these providers, so the adapters are hand-written over `URLSession`.
 
+## Footprint
+
+Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026, as the memory figure Activity Monitor shows (physical footprint). Kuri and the Claude desktop app are very different products: Claude is the full client for Anthropic's hosted service, Kuri a local engine with a thin interface. The comparison is about what each costs to keep running.
+
+| | Kuri | Claude desktop app |
+|---|---|---|
+| On disk | 65 MB | 975 MB |
+| Running, idle | ≈ 40 MB | not measured (1) |
+| Running, during an agent turn | ≈ 40–65 MB (2) | ≈ 1.4 GB across 13 processes (3) |
+| Sandbox VM, booted or doing light shell work | + ≈ 300 MB | no VM to compare (4) |
+| Sandbox VM after a 300 MB workload | + ≈ 600 MB until the container stops (5) | no VM to compare (4) |
+
+1. The Claude app was hosting the session that took these measurements, so it was never idle.
+2. The app idle (≈ 40 MB) plus the engine alone during a turn that ran shell commands (24 MB at its peak).
+3. Mid-session, with a long Code tab conversation open. The Claude Code agent runs as one more process, ≈ 350 MB resident.
+4. Claude's Code tab runs tools directly on the Mac.
+5. The Linux guest doesn't hand freed memory back to macOS, so a VM holds its peak until it stops: after `idleMinutes` (10 by default), on Stop, or on quit. `sandbox.memoryMiB` (2 GB by default) caps it.
+
+Neither column includes a model's weights. A local model runs in its own process (`qwen3.5:2b` takes about 3 GB in Ollama); a hosted one costs nothing locally. Other clients (ChatGPT, LM Studio) and Docker Desktop (2.1 GB on disk, a shared VM with its own memory limit) weren't installed or running on this Mac, so they aren't measured here.
+
 ## Dependencies
 
 | Dependency | Why | When |
