@@ -87,9 +87,19 @@ private func context(_ store: Store, conversation: UUID = UUID()) -> ToolContext
         #expect(output.text.contains(#"<conversation title="Trip""#))
         #expect(output.text.contains("user: Where should I go?\nassistant: Kyoto in spring.\nuser: Thanks"))
 
-        let scoped = try await ConversationSearchTool().run(arguments: Data(#"{"query":"kyoto","scope":"this_chat"}"#.utf8),
-                                                            context: context(store, conversation: current.id))
-        #expect(scoped.text.hasPrefix("No matches"))
+        // this_chat only covers what a summary replaced.
+        try await store.append(Item(conversationID: current.id, payload: .message(Message(role: .user, text: "Kyoto again?"))))
+        let unsummarized = try await ConversationSearchTool().run(arguments: Data(#"{"query":"kyoto","scope":"this_chat"}"#.utf8),
+                                                                  context: context(store, conversation: current.id))
+        #expect(unsummarized.text.contains("hasn't been summarized"))
+        #expect(unsummarized.text.contains(#"<conversation title="Trip""#))  // fell back to other chats
+
+        try await store.append(Item(conversationID: current.id, payload: .compaction(Compaction(summary: "Talked about trips."))))
+        try await store.append(Item(conversationID: current.id, payload: .message(Message(role: .user, text: "And Kyoto now?"))))
+        let summarized = try await ConversationSearchTool().run(arguments: Data(#"{"query":"kyoto","scope":"this_chat"}"#.utf8),
+                                                                context: context(store, conversation: current.id))
+        #expect(summarized.text.contains("Kyoto again?"))
+        #expect(!summarized.text.contains("And Kyoto now?"))
     }
 
     @Test func excerptsCentreOnTheMatch() {

@@ -123,10 +123,10 @@ public actor Store {
     /// Full-text search over messages and compaction summaries.
     ///
     /// Any of the words may match, as a prefix; results with more of them
-    /// rank first. Pass `conversationID` to search one conversation only,
-    /// or `excluded` to leave one out.
-    public func search(_ query: String, in conversationID: UUID? = nil, excluding excluded: UUID? = nil,
-                       limit: Int = 10) throws -> [SearchHit] {
+    /// rank first. Pass `conversationID` to search one conversation only
+    /// (optionally only items before `seq`), or `excluded` to leave one out.
+    public func search(_ query: String, in conversationID: UUID? = nil, before seq: Int? = nil,
+                       excluding excluded: UUID? = nil, limit: Int = 10) throws -> [SearchHit] {
         let terms = query.split(whereSeparator: { $0.isWhitespace || $0.isPunctuation })
             .map { "\"\($0.replacingOccurrences(of: "\"", with: "\"\""))\"*" }
             .joined(separator: " OR ")
@@ -138,24 +138,35 @@ public actor Store {
             JOIN conversations c ON c.id = i.conversation_id
             WHERE items_fts MATCH ? AND i.kind IN ('message', 'compaction')
                 AND (? IS NULL OR i.conversation_id = ?) AND (? IS NULL OR i.conversation_id != ?)
+                AND (? IS NULL OR i.seq < ?)
             ORDER BY rank LIMIT ?
             """, .text(terms), .optional(conversationID), .optional(conversationID), .optional(excluded),
-            .optional(excluded), .int(limit)) { row in
+            .optional(excluded), .optional(seq), .optional(seq), .int(limit)) { row in
             SearchHit(conversationID: row.uuid(0), conversationTitle: row.string(1), itemID: row.uuid(2),
                       seq: row.int(3), role: row.optionalString(4), text: row.string(5), createdAt: row.date(6))
         }
     }
 
+    /// The position of the latest compaction in a conversation, if any.
+    /// Everything before it is no longer in the model's context.
+    public func lastCompactionSeq(in conversationID: UUID) throws -> Int? {
+        try db.query("SELECT MAX(seq) FROM items WHERE conversation_id = ? AND kind = 'compaction'",
+                     .uuid(conversationID)) { $0.optionalInt(0) }.first ?? nil
+    }
+
     /// The messages just before and after `seq` in a conversation, for
     /// showing a search hit in context.
-    public func neighbours(of seq: Int, in conversationID: UUID) throws -> (before: SearchHit?, after: SearchHit?) {
+    /// Neither goes past `limit`, when given.
+    public func neighbours(of seq: Int, in conversationID: UUID, before limit: Int? = nil) throws
+        -> (before: SearchHit?, after: SearchHit?)
+    {
         func fetch(_ comparison: String, _ order: String) throws -> SearchHit? {
             try db.query("""
                 SELECT i.conversation_id, c.title, i.id, i.seq, i.role, i.text, i.created_at
                 FROM items i JOIN conversations c ON c.id = i.conversation_id
-                WHERE i.conversation_id = ? AND i.kind = 'message' AND i.seq \(comparison) ?
+                WHERE i.conversation_id = ? AND i.kind = 'message' AND i.seq \(comparison) ? AND (? IS NULL OR i.seq < ?)
                 ORDER BY i.seq \(order) LIMIT 1
-                """, .uuid(conversationID), .int(seq)) { row in
+                """, .uuid(conversationID), .int(seq), .optional(limit), .optional(limit)) { row in
                 SearchHit(conversationID: row.uuid(0), conversationTitle: row.string(1), itemID: row.uuid(2),
                           seq: row.int(3), role: row.optionalString(4), text: row.string(5), createdAt: row.date(6))
             }.first

@@ -20,10 +20,10 @@ public struct ConversationSearchTool: Tool {
     public let spec = ToolSpec(
         name: "conversation_search",
         description: """
-            Searches the user's past conversations with you and returns each matching message with the \
+            Searches the user's other conversations with you and returns each matching message with the \
             messages around it. Use it when the user refers to something discussed before ("as we said last \
-            week"), and with scope this_chat when you need an exact detail of this conversation that was \
-            summarized and is no longer in your context: search for it instead of guessing.
+            week", "in an earlier conversation"). Only if this conversation was summarized and you need an \
+            exact detail from before the summary, search it with scope this_chat.
             """,
         parameters: [
             "type": "object",
@@ -35,7 +35,7 @@ public struct ConversationSearchTool: Tool {
                 "scope": [
                     "type": "string",
                     "enum": ["other_chats", "this_chat"],
-                    "description": "other_chats: every conversation except this one (default). this_chat: only this one.",
+                    "description": "other_chats: every other conversation (default, use this almost always). this_chat: only the summarized part of this conversation.",
                 ],
                 "limit": ["type": "integer", "minimum": 1, "maximum": 10, "description": "Matches to return. Default 5."],
             ],
@@ -56,10 +56,22 @@ public struct ConversationSearchTool: Tool {
         let thisChat = args.scope == "this_chat"
         let words = Self.words(in: args.query)
 
-        let hits = try await context.store.search(
-            args.query, in: thisChat ? context.conversationID : nil, excluding: thisChat ? nil : context.conversationID,
-            limit: limit)
-        guard !hits.isEmpty else { return ToolOutput("No matches for “\(args.query)”.") }
+        var hits: [SearchHit] = []
+        var boundary: Int?
+        var note = ""
+        // What's after the last summary is already in the model's context,
+        // so this_chat only searches before it. A conversation that was
+        // never summarized has nothing to recover: search the others.
+        if thisChat, let summarized = try await context.store.lastCompactionSeq(in: context.conversationID) {
+            boundary = summarized
+            hits = try await context.store.search(args.query, in: context.conversationID, before: summarized, limit: limit)
+        } else {
+            if thisChat {
+                note = "This conversation hasn't been summarized, so all of it is already in your context. Searched your other conversations instead.\n"
+            }
+            hits = try await context.store.search(args.query, excluding: context.conversationID, limit: limit)
+        }
+        guard !hits.isEmpty else { return ToolOutput(note + "No matches for “\(args.query)”.") }
 
         // Group by conversation, keeping the rank order of each one's best hit.
         var order: [UUID] = []
@@ -75,7 +87,7 @@ public struct ConversationSearchTool: Tool {
             let title = group[0].conversationTitle.isEmpty ? "Untitled" : group[0].conversationTitle
             var excerpts: [String] = []
             for hit in group.sorted(by: { $0.seq < $1.seq }) {
-                let (before, after) = try await context.store.neighbours(of: hit.seq, in: conversationID)
+                let (before, after) = try await context.store.neighbours(of: hit.seq, in: conversationID, before: boundary)
                 var lines: [String] = []
                 if let before { lines.append(Self.line(before, limit: Self.contextCharacters, words: words)) }
                 lines.append(Self.line(hit, limit: Self.matchCharacters, words: words))
@@ -88,7 +100,7 @@ public struct ConversationSearchTool: Tool {
                 </conversation>
                 """)
         }
-        return ToolOutput(sections.joined(separator: "\n"))
+        return ToolOutput(note + sections.joined(separator: "\n"))
     }
 
     private static func line(_ hit: SearchHit, limit: Int, words: [String]) -> String {
