@@ -1,16 +1,30 @@
 import KuriConfig
+import KuriCore
+import KuriStore
+import KuriTools
 import SwiftUI
 
-/// For now: where the configuration lives, and a way to open it.
-/// Editing providers and MCP servers from here comes later.
 struct SettingsView: View {
+    var body: some View {
+        TabView {
+            Tab("General", systemImage: "gearshape") { GeneralSettings() }
+            Tab("Tools", systemImage: "wrench.and.screwdriver") { ToolsSettings() }
+            Tab("Memory", systemImage: "brain") { MemorySettings() }
+        }
+        .frame(width: 560, height: 460)
+    }
+}
+
+// MARK: - General
+
+private struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Form {
             if let home = model.engine?.home {
                 Section("Configuration") {
-                    fileRow("Providers and models", url: home.configFile)
+                    fileRow("Providers, models, tool policies", url: home.configFile)
                     fileRow("MCP servers", url: home.mcpFile)
                     LabeledContent("Data folder") {
                         Button(home.root.path(percentEncoded: false)) {
@@ -30,13 +44,159 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func fileRow(_ title: String, url: URL) -> some View {
         LabeledContent(title) {
             Button("Open \(url.lastPathComponent)") { NSWorkspace.shared.open(url) }
         }
+    }
+}
+
+// MARK: - Tools
+
+private struct ToolsSettings: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(model.tools.filter { $0.source == .builtIn }) { tool in
+                    ToolRow(tool: tool)
+                }
+            } header: {
+                Text("Built in")
+            } footer: {
+                Text("Change a tool's policy in config.json under “tools”, e.g. `tools: { memory: \"deny\" }`.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+struct ToolRow: View {
+    let tool: ToolInfo
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tool.originalName).font(.body.monospaced())
+                Text(tool.description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .help(tool.description)
+            }
+            Spacer()
+            PolicyBadge(policy: tool.policy)
+        }
+    }
+}
+
+struct PolicyBadge: View {
+    let policy: ToolPolicy
+
+    var body: some View {
+        Text(policy.rawValue)
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 7).padding(.vertical, 2)
+            .background(color.opacity(0.15), in: .capsule)
+            .foregroundStyle(color)
+    }
+
+    private var color: Color {
+        switch policy {
+        case .allow: .green
+        case .ask: .orange
+        case .deny: .red
+        }
+    }
+}
+
+// MARK: - Memory
+
+private struct MemorySettings: View {
+    @Environment(AppModel.self) private var model
+    @State private var draft = ""
+    @State private var editing: Memory?
+    @State private var editText = ""
+
+    var body: some View {
+        Form {
+            Section {
+                if model.memories.isEmpty {
+                    Text("Nothing yet. Kuri saves durable facts here when you ask it to remember something.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(model.memories) { memory in
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(memory.handle)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.tertiary)
+                            .frame(width: 34, alignment: .leading)
+                        Text(memory.content)
+                            .textSelection(.enabled)
+                        Spacer()
+                        Menu {
+                            Button("Edit…") {
+                                editText = memory.content
+                                editing = memory
+                            }
+                            Button("Forget", role: .destructive) {
+                                Task { await model.changeMemories([.remove(number: memory.number)]) }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                    }
+                }
+            } header: {
+                Text("What Kuri remembers")
+            } footer: {
+                Text("Included in every conversation. The model edits it with the memory tool; you can too.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Add") {
+                HStack {
+                    TextField("A fact about you, e.g. “I use zsh and Helix”", text: $draft)
+                        .onSubmit(add)
+                    Button("Add", action: add)
+                        .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .sheet(item: $editing) { memory in
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Edit \(memory.handle)").font(.headline)
+                TextField("Memory", text: $editText, axis: .vertical)
+                    .lineLimit(2...6)
+                HStack {
+                    Spacer()
+                    Button("Cancel") { editing = nil }
+                        .keyboardShortcut(.cancelAction)
+                    Button("Save") {
+                        let content = editText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        editing = nil
+                        guard !content.isEmpty else { return }
+                        Task { await model.changeMemories([.update(number: memory.number, content: content)]) }
+                    }
+                    .keyboardShortcut(.defaultAction)
+                }
+            }
+            .padding(20)
+            .frame(width: 400)
+        }
+    }
+
+    private func add() {
+        let content = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !content.isEmpty else { return }
+        draft = ""
+        Task { await model.changeMemories([.add(content)]) }
     }
 }

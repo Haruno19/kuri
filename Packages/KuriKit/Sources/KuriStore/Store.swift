@@ -120,24 +120,47 @@ public actor Store {
         }
     }
 
-    /// Full-text search over every item. `query` uses FTS5 syntax; plain
-    /// words are matched as a phrase prefix.
-    public func search(_ query: String, limit: Int = 20) throws -> [SearchHit] {
-        let terms = query.split(whereSeparator: \.isWhitespace)
+    /// Full-text search over messages and compaction summaries.
+    ///
+    /// Any of the words may match, as a prefix; results with more of them
+    /// rank first. Pass `conversationID` to search one conversation only,
+    /// or `excluded` to leave one out.
+    public func search(_ query: String, in conversationID: UUID? = nil, excluding excluded: UUID? = nil,
+                       limit: Int = 10) throws -> [SearchHit] {
+        let terms = query.split(whereSeparator: { $0.isWhitespace || $0.isPunctuation })
             .map { "\"\($0.replacingOccurrences(of: "\"", with: "\"\""))\"*" }
-            .joined(separator: " ")
+            .joined(separator: " OR ")
         guard !terms.isEmpty else { return [] }
         return try db.query("""
-            SELECT i.conversation_id, c.title, i.id, snippet(items_fts, 0, '[', ']', '…', 12), i.created_at
+            SELECT i.conversation_id, c.title, i.id, i.seq, i.role, i.text, i.created_at
             FROM items_fts f
             JOIN items i ON i.rowid = f.rowid
             JOIN conversations c ON c.id = i.conversation_id
             WHERE items_fts MATCH ? AND i.kind IN ('message', 'compaction')
+                AND (? IS NULL OR i.conversation_id = ?) AND (? IS NULL OR i.conversation_id != ?)
             ORDER BY rank LIMIT ?
-            """, .text(terms), .int(limit)) { row in
+            """, .text(terms), .optional(conversationID), .optional(conversationID), .optional(excluded),
+            .optional(excluded), .int(limit)) { row in
             SearchHit(conversationID: row.uuid(0), conversationTitle: row.string(1), itemID: row.uuid(2),
-                      snippet: row.string(3), createdAt: row.date(4))
+                      seq: row.int(3), role: row.optionalString(4), text: row.string(5), createdAt: row.date(6))
         }
+    }
+
+    /// The messages just before and after `seq` in a conversation, for
+    /// showing a search hit in context.
+    public func neighbours(of seq: Int, in conversationID: UUID) throws -> (before: SearchHit?, after: SearchHit?) {
+        func fetch(_ comparison: String, _ order: String) throws -> SearchHit? {
+            try db.query("""
+                SELECT i.conversation_id, c.title, i.id, i.seq, i.role, i.text, i.created_at
+                FROM items i JOIN conversations c ON c.id = i.conversation_id
+                WHERE i.conversation_id = ? AND i.kind = 'message' AND i.seq \(comparison) ?
+                ORDER BY i.seq \(order) LIMIT 1
+                """, .uuid(conversationID), .int(seq)) { row in
+                SearchHit(conversationID: row.uuid(0), conversationTitle: row.string(1), itemID: row.uuid(2),
+                          seq: row.int(3), role: row.optionalString(4), text: row.string(5), createdAt: row.date(6))
+            }.first
+        }
+        return (try fetch("<", "DESC"), try fetch(">", "ASC"))
     }
 
     // MARK: Turns
@@ -193,45 +216,85 @@ public actor Store {
 
     // MARK: Memories
 
+    private static let memoryColumns =
+        "number, id, content, source, status, supersedes_id, origin_conversation_id, created_at, updated_at"
+
+    private static func memory(_ row: Row) -> Memory {
+        Memory(
+            number: row.int(0), id: row.uuid(1), content: row.string(2),
+            source: Memory.Source(rawValue: row.string(3)) ?? .user,
+            status: Memory.Status(rawValue: row.string(4)) ?? .active,
+            supersedesID: row.optionalUUID(5), originConversationID: row.optionalUUID(6),
+            createdAt: row.date(7), updatedAt: row.date(8))
+    }
+
     public func memories(includeArchived: Bool = false) throws -> [Memory] {
-        try db.query("""
-            SELECT id, content, source, status, supersedes_id, origin_conversation_id, created_at, updated_at
-            FROM memories WHERE status = 'active' OR ? ORDER BY created_at
-            """, .bool(includeArchived)) { row in
-            Memory(
-                id: row.uuid(0), content: row.string(1),
-                source: Memory.Source(rawValue: row.string(2)) ?? .user,
-                status: Memory.Status(rawValue: row.string(3)) ?? .active,
-                supersedesID: row.optionalUUID(4), originConversationID: row.optionalUUID(5),
-                createdAt: row.date(6), updatedAt: row.date(7))
+        try db.query("SELECT \(Self.memoryColumns) FROM memories WHERE status = 'active' OR ? ORDER BY number",
+                     .bool(includeArchived), map: Self.memory)
+    }
+
+    /// Applies a batch of changes atomically: either all of them land, or
+    /// none do. Fails if a change targets a memory that isn't active, or if
+    /// the active memories would exceed `maxTotalCharacters` afterwards.
+    @discardableResult
+    public func applyMemoryChanges(
+        _ changes: [MemoryChange],
+        source: Memory.Source,
+        originConversationID: UUID? = nil,
+        maxTotalCharacters: Int? = nil,
+        at date: Date = .now
+    ) throws -> [MemoryChangeOutcome] {
+        try db.transaction {
+            var outcomes: [MemoryChangeOutcome] = []
+            for change in changes {
+                switch change {
+                case .add(let content):
+                    let memory = try insertMemory(content, source: source, supersedes: nil,
+                                                  origin: originConversationID, at: date)
+                    outcomes.append(.added(memory))
+                case .update(let number, let content):
+                    let old = try archiveActiveMemory(number, at: date)
+                    let memory = try insertMemory(content, source: source, supersedes: old,
+                                                  origin: originConversationID, at: date)
+                    outcomes.append(.updated(old: number, new: memory))
+                case .remove(let number):
+                    _ = try archiveActiveMemory(number, at: date)
+                    outcomes.append(.removed(number))
+                }
+            }
+            if let maxTotalCharacters {
+                let total = try db.query("SELECT COALESCE(SUM(LENGTH(content)), 0) FROM memories WHERE status = 'active'") {
+                    $0.int(0)
+                }.first ?? 0
+                if total > maxTotalCharacters {
+                    throw KuriError.memoryFull(total: total, limit: maxTotalCharacters)
+                }
+            }
+            return outcomes
         }
     }
 
-    public func saveMemory(_ memory: Memory) throws {
+    private func insertMemory(_ content: String, source: Memory.Source, supersedes: UUID?, origin: UUID?,
+                              at date: Date) throws -> Memory {
+        let id = UUID()
         try db.run("""
             INSERT INTO memories (id, content, source, status, supersedes_id, origin_conversation_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET content = excluded.content, status = excluded.status,
-                updated_at = excluded.updated_at
+            VALUES (?, ?, ?, 'active', ?, ?, ?, ?)
             """,
-            .uuid(memory.id), .text(memory.content), .text(memory.source.rawValue), .text(memory.status.rawValue),
-            .optional(memory.supersedesID), .optional(memory.originConversationID),
-            .date(memory.createdAt), .date(memory.updatedAt))
+            .uuid(id), .text(content), .text(source.rawValue), .optional(supersedes), .optional(origin),
+            .date(date), .date(date))
+        return Memory(number: db.lastInsertRowID, id: id, content: content, source: source, supersedesID: supersedes,
+                      originConversationID: origin, createdAt: date, updatedAt: date)
     }
 
-    /// Replaces a memory's content, keeping the old version archived.
-    public func reviseMemory(_ id: UUID, content: String, source: Memory.Source, at date: Date = .now) throws -> Memory {
-        let revised = Memory(content: content, source: source, supersedesID: id, createdAt: date, updatedAt: date)
-        try db.transaction {
-            try db.run("UPDATE memories SET status = 'archived', updated_at = ? WHERE id = ?", .date(date), .uuid(id))
-            guard db.changes == 1 else { throw KuriError.database("No memory with id \(id).") }
-            try saveMemory(revised)
+    /// Archives an active memory and returns its id.
+    private func archiveActiveMemory(_ number: Int, at date: Date) throws -> UUID {
+        guard let id = try db.query("SELECT id FROM memories WHERE number = ? AND status = 'active'", .int(number), map: {
+            $0.uuid(0)
+        }).first else {
+            throw KuriError.memoryNotFound(number)
         }
-        return revised
-    }
-
-    public func archiveMemory(_ id: UUID, at date: Date = .now) throws {
-        try db.run("UPDATE memories SET status = 'archived', updated_at = ? WHERE id = ?", .date(date), .uuid(id))
-        guard db.changes == 1 else { throw KuriError.database("No memory with id \(id).") }
+        try db.run("UPDATE memories SET status = 'archived', updated_at = ? WHERE number = ?", .date(date), .int(number))
+        return id
     }
 }

@@ -91,6 +91,7 @@ struct TurnRunner {
                 callCounts[signature, default: 0] += 1
                 let output = await execute(call, repeatCount: callCounts[signature]!)
                 try await append(.toolResult(ToolResult(callID: call.id, output: output.text, isError: output.isError)))
+                emit(.toolFinished(conversationID: conversationID, call: call, output: output))
             }
         }
         return .other("max_rounds")

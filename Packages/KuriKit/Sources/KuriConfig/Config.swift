@@ -8,17 +8,22 @@ public struct Config: Codable, Sendable, Hashable {
     /// A small, fast model for background jobs: titles, summaries, memory review.
     public var utilityModel: ModelRef?
     public var providers: [String: ProviderConfig]
+    /// Tool name or `*` glob → policy, for any tool by the name the model
+    /// sees (`memory`, `github__create_issue`). Wins over `mcp.json`.
+    public var tools: [String: ToolPolicy]?
     public var sandbox: SandboxConfig?
 
     public init(
         defaultModel: ModelRef? = nil,
         utilityModel: ModelRef? = nil,
         providers: [String: ProviderConfig] = [:],
+        tools: [String: ToolPolicy]? = nil,
         sandbox: SandboxConfig? = nil
     ) {
         self.defaultModel = defaultModel
         self.utilityModel = utilityModel
         self.providers = providers
+        self.tools = tools
         self.sandbox = sandbox
     }
 
@@ -27,6 +32,7 @@ public struct Config: Codable, Sendable, Hashable {
         defaultModel = try container.decodeIfPresent(ModelRef.self, forKey: .defaultModel)
         utilityModel = try container.decodeIfPresent(ModelRef.self, forKey: .utilityModel)
         providers = try container.decodeIfPresent([String: ProviderConfig].self, forKey: .providers) ?? [:]
+        tools = try container.decodeIfPresent([String: ToolPolicy].self, forKey: .tools)
         sandbox = try container.decodeIfPresent(SandboxConfig.self, forKey: .sandbox)
     }
 

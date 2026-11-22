@@ -61,6 +61,11 @@ public struct TaskListTool: Tool {
         return ToolOutput("Task list updated: \(done)/\(tasks.count) done.")
     }
 
+    /// The list carried by one call's arguments, if they're valid.
+    public static func entries(fromArguments arguments: String) -> [Entry]? {
+        try? JSONDecoder().decode(Arguments.self, from: Data(arguments.utf8)).tasks
+    }
+
     /// The latest successful task list in a conversation.
     public static func current(in items: [Item]) -> [Entry] {
         var failed: Set<String> = []
@@ -69,9 +74,7 @@ public struct TaskListTool: Tool {
             case .toolResult(let result) where result.isError:
                 failed.insert(result.callID)
             case .toolCall(let call) where call.name == "tasklist" && !failed.contains(call.id):
-                if let arguments = try? JSONDecoder().decode(Arguments.self, from: Data(call.arguments.utf8)) {
-                    return arguments.tasks
-                }
+                if let entries = entries(fromArguments: call.arguments) { return entries }
             default:
                 continue
             }

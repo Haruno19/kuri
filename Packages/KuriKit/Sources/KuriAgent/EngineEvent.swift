@@ -15,10 +15,15 @@ public enum EngineEvent: Sendable {
     case inference(conversationID: UUID, InferenceEvent)
     case turnStarted(Turn)
     case turnFinished(conversationID: UUID, turnID: UUID, TurnOutcome)
+    /// A tool call finished; its result also arrives as `itemAdded`.
+    case toolFinished(conversationID: UUID, call: ToolCall, output: ToolOutput)
     case inputRequested(InputRequest)
     case inputResolved(requestID: UUID)
     case configReloaded
     case configFailed(String)
+    /// Tools were added, removed, or their policies changed.
+    case toolsChanged
+    case memoriesChanged
 }
 
 public enum TurnOutcome: Sendable, Hashable {

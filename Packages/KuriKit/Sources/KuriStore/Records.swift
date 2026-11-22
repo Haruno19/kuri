@@ -70,6 +70,9 @@ public struct Memory: Identifiable, Sendable, Hashable {
     public enum Source: String, Sendable { case user, agent, review }
     public enum Status: String, Sendable { case active, archived }
 
+    /// Short, human- and model-friendly handle (the row number), shown as
+    /// `m12`. Updating a memory creates a new row, so it gets a new number.
+    public var number: Int
     public var id: UUID
     public var content: String
     public var source: Source
@@ -80,6 +83,7 @@ public struct Memory: Identifiable, Sendable, Hashable {
     public var updatedAt: Date
 
     public init(
+        number: Int,
         id: UUID = UUID(),
         content: String,
         source: Source,
@@ -89,6 +93,7 @@ public struct Memory: Identifiable, Sendable, Hashable {
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
+        self.number = number
         self.id = id
         self.content = content
         self.source = source
@@ -98,12 +103,35 @@ public struct Memory: Identifiable, Sendable, Hashable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
+
+    /// `m12`
+    public var handle: String { "m\(number)" }
+
+    /// Parses `m12` or `12`.
+    public static func number(fromHandle handle: String) -> Int? {
+        let digits = handle.hasPrefix("m") ? handle.dropFirst() : Substring(handle)
+        return Int(digits)
+    }
+}
+
+public enum MemoryChange: Sendable, Hashable {
+    case add(String)
+    case update(number: Int, content: String)
+    case remove(number: Int)
+}
+
+public enum MemoryChangeOutcome: Sendable, Hashable {
+    case added(Memory)
+    case updated(old: Int, new: Memory)
+    case removed(Int)
 }
 
 public struct SearchHit: Sendable, Hashable {
     public var conversationID: UUID
     public var conversationTitle: String
     public var itemID: UUID
-    public var snippet: String
+    public var seq: Int
+    public var role: String?
+    public var text: String
     public var createdAt: Date
 }

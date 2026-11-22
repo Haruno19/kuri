@@ -48,21 +48,54 @@ private func context(_ store: Store, conversation: UUID = UUID()) -> ToolContext
 }
 
 @Suite struct MemoryToolTests {
-    @Test func addsUpdatesAndRemoves() async throws {
+    @Test func appliesABatchOfOperations() async throws {
         let store = try Store(url: nil)
-        let tool = MemoryTool()
         let conversation = Conversation()
         try await store.createConversation(conversation)
         let ctx = context(store, conversation: conversation.id)
+        let tool = MemoryTool()
 
-        _ = try await tool.run(arguments: Data(#"{"action":"add","content":"Uses zsh"}"#.utf8), context: ctx)
-        let id = try #require(try await store.memories().first?.id.uuidString)
+        let first = try await tool.run(arguments: Data(#"{"operations":[{"action":"add","content":"Uses zsh"},{"action":"add","content":"Editor: Helix"}]}"#.utf8), context: ctx)
+        #expect(first.text == "Added m1: Uses zsh\nAdded m2: Editor: Helix")
 
-        _ = try await tool.run(arguments: Data(#"{"action":"update","id":"\#(id)","content":"Uses fish"}"#.utf8), context: ctx)
-        #expect(try await store.memories().map(\.content) == ["Uses fish"])
+        let second = try await tool.run(arguments: Data(#"{"operations":[{"action":"update","id":"m1","content":"Uses fish"},{"action":"remove","id":"m2"}]}"#.utf8), context: ctx)
+        #expect(second.text == "Updated m1, now m3: Uses fish\nRemoved m2")
+        #expect(try await store.memories().map(\.handle) == ["m3"])
+    }
 
-        let newID = try #require(try await store.memories().first?.id.uuidString)
-        _ = try await tool.run(arguments: Data(#"{"action":"remove","id":"\#(newID)"}"#.utf8), context: ctx)
-        #expect(try await store.memories().isEmpty)
+    @Test func explainsInvalidOperations() async throws {
+        let store = try Store(url: nil)
+        let output = try await MemoryTool().run(arguments: Data(#"{"operations":[{"action":"update","content":"x"}]}"#.utf8),
+                                                context: context(store))
+        #expect(output.isError)
+        #expect(output.text.contains("id"))
+    }
+}
+
+@Suite struct ConversationSearchToolTests {
+    @Test func groupsHitsByConversationWithContext() async throws {
+        let store = try Store(url: nil)
+        let past = Conversation(title: "Trip")
+        let current = Conversation(title: "Now")
+        try await store.createConversation(past)
+        try await store.createConversation(current)
+        for (role, text) in [(Role.user, "Where should I go?"), (.assistant, "Kyoto in spring."), (.user, "Thanks")] {
+            try await store.append(Item(conversationID: past.id, payload: .message(Message(role: role, text: text))))
+        }
+        let output = try await ConversationSearchTool().run(arguments: Data(#"{"query":"kyoto"}"#.utf8),
+                                                            context: context(store, conversation: current.id))
+        #expect(output.text.contains(#"<conversation title="Trip""#))
+        #expect(output.text.contains("user: Where should I go?\nassistant: Kyoto in spring.\nuser: Thanks"))
+
+        let scoped = try await ConversationSearchTool().run(arguments: Data(#"{"query":"kyoto","scope":"this_chat"}"#.utf8),
+                                                            context: context(store, conversation: current.id))
+        #expect(scoped.text.hasPrefix("No matches"))
+    }
+
+    @Test func excerptsCentreOnTheMatch() {
+        let text = String(repeating: "a ", count: 500) + "needle" + String(repeating: " b", count: 500)
+        let excerpt = ConversationSearchTool.excerpt(text, limit: 100, around: ["needle"])
+        #expect(excerpt.contains("needle"))
+        #expect(excerpt.hasPrefix("…") && excerpt.hasSuffix("…"))
     }
 }

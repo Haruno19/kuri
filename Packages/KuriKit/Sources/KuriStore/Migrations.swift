@@ -1,7 +1,7 @@
 /// Schema migrations, applied in order. `PRAGMA user_version` records how
 /// many have run. Never edit a shipped migration: append a new one.
 enum Migrations {
-    static let all: [String] = [v1]
+    static let all: [String] = [v1, v2]
 
     static let v1 = """
         CREATE TABLE conversations (
@@ -75,5 +75,29 @@ enum Migrations {
             created_at             REAL NOT NULL,
             updated_at             REAL NOT NULL
         );
+        """
+
+    /// Gives memories a stable integer `number` (shown to the model as
+    /// `m12`). An implicit rowid isn't enough: VACUUM may renumber it.
+    /// The new table references itself by its temporary name; the rename
+    /// rewrites that reference, and dropping the old table can't cascade
+    /// into the new one.
+    static let v2 = """
+        CREATE TABLE memories_v2 (
+            number                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            id                     TEXT NOT NULL UNIQUE,
+            content                TEXT NOT NULL,
+            source                 TEXT NOT NULL,
+            status                 TEXT NOT NULL DEFAULT 'active',
+            supersedes_id          TEXT REFERENCES memories_v2(id) ON DELETE SET NULL,
+            origin_conversation_id TEXT REFERENCES conversations(id) ON DELETE SET NULL,
+            created_at             REAL NOT NULL,
+            updated_at             REAL NOT NULL
+        );
+        INSERT INTO memories_v2 (id, content, source, status, supersedes_id, origin_conversation_id, created_at, updated_at)
+            SELECT id, content, source, status, supersedes_id, origin_conversation_id, created_at, updated_at
+            FROM memories ORDER BY created_at;
+        DROP TABLE memories;
+        ALTER TABLE memories_v2 RENAME TO memories;
         """
 }

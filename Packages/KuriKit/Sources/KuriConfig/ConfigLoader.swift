@@ -56,14 +56,14 @@ public struct ConfigLoader: Sendable {
         // Kuri reloads this file when it changes.
         {
           // "<provider>/<model>". Everything after the first slash is the model id.
-          defaultModel: "ollama/qwen3:8b",
+          defaultModel: "ollama/qwen3.5:2b",
 
           providers: {
             // Anything that speaks Open Responses: Ollama, LM Studio, vLLM, OpenAI…
             ollama: {
               format: "open-responses",
               baseURL: "http://localhost:11434/v1",
-              models: ["qwen3:8b"],
+              models: ["qwen3.5:2b"],
             },
 
             // lmstudio: {
@@ -80,6 +80,10 @@ public struct ConfigLoader: Sendable {
             //   models: [{ id: "gpt-5", reasoningEffort: "medium" }],
             // },
           },
+
+          // Tool policies: "allow", "ask" or "deny", by the name the model sees.
+          // "*" globs work; MCP tools are named "<server>__<tool>".
+          // tools: { memory: "deny", "github__*": "ask" },
         }
 
         """

@@ -10,7 +10,9 @@ struct MainView: View {
         NavigationSplitView {
             List(selection: $model.selection) {
                 ForEach(model.conversations) { conversation in
-                    ConversationRow(conversation: conversation, isRunning: model.running.contains(conversation.id))
+                    ConversationRow(conversation: conversation,
+                                    isRunning: model.running.contains(conversation.id),
+                                    isAwaitingInput: model.isAwaitingInput(conversation.id))
                         .tag(conversation.id)
                         .contextMenu {
                             Button("Delete", role: .destructive) {
@@ -51,13 +53,18 @@ struct MainView: View {
 private struct ConversationRow: View {
     let conversation: Conversation
     let isRunning: Bool
+    let isAwaitingInput: Bool
 
     var body: some View {
         HStack {
             Text(conversation.title.isEmpty ? "New Conversation" : conversation.title)
                 .lineLimit(1)
             Spacer()
-            if isRunning {
+            if isAwaitingInput {
+                Image(systemName: "questionmark.bubble.fill")
+                    .foregroundStyle(.tint)
+                    .help("Waiting for your answer")
+            } else if isRunning {
                 ProgressView().controlSize(.small)
             }
         }

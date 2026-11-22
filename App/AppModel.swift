@@ -2,6 +2,7 @@ import Foundation
 import KuriAgent
 import KuriCore
 import KuriStore
+import KuriTools
 import Observation
 
 /// The UI's view of the engine: a main-actor mirror of the state the views
@@ -31,6 +32,8 @@ final class AppModel {
     private(set) var running: Set<UUID> = []
     private(set) var inputRequests: [InputRequest] = []
     private(set) var models: [ModelRef] = []
+    private(set) var tools: [ToolInfo] = []
+    private(set) var memories: [Memory] = []
     var errorMessage: String?
 
     var selectedConversation: Conversation? {
@@ -39,6 +42,15 @@ final class AppModel {
 
     var isSelectedRunning: Bool {
         selection.map(running.contains) ?? false
+    }
+
+    func isAwaitingInput(_ conversationID: UUID) -> Bool {
+        inputRequests.contains { $0.conversationID == conversationID }
+    }
+
+    /// The selected conversation's current plan, from its latest `tasklist` call.
+    var taskList: [TaskListTool.Entry] {
+        TaskListTool.current(in: items)
     }
 
     // MARK: Lifecycle
@@ -50,6 +62,8 @@ final class AppModel {
             self.engine = engine
             conversations = try await engine.store.conversations()
             models = await engine.models
+            tools = await engine.toolCatalog()
+            memories = try await engine.memories()
             phase = .ready
             Task { await observe(engine) }
         } catch {
@@ -63,7 +77,7 @@ final class AppModel {
         }
     }
 
-    // MARK: Actions
+    // MARK: Conversations
 
     func newConversation() async {
         guard let engine else { return }
@@ -119,6 +133,20 @@ final class AppModel {
         items = (try? await engine.store.items(of: id)) ?? []
     }
 
+    // MARK: Memory
+
+    func changeMemories(_ changes: [MemoryChange]) async {
+        do {
+            try await engine?.changeMemories(changes)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func reloadMemories() async {
+        memories = (try? await engine?.memories()) ?? memories
+    }
+
     // MARK: Events
 
     private func handle(_ event: EngineEvent) {
@@ -159,6 +187,9 @@ final class AppModel {
             }
             if case .failed(let message) = outcome { errorMessage = message }
 
+        case .toolFinished:
+            break
+
         case .inputRequested(let request):
             inputRequests.append(request)
 
@@ -170,6 +201,12 @@ final class AppModel {
 
         case .configFailed(let message):
             errorMessage = message
+
+        case .toolsChanged:
+            Task { tools = await engine?.toolCatalog() ?? [] }
+
+        case .memoriesChanged:
+            Task { await reloadMemories() }
         }
     }
 }

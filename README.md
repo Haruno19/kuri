@@ -129,18 +129,25 @@ Every adapter implements one method — `stream(InferenceRequest) -> AsyncThrowi
 
 ### Tools
 
-Every tool implements `Tool`: a spec (name, description, JSON Schema), a default permission, whether it is read-only, and an async `run`.
+Every tool implements `Tool`: a spec (name, description, JSON Schema), a default policy, whether it is read-only, and an async `run`. The `ToolRegistry` holds them all, built-in and discovered alike, each tagged with its source (`builtIn` or `mcp(server:)`), and decides which ones the model sees.
 
 | Tool | What it does | Default |
 |---|---|---|
 | `clarify` | Ask the user one or more questions and wait for the answers | allow |
-| `tasklist` | Write the current task list (the whole list each call) | allow |
-| `memory` | Add, update, remove or list long-term memories | allow |
-| `conversation_search` | Full-text search over past conversations | allow |
+| `tasklist` | Write the current plan (the whole list each call) | allow |
+| `memory` | Add, update or remove long-term memories, in one batched call | allow |
+| `conversation_search` | Full-text search over past conversations, or this one | allow |
 | `shell` *(planned)* | Run a command in the conversation's container | allow (it's sandboxed) |
-| MCP tools *(planned)* | Discovered at runtime, named `server__tool` | per `mcp.json`, else ask |
+| MCP tools | Discovered at runtime, named `<server>__<tool>` | allow if the server marks them read-only, else ask |
 
-The task list has no table: the current list is the arguments of the latest `tasklist` call.
+**Policies.** `allow` runs the call, `ask` shows an approval panel first, `deny` hides the tool from the model entirely. Rules come from `config.json` (`tools`, by the name the model sees, for any tool) and `mcp.json` (`tools` inside a server, by the server's own names). An exact name beats a `*` glob, a longer glob beats a shorter one, and `config.json` wins over `mcp.json` on the same name.
+
+**Built-in tools in detail.**
+
+- `clarify` blocks the turn and shows a panel with the questions (and suggested answers, if the model gave any). The answers come back as the tool's result.
+- `tasklist` has no table: the current plan is the arguments of the latest successful call. The app pins it above the composer while it has open tasks.
+- `memory` entries appear in every conversation's instructions with a short id (`m12`), so the model edits them directly. All changes in a call land atomically, and the call fails if the entries would exceed 4,000 characters in total, so the model has to make room in the same call. The tool's description spells out what *not* to save. You can view and edit memories in Settings.
+- `conversation_search` matches any of the words (as prefixes, ranked by how many match), groups hits by conversation, and returns each hit with the messages before and after it. By default it searches the other conversations; `scope: "this_chat"` recovers exact details from the current conversation once they've been compacted away.
 
 **No file tools.** The shell lists, reads, searches and writes files; separate `read_file`/`write_file`/`edit_file` tools would only duplicate it. One tool, one path namespace, one place to sandbox.
 
@@ -173,7 +180,7 @@ Everything lives in `~/.config/kuri`. The location resolves in this order: the `
 
 ```
 ~/.config/kuri/
-├─ config.json     providers, models, defaults, sandbox settings
+├─ config.json     providers, models, defaults, tool policies, sandbox settings
 ├─ mcp.json        MCP servers
 ├─ kuri.sqlite     conversations, turns, items, memories
 ├─ blobs/          attachments, content-addressed by SHA-256
@@ -187,13 +194,13 @@ Both config files are **JSON5**: comments, unquoted keys and trailing commas are
 ```json5
 {
   // "<provider>/<model>". Everything after the first slash is the model id.
-  defaultModel: "ollama/qwen3:8b",
+  defaultModel: "ollama/qwen3.5:2b",
 
   providers: {
     ollama: {
       format: "open-responses",
       baseURL: "http://localhost:11434/v1",
-      models: ["qwen3:8b", { id: "qwen3-coder:30b", contextWindow: 65536 }],
+      models: ["qwen3.5:2b", { id: "qwen3.5:9b", contextWindow: 65536 }],
     },
     anthropic: {
       format: "anthropic-messages",
@@ -202,6 +209,9 @@ Both config files are **JSON5**: comments, unquoted keys and trailing commas are
       models: ["claude-sonnet-5-5"],
     },
   },
+
+  // Tool policies by the name the model sees; "*" globs work.
+  tools: { memory: "deny", "github__*": "ask" },
 }
 ```
 

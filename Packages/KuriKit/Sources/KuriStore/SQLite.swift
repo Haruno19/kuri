@@ -67,6 +67,8 @@ final class SQLiteDatabase {
 
     var changes: Int { Int(sqlite3_changes(handle)) }
 
+    var lastInsertRowID: Int { Int(sqlite3_last_insert_rowid(handle)) }
+
     private var lastError: String { String(cString: sqlite3_errmsg(handle)) }
 
     private func prepare(_ sql: String, _ values: [SQLValue]) throws -> Statement {
