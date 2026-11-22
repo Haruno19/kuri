@@ -204,7 +204,7 @@ Settings › Tools lists every server with its state, the server's own name and 
   - a Linux kernel: Kata Containers publishes its container-tuned kernel only inside its release tarball (about 680 MB), so Kuri downloads it once and keeps just the kernel;
   - Apple's init filesystem (`ghcr.io/apple/containerization/vminit`, matching the package version);
   - the container image, unpacked once into a snapshot that each container clones (APFS copy-on-write).
-  After that the sandbox works offline. Everything lives in `~/.config/kuri/sandbox`. The `shell` tool only appears once setup is done.
+  After that the sandbox works offline. Everything lives in `~/.config/kuri/sandbox`: about 0.8 GB with the default image, mostly image layers, Apple's init filesystem and the unpacked snapshot (the kernel itself is 18 MB). The `shell` tool only appears once setup is done.
 - **The model is told where things are:** its instructions say which folder of the user's is mounted where (or that `/work` is a scratch folder).
 - **Testing.** Starting a VM needs the `com.apple.security.virtualization` entitlement on the running executable, which `swift test` can't have; the package tests cover the logic, and real VMs are exercised by a signed executable and by the app.
 - **Not covered by design:** macOS-native commands (`xcodebuild`, `open`…). A host-side shell with approval may come later.

@@ -232,8 +232,9 @@ private struct SandboxSettingsView: View {
                 case .notInstalled:
                     Label("Not set up yet.", systemImage: "shippingbox")
                     Text("""
-                        Setup downloads a Linux kernel (about 680 MB once; about 50 MB is kept), Apple's init image \
-                        and the container image. After that the sandbox works offline.
+                        Setup downloads a Linux kernel release (about 680 MB, of which only the 18 MB kernel is \
+                        kept), Apple's init image and the container image: about 0.8 GB on disk in the end. After \
+                        that the sandbox works offline.
                         """)
                     .font(.callout).foregroundStyle(.secondary)
                     Button("Set Up Sandbox") { Task { await model.setUpSandbox() } }
