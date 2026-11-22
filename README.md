@@ -111,7 +111,7 @@ Kuri is **stateless towards providers**: every request carries the history it ne
 4. If the model called tools: each call is checked against its permission policy (`allow` / `ask` / `deny`), run, its output capped, and stored as a `toolResult`. Back to step 2.
 5. Otherwise the turn closes with its stop reason and token usage.
 
-Guards carried over from Alembic: a round limit per turn, detection of identical repeated calls, a cap on tool output size, and (planned) compaction when the context approaches the model's window, plus fallback models.
+Guards against runaway turns: a round limit per turn, detection of identical repeated calls, a cap on tool output size, and (planned) compaction when the context approaches the model's window, plus fallback models.
 
 **Clarify suspends the turn.** The `clarify` tool asks the user and *waits*: the answer is the tool's return value, so the model continues the same turn. The tool call is already persisted, so a pending question survives a relaunch — a `toolCall` with no matching `toolResult` *is* the pending state.
 
