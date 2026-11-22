@@ -10,3 +10,6 @@ build/
 # Swift Package Manager
 .build/
 .swiftpm/
+
+# Fonts for trying in the sketches; some licences forbid redistributing them
+Sketches/Fonts/

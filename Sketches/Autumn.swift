@@ -91,7 +91,7 @@ extension EnvironmentValues {
 
     // Chosen: Publico Text and iA Writer Mono. The sans is still open.
     static let serifs = ["Publico Text", "Iowan Old Style"]
-    static let sanses = ["SF Pro Rounded", "Galvji", "SF Pro", "Avenir Next", "Lucida Grande", "Instrument Sans"]
+    static let sanses = ["DM Sans", "Satoshi", "Figtree", "SF Pro Rounded", "Galvji", "SF Pro", "Avenir Next", "Lucida Grande", "Instrument Sans"]
     static let monos = ["iA Writer Mono S"]
 
     var serif = serifs[0]
@@ -107,7 +107,8 @@ extension EnvironmentValues {
     }
 
     /// Fonts dropped in Sketches/Fonts are loaded for this process only, the
-    /// way the app would load fonts it bundles.
+    /// way the app would load fonts it bundles. The folder is gitignored:
+    /// some licences (Satoshi's) forbid redistributing the files.
     private static func registerBundled() {
         let folder = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "Fonts")
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
@@ -766,7 +767,7 @@ struct Composer: View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("Ask anything", text: $chat.draft, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(Typeface.sans(16))
+                .font(Typeface.sans(14.5))
                 .foregroundStyle(palette.ink)
                 .lineLimit(1...8)
                 .focused($focused)
@@ -837,9 +838,9 @@ struct ModelPicker: View {
             HStack(spacing: 5) {
                 Text(model).foregroundStyle(palette.ink.opacity(0.85))
                 Text(effort).foregroundStyle(palette.faint)
-                PencilIcon(glyph: .chevron, size: 12, color: palette.secondary)
+                PencilIcon(glyph: .chevron, size: 11, color: palette.secondary)
             }
-            .font(Typeface.sans(14))
+            .font(Typeface.sans(13))
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .modifier(HoverWash())
@@ -972,8 +973,8 @@ struct QuietButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                PencilIcon(glyph: glyph, size: 16, color: palette.secondary)
-                if let label { Text(label).font(Typeface.sans(14)).foregroundStyle(palette.secondary) }
+                PencilIcon(glyph: glyph, size: 15, color: palette.secondary)
+                if let label { Text(label).font(Typeface.sans(13)).foregroundStyle(palette.secondary) }
             }
             .padding(.horizontal, 7)
             .padding(.vertical, 5)

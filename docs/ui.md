@@ -19,7 +19,7 @@ The brief for the redesign. Every app change is checked against it. Directions a
 - **Type**:
   - **Serif** (model replies, headings, accents): *Publico Text*, an Apple-provided download macOS fetches on request. Fallback: *Iowan Old Style*, which ships with macOS.
   - **Mono** (code): *iA Writer Mono*, open-licensed (OFL) and bundled in the app, set smaller than the surrounding text (×0.86).
-  - **Sans** (user messages and the rest of the UI: titles, model selector, buttons): still open, chosen in the sketch, which switches it live. It should feel Apple-native while having some character. Candidates: *SF Pro Rounded*, *Galvji*, *SF Pro*, *Avenir Next*, *Lucida Grande*, *Instrument Sans*.
+  - **Sans** (user messages and the rest of the UI: titles, model selector, buttons): still open, chosen in the sketch, which switches it live. It should feel Apple-native while having some character. Candidates: *DM Sans*, *Figtree* (both OFL), *Satoshi* (ITF Free Font License: may be embedded in an app, but the files may not sit in a public repository), *SF Pro Rounded*, *Galvji*, *SF Pro*, *Avenir Next*, *Lucida Grande*, *Instrument Sans*.
 - **Glass**: Liquid Glass (`glassEffect`) and materials where something floats above the content (composer, floating buttons, popovers), so the app feels first-party and modern.
 - **Icons**: look hand-drawn with a pencil: slightly irregular strokes, round caps, a graphite feel. Custom shapes, not SF Symbols, wherever the user sees them in the main window.
 
