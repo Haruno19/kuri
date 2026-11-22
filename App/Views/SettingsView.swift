@@ -1,5 +1,6 @@
 import KuriConfig
 import KuriCore
+import KuriMCP
 import KuriStore
 import KuriTools
 import SwiftUI
@@ -66,12 +67,85 @@ private struct ToolsSettings: View {
                 }
             } header: {
                 Text("Built in")
+            }
+
+            ForEach(model.mcpServers) { server in
+                MCPServerSection(server: server, tools: model.tools.filter { $0.source == .mcp(server: server.name) })
+            }
+
+            Section {
+                if let home = model.engine?.home {
+                    LabeledContent(model.mcpServers.isEmpty ? "No MCP servers yet" : "MCP servers") {
+                        Button("Open mcp.json") { NSWorkspace.shared.open(home.mcpFile) }
+                    }
+                }
             } footer: {
-                Text("Change a tool's policy in config.json under “tools”, e.g. `tools: { memory: \"deny\" }`.")
-                    .foregroundStyle(.secondary)
+                Text("""
+                    Kuri reconnects servers as soon as mcp.json changes. Policies go in config.json under “tools” \
+                    (any tool, e.g. `memory: "deny"`) or in mcp.json inside a server (its own tool names). \
+                    MCP tools the server marks read-only are allowed; others ask first.
+                    """)
+                .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct MCPServerSection: View {
+    @Environment(AppModel.self) private var model
+    let server: MCPServerStatus
+    let tools: [ToolInfo]
+    @State private var showsLog = false
+
+    var body: some View {
+        Section {
+            if case .failed(let message) = server.state {
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+            }
+            ForEach(tools) { tool in
+                ToolRow(tool: tool)
+            }
+            if !server.log.isEmpty {
+                DisclosureGroup("Log", isExpanded: $showsLog) {
+                    Text(server.log.joined(separator: "\n"))
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        } header: {
+            HStack(spacing: 8) {
+                Circle().fill(color).frame(width: 8, height: 8)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(server.name)
+                    Text(server.serverInfo.map { "\($0) · \(server.target)" } ?? server.target)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer()
+                if server.state == .connecting {
+                    ProgressView().controlSize(.small)
+                } else if server.state != .disabled {
+                    Button("Reconnect") { Task { await model.reconnect(mcpServer: server.name) } }
+                        .controlSize(.small)
+                }
+            }
+        }
+    }
+
+    private var color: Color {
+        switch server.state {
+        case .connected: .green
+        case .connecting: .yellow
+        case .failed: .red
+        case .disabled: .gray
+        }
     }
 }
 

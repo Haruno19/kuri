@@ -10,6 +10,22 @@ struct KuriApp: App {
         // The engine starts with the app, not with a window: Kuri keeps
         // running from the menu bar when every window is closed.
         Task { await model.start() }
+        // Give MCP servers a chance to exit cleanly on quit.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated {
+                // The engine is its own actor, so it can finish while the
+                // main thread waits here.
+                guard let engine = model.engine else { return }
+                let done = DispatchSemaphore(value: 0)
+                Task.detached {
+                    await engine.shutdown()
+                    done.signal()
+                }
+                _ = done.wait(timeout: .now() + 2)
+            }
+        }
     }
 
     var body: some Scene {

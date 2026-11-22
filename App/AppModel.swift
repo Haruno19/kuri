@@ -1,6 +1,7 @@
 import Foundation
 import KuriAgent
 import KuriCore
+import KuriMCP
 import KuriStore
 import KuriTools
 import Observation
@@ -34,6 +35,7 @@ final class AppModel {
     private(set) var models: [ModelRef] = []
     private(set) var tools: [ToolInfo] = []
     private(set) var memories: [Memory] = []
+    private(set) var mcpServers: [MCPServerStatus] = []
     var errorMessage: String?
 
     var selectedConversation: Conversation? {
@@ -64,6 +66,7 @@ final class AppModel {
             models = await engine.models
             tools = await engine.toolCatalog()
             memories = try await engine.memories()
+            mcpServers = await engine.mcpServers()
             phase = .ready
             Task { await observe(engine) }
         } catch {
@@ -131,6 +134,10 @@ final class AppModel {
             return
         }
         items = (try? await engine.store.items(of: id)) ?? []
+    }
+
+    func reconnect(mcpServer name: String) async {
+        await engine?.reconnectMCPServer(name)
     }
 
     // MARK: Memory
@@ -207,6 +214,9 @@ final class AppModel {
 
         case .memoriesChanged:
             Task { await reloadMemories() }
+
+        case .mcpServersChanged(let servers):
+            mcpServers = servers
         }
     }
 }

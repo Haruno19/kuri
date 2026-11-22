@@ -1,5 +1,6 @@
 import Foundation
 import KuriCore
+import KuriMCP
 import KuriStore
 import KuriTools
 import Synchronization
@@ -24,6 +25,7 @@ public enum EngineEvent: Sendable {
     /// Tools were added, removed, or their policies changed.
     case toolsChanged
     case memoriesChanged
+    case mcpServersChanged([MCPServerStatus])
 }
 
 public enum TurnOutcome: Sendable, Hashable {

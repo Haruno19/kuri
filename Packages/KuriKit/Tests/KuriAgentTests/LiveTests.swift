@@ -1,6 +1,7 @@
 import Foundation
 import KuriConfig
 import KuriCore
+import KuriMCP
 import KuriStore
 import Testing
 @testable import KuriAgent
@@ -34,7 +35,7 @@ struct LiveTests {
         }
     }
 
-    private func makeEngine() throws -> (Engine, KuriHome) {
+    private func makeEngine(mcp: MCPConfig = MCPConfig()) throws -> (Engine, KuriHome) {
         let model = try #require(Live.model)
         let root = FileManager.default.temporaryDirectory.appending(path: "kuri-live-\(UUID().uuidString)")
         let home = KuriHome(root: root)
@@ -43,7 +44,7 @@ struct LiveTests {
             defaultModel: model,
             providers: [model.provider: ProviderConfig(format: .openResponses, baseURL: Live.baseURL,
                                                        models: [ModelConfig(id: model.model)])])
-        let engine = Engine(home: home, store: try Store(url: home.database), config: config, mcpConfig: MCPConfig())
+        let engine = Engine(home: home, store: try Store(url: home.database), config: config, mcpConfig: mcp)
         return (engine, home)
     }
 
@@ -140,5 +141,23 @@ struct LiveTests {
             engine: engine)
         #expect(run.toolNames.contains("conversation_search"))
         #expect(run.reply.localizedCaseInsensitiveContains("alfama"))
+    }
+
+    @Test func usesAnMCPTool() async throws {
+        let fixture = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "KuriMCPTests/Fixtures/stdio_server.py")
+        let (engine, home) = try makeEngine(mcp: MCPConfig(mcpServers: [
+            "calc": MCPServerConfig(command: "/usr/bin/python3", args: [fixture.path]),
+        ]))
+        defer { try? FileManager.default.removeItem(at: home.root) }
+        await engine.start()
+        defer { Task { await engine.shutdown() } }
+        for _ in 0..<200 {
+            if await engine.toolCatalog().contains(where: { $0.name == "calc__add" }) { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let run = try await run("Use the calc add tool to compute 1234 + 4321, then tell me the result.", engine: engine)
+        #expect(run.toolNames.contains("calc__add"))
+        #expect(run.reply.contains("5555") || run.reply.contains("5,555"))
     }
 }

@@ -2,6 +2,7 @@ import Foundation
 import KuriConfig
 import KuriCore
 import KuriInference
+import KuriMCP
 import KuriStore
 import KuriTools
 
@@ -18,6 +19,7 @@ public actor Engine {
     public var limits = TurnLimits()
 
     private let registry: ToolRegistry
+    private let mcp: MCPManager
     private let broker: InteractionBroker
     private let broadcaster: EventBroadcaster
     private let factory: ProviderFactory
@@ -43,21 +45,32 @@ public actor Engine {
     init(home: KuriHome, store: Store, config: Config, mcpConfig: MCPConfig,
          tools: [any Tool] = BuiltInTools.all, factory: ProviderFactory = ProviderFactory()) {
         let broadcaster = EventBroadcaster()
+        let registry = ToolRegistry(tools)
         self.home = home
         self.store = store
         self.config = config
         self.mcpConfig = mcpConfig
-        self.registry = ToolRegistry(tools)
+        self.registry = registry
+        self.mcp = MCPManager(registry: registry, onChange: { broadcaster.emit(.mcpServersChanged($0)) })
         self.broadcaster = broadcaster
         self.broker = InteractionBroker(emit: { broadcaster.emit($0) })
         self.factory = factory
     }
 
-    /// Hooks up observers and applies the loaded configuration.
+    /// Hooks up observers, applies the loaded configuration and connects
+    /// the MCP servers (in the background: `start` doesn't wait for them).
     func start() async {
         await registry.onChange { [broadcaster] in broadcaster.emit(.toolsChanged) }
         await applyToolPolicies()
+        await mcp.apply(mcpConfig)
         startWatching()
+    }
+
+    /// Disconnects MCP servers and stops their processes. Call on quit.
+    public func shutdown() async {
+        watcher?.cancel()
+        for task in running.values { task.cancel() }
+        await mcp.shutdown()
     }
 
     public nonisolated func events() -> AsyncStream<EngineEvent> {
@@ -75,14 +88,16 @@ public actor Engine {
             mcpConfig = try loader.loadMCP()
             providers.removeAll()
             await applyToolPolicies()
+            await mcp.apply(mcpConfig)
             broadcaster.emit(.configReloaded)
         } catch {
             broadcaster.emit(.configFailed(error.localizedDescription))
         }
     }
 
+    /// `config.json` rules win over `mcp.json` ones on the same name.
     private func applyToolPolicies() async {
-        await registry.setPolicies(config.tools ?? [:])
+        await registry.setPolicies(mcpConfig.toolPolicies.merging(config.tools ?? [:]) { _, global in global })
     }
 
     private func startWatching() {
@@ -109,6 +124,14 @@ public actor Engine {
     /// Every tool, built-in and discovered, with its effective policy.
     public func toolCatalog() async -> [ToolInfo] {
         await registry.catalog()
+    }
+
+    public func mcpServers() async -> [MCPServerStatus] {
+        await mcp.statuses
+    }
+
+    public func reconnectMCPServer(_ name: String) async {
+        await mcp.reconnect(name)
     }
 
     // MARK: Memory

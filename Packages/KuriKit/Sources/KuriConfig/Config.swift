@@ -157,8 +157,22 @@ public struct MCPServerConfig: Codable, Sendable, Hashable {
     public var headers: [String: SecretRef]?
     // Kuri extensions
     public var enabled: Bool?
-    /// Tool name or `*` glob → policy. Unlisted tools default to `ask`.
+    /// Tool name (as the server calls it) or `*` glob → policy. Unlisted
+    /// tools run without asking if the server marks them read-only, and
+    /// ask otherwise.
     public var tools: [String: ToolPolicy]?
 
     public var isEnabled: Bool { enabled ?? true }
+
+    public init(command: String? = nil, args: [String]? = nil, env: [String: SecretRef]? = nil,
+                url: URL? = nil, headers: [String: SecretRef]? = nil,
+                enabled: Bool? = nil, tools: [String: ToolPolicy]? = nil) {
+        self.command = command
+        self.args = args
+        self.env = env
+        self.url = url
+        self.headers = headers
+        self.enabled = enabled
+        self.tools = tools
+    }
 }
