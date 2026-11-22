@@ -36,7 +36,7 @@ struct KuriApp: App {
         }
         .defaultSize(width: 960, height: 680)
 
-        MenuBarExtra("Kuri", systemImage: "sparkle") {
+        MenuBarExtra("Kuri", image: "MenuBarIcon") {
             MenuBarView()
                 .environment(model)
         }
