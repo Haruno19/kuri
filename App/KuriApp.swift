@@ -7,6 +7,7 @@ struct KuriApp: App {
     init() {
         let model = AppModel()
         _model = State(initialValue: model)
+        FontLibrary.shared.prepare()
         // The engine starts with the app, not with a window: Kuri keeps
         // running from the menu bar when every window is closed.
         Task { await model.start() }
@@ -32,9 +33,11 @@ struct KuriApp: App {
         Window("Kuri", id: "main") {
             MainView()
                 .environment(model)
+                .modifier(Themed())
                 .frame(minWidth: 640, minHeight: 420)
         }
-        .defaultSize(width: 960, height: 680)
+        .windowToolbarStyle(.unified)
+        .defaultSize(width: 1040, height: 760)
 
         MenuBarExtra("Kuri", image: "MenuBarIcon") {
             MenuBarView()

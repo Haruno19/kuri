@@ -10,6 +10,7 @@ struct ToolCallView: View {
     let isLive: Bool
 
     @State private var expanded = false
+    @Environment(\.palette) private var palette
 
     var body: some View {
         let presentation = ToolPresentation(call: call, result: result)
@@ -19,29 +20,28 @@ struct ToolCallView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: presentation.symbol)
+                        .font(.system(size: 11))
                         .frame(width: 16)
-                        .foregroundStyle(result?.isError == true ? .red : .secondary)
+                        .foregroundStyle(result?.isError == true ? palette.accent : palette.faint)
                     Text(presentation.title)
                         .lineLimit(1)
                     if result == nil && isLive {
-                        ProgressView().controlSize(.mini)
+                        Orb(size: 6)
                     }
+                    PencilIcon(glyph: .chevron, size: 11, color: palette.faint)
+                        .rotationEffect(.degrees(expanded ? 0 : -90))
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.semibold))
-                        .rotationEffect(.degrees(expanded ? 90 : 0))
-                        .foregroundStyle(.tertiary)
                 }
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .font(.callout)
-            .foregroundStyle(.secondary)
+            .font(Typeface.sans(13))
+            .foregroundStyle(palette.secondary)
 
             if expanded {
                 presentation.detail
                     .padding(.leading, 24)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(.opacity.combined(with: .offset(y: -4)))
             }
         }
     }
@@ -108,7 +108,7 @@ private struct OutputText: View {
     var body: some View {
         if !text.isEmpty {
             Text(text)
-                .font(.caption.monospaced())
+                .font(Typeface.mono(11.5))
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -125,6 +125,7 @@ struct TaskListRows: View {
             ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: Self.symbol(for: entry.status))
+                        .font(.system(size: 11))
                         .foregroundStyle(entry.status == .completed ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                     Text(entry.content)
                         .strikethrough(entry.status == .completed, color: .secondary)
@@ -133,7 +134,7 @@ struct TaskListRows: View {
                 }
             }
         }
-        .font(.callout)
+        .font(Typeface.sans(13))
     }
 
     static func symbol(for status: TaskListTool.Entry.Status) -> String {

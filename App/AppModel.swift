@@ -53,6 +53,8 @@ final class AppModel {
     /// Folders attached to the selected conversation.
     private(set) var folders: [ConversationFolder] = []
     var errorMessage: String?
+    /// The model picked on the new-chat page, before a conversation exists.
+    var draftModel: ModelRef?
 
     var selectedConversation: Conversation? {
         conversations.first { $0.id == selection }
@@ -115,7 +117,7 @@ final class AppModel {
         guard !text.isEmpty else { return }
         do {
             if selection == nil {
-                selection = try await engine.newConversation().id
+                selection = try await engine.newConversation(model: draftModel).id
             }
             guard let id = selection else { return }
             try await engine.send(text, to: id)
@@ -124,7 +126,17 @@ final class AppModel {
         }
     }
 
+    /// The model the composer shows: the conversation's, or on the new-chat
+    /// page the one picked there, else the default.
+    var composerModel: ModelRef? {
+        selection == nil ? draftModel ?? config.defaultModel : selectedConversation?.model ?? config.defaultModel
+    }
+
     func setModel(_ model: ModelRef) async {
+        guard selection != nil else {
+            draftModel = model
+            return
+        }
         guard let engine, var conversation = selectedConversation else { return }
         conversation.model = model
         try? await engine.update(conversation)
@@ -254,7 +266,7 @@ final class AppModel {
     func attach(_ urls: [URL]) async {
         guard let engine else { return }
         do {
-            if selection == nil { selection = try await engine.newConversation().id }
+            if selection == nil { selection = try await engine.newConversation(model: draftModel).id }
             guard let id = selection else { return }
             var updated = folders
             for url in urls where !updated.contains(where: { $0.path == url.path(percentEncoded: false) }) {
