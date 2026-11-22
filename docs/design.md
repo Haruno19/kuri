@@ -208,7 +208,3 @@ memories             (id, content, source, status, supersedes_id, origin_convers
 - `swift test` in `Packages/KuriKit` runs the unit and integration tests, including MCP servers written as Python fixtures (standard library only) and engine tests against a stubbed Open Responses endpoint.
 - Live tests run real turns against a model and are skipped unless `KURI_LIVE_MODEL` names one (`KURI_LIVE_MODEL=ollama/qwen3.5:2b swift test --filter LiveTests`). Small models aren't deterministic, so they assert on what the plumbing guarantees and print transcripts.
 - Real sandbox VMs need the virtualization entitlement on the running executable, which `swift test` can't have; they're exercised from a signed executable (see [CLAUDE.md](../CLAUDE.md)).
-
-## Later: iOS client
-
-`KuriCore`, `KuriInference` and `KuriAgent` contain nothing Mac-specific. An iOS app can either connect to a Mac running Kuri (a planned `KuriServer` module: HTTP + WebSocket over `Network.framework`, Bonjour discovery, pairing) or run on its own with hosted providers or the on-device model.

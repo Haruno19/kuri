@@ -4,7 +4,7 @@ A native macOS app for working with language models — local or hosted — that
 
 Kuri is a single app that is both the engine and the interface: no server to deploy, no database service, no Docker. It runs offline with local models, talks to any hosted provider when you want it to, discovers MCP servers at runtime, and runs the model's commands inside a lightweight Linux VM. It needs an Apple silicon Mac with macOS 26 and Xcode 26.
 
-> Status: early. Working: the Open Responses adapter, the agent loop, the built-in tools, MCP servers with runtime discovery, durable turns, compaction, the Linux sandbox with its `shell` tool, and a basic app whose UI will be redesigned once the engine is complete.
+> Status: early. Working: the Open Responses and Apple on-device adapters, the agent loop, the built-in tools, MCP servers with runtime discovery, durable turns, compaction, a message queue, generated titles, the Linux sandbox with its `shell` tool, and a basic app whose UI will be redesigned once the engine is complete.
 
 | Document | What's in it |
 |---|---|
@@ -12,6 +12,7 @@ Kuri is a single app that is both the engine and the interface: no server to dep
 | [docs/flows.html](docs/flows.html) | Every flow as a sequence diagram, and the event and protocol reference (open it in a browser) |
 | [docs/config.md](docs/config.md) | Every configuration key |
 | [docs/decisions/](docs/decisions/) | Why things are the way they are |
+| [docs/roadmap.md](docs/roadmap.md) | What's done and what comes next |
 | [CLAUDE.md](CLAUDE.md) | Working agreements, build and test commands |
 
 ---
@@ -28,25 +29,25 @@ Kuri is a single app that is both the engine and the interface: no server to dep
 ## Architecture
 
 ```
-┌───────────────────────────────────── Kuri.app ─────────────────────────────────────┐
-│                                                                                    │
-│  App (SwiftUI)   main window · menu bar · settings                                 │
-│        │  observes EngineEvents, calls Engine methods                              │
-│        ▼                                                                           │
-│  KuriAgent       Engine (actor) ── TurnRunner ── InteractionBroker                 │
-│        │                                                                           │
-│        ├────────────┬────────────┬────────────┬────────────┬────────────┐          │
-│        ▼            ▼            ▼            ▼            ▼            ▼          │
-│  KuriInference  KuriMCP      KuriSandbox  KuriTools    KuriStore    KuriConfig     │
-│  adapters       MCP servers  Linux VMs,   registry,    SQLite       JSON5 files,   │
-│  (HTTP + SSE)   → tools      shell tool   built-ins    file         Keychain       │
-│        └────────────┴────── KuriCore (domain types) ───────┴────────────┘          │
-│                                                                                    │
-│  Each sandbox VM runs in its own system process (Virtualization.framework).        │
-└────────────────────────────────────────────────────────────────────────────────────┘
++------------------------------------- Kuri.app -------------------------------------+
+|                                                                                    |
+|  App (SwiftUI)   main window, menu bar, settings                                   |
+|        |  observes EngineEvents, calls Engine methods                              |
+|        v                                                                           |
+|  KuriAgent       Engine (actor), TurnRunner, InteractionBroker                     |
+|        |                                                                           |
+|        +------------+------------+------------+------------+------------+          |
+|        v            v            v            v            v            v          |
+|  KuriInference  KuriMCP      KuriSandbox  KuriTools    KuriStore    KuriConfig     |
+|  adapters       MCP servers  Linux VMs,   registry,    SQLite       JSON5 files,   |
+|  (HTTP + SSE)   as tools     shell tool   built-ins    file         Keychain       |
+|        +------------+---- KuriCore (domain types) ---------+------------+          |
+|                                                                                    |
+|  Each sandbox VM runs in its own system process (Virtualization.framework).        |
++------------------------------------------------------------------------------------+
 ```
 
-**The engine is in-process.** The SwiftUI layer talks to `Engine` directly and subscribes to its event stream. A future network server (for an iOS client) is just another subscriber to the same stream; the local UI never goes through HTTP.
+**The engine is in-process.** The SwiftUI layer talks to `Engine` directly and subscribes to its event stream. Any other client would be just another subscriber to the same stream; the local UI never goes through HTTP.
 
 **Stateless towards providers.** Every request carries the history it needs, rebuilt from Kuri's database, as a list of items (messages, reasoning, tool calls and results, summaries) rather than chat messages. That keeps behaviour identical across providers, works offline, and makes switching model mid-conversation trivial.
 
@@ -118,20 +119,3 @@ Every adapter turns its wire format into the same item model and event stream; n
 The MCP SDK brings in, transitively, `apple/swift-system`, `apple/swift-log` and `mattt/eventsource` (SSE parsing for its HTTP transport); those are what end up linked into Kuri. SwiftPM also fetches `apple/swift-nio` and friends, used only by the SDK's own sample executables.
 
 Containerization is the heavy one: it brings gRPC (`grpc/grpc-swift-2` and friends, to talk to the VM's init process), SwiftNIO, swift-crypto, swift-protobuf, `swift-server/async-http-client` and `facebook/zstd`. All come from Apple, the Swift server workgroup, gRPC or Meta; no personal libraries.
-
----
-
-## Roadmap
-
-Done, the core: foundations (domain model, config, storage, Open Responses adapter, agent loop), the built-in tools, MCP with runtime discovery, durable turns and compaction, the sandbox with folder attachment and the `shell` tool.
-
-**Next: finish the engine.** The UI stays functional and minimal until then.
-
-1. **Message queue** — type while a turn runs: the message joins the running turn at its next step, after the current tool round, or starts the next turn if it ends first. *(done)*
-2. **Apple's on-device model** as a provider (`apple-foundation-models`), offline and free, a natural utility model. *(done)*
-3. **Generated titles**, switchable in Settings. *(done)*
-4. **Read-only tool calls in parallel.** *(done)*
-
-**Later, engine:** more providers (Anthropic Messages, Gemini, Chat Completions), fallback models, memory review, attachments in messages, sub-agents, `KuriServer` for the iOS client.
-
-**Then: the UI redesign.** Streaming Markdown renderer, theming and the style layer, mini panel and global hotkey, conversation management, editing providers and MCP servers from Settings.
