@@ -25,6 +25,8 @@ enum Tune {
     static let hover = Animation.easeOut(duration: 0.14)
     /// Pressed buttons.
     static let press = Animation.spring(response: 0.22, dampingFraction: 0.65)
+    /// Seconds for the shine to cross the logo.
+    static let shine = 0.7
     /// Seconds for the light to cross the status text once.
     static let shimmer = 3.6
     /// Seconds per word while a fake reply streams.
@@ -57,7 +59,7 @@ struct Palette {
     var iconGradient: LinearGradient { LinearGradient(colors: [iconTop, iconBottom], startPoint: .top, endPoint: .bottom) }
 
     // User cards: a slab of paper, lighter than the background.
-    var cardTop: Color { dark ? hex(0x2B2A28) : hex(0xFFFFFF) }
+    var cardTop: Color { dark ? hex(0x2F2B26) : hex(0xFFFDF8) }
     var cardBottom: Color { dark ? hex(0x262523) : hex(0xFCFBF8) }
     var cardEdge: Color { dark ? hex(0x121110) : hex(0xE4E1D7) }
     var highlight: Color { .white.opacity(dark ? 0.07 : 0.9) }
@@ -278,13 +280,15 @@ struct NewChat: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            HStack(spacing: 16) {
+            // The greeting's baseline sits on the logo's bottom.
+            HStack(alignment: .lastTextBaseline, spacing: 16) {
                 GlassChestnut(size: 46)
+                    .alignmentGuide(.lastTextBaseline) { $0[.bottom] - 2 }
                 Text(greeting)
                     .font(Typeface.serif(30))
                     .foregroundStyle(palette.ink)
             }
-            .padding(.leading, 4)
+            .padding(.leading, 18)
             .transition(.asymmetric(insertion: .opacity,
                                     removal: .opacity.combined(with: .scale(scale: 0.96, anchor: .leading)).combined(with: .offset(y: -12))))
             Composer()
@@ -293,7 +297,7 @@ struct NewChat: View {
         .frame(maxWidth: 740)
         .padding(.horizontal, 48)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .offset(y: -20)
+        .offset(x: 12, y: -20)
     }
 
     private var greeting: String {
@@ -306,54 +310,49 @@ struct NewChat: View {
 
 // MARK: - Logo
 
-/// The chestnut from the app icon, in Liquid Glass tinted with the icon's
-/// gradient. Still at rest; each click plays one of a few small reactions,
-/// never the same twice in a row.
+/// The chestnut from the app icon, in frosted glass tinted with the icon's
+/// gradient. Still at rest; clicks cycle through a hop, a shine and a shake.
+///
+/// The glass is a material, not `glassEffect`: Liquid Glass is drawn in a
+/// separate pass that trails the shape while it's scaled or moved, which
+/// showed as a ghost outline during the reactions.
 struct GlassChestnut: View {
     let size: CGFloat
     @Environment(\.palette) private var palette
-    /// One counter per reaction; bumping one plays it.
-    @State private var plays: [Reaction: Int] = [:]
-    @State private var last = Reaction.hop
-
-    enum Reaction: CaseIterable {
-        /// Squish, jump, land.
-        case hop
-        /// Two small hops, the second smaller.
-        case skip
-        /// Shakes its head, like a jelly.
-        case wiggle
-        /// A jump with a full turn in the air.
-        case flip
-    }
+    @State private var hops = 0
+    @State private var shines = 0
+    @State private var shakes = 0
+    @State private var clicks = 0
 
     struct Pose { var sx = 1.0, sy = 1.0, y = 0.0, r = 0.0 }
 
     var body: some View {
         let shape = ChestnutShape()
         ZStack {
-            Color.clear
-                .glassEffect(.regular.tint(palette.iconBottom.opacity(0.3)), in: shape)
-            // The icon's gradient, thin enough that the glass shows through.
-            shape.fill(palette.iconGradient).opacity(palette.dark ? 0.6 : 0.5)
+            shape.fill(.ultraThinMaterial)
+            // The icon's gradient, thin enough that the frost shows through.
+            shape.fill(palette.iconGradient).opacity(palette.dark ? 0.7 : 0.6)
             // Depth: the glass thickens toward the bottom...
             shape.fill(LinearGradient(colors: [.clear, palette.iconTop.opacity(0.35)], startPoint: .center, endPoint: .bottom))
             // ...and catches the light at the top.
-            shape.fill(LinearGradient(colors: [.white.opacity(palette.dark ? 0.18 : 0.35), .clear], startPoint: .top, endPoint: .center))
-            shape.stroke(LinearGradient(colors: [.white.opacity(palette.dark ? 0.45 : 0.85), .white.opacity(0.12)],
+            shape.fill(LinearGradient(colors: [.white.opacity(palette.dark ? 0.16 : 0.32), .clear], startPoint: .top, endPoint: .center))
+            Shine(trigger: shines).mask(shape)
+            shape.stroke(LinearGradient(colors: [.white.opacity(palette.dark ? 0.4 : 0.8), .white.opacity(0.1)],
                                         startPoint: .top, endPoint: .bottom), lineWidth: 1)
         }
         .frame(width: size, height: size)
         .compositingGroup()
         .shadow(color: palette.shadow.opacity(palette.dark ? 0.35 : 0.1), radius: 4, y: 2)
         .contentShape(shape)
-        .keyframeAnimator(initialValue: Pose(), trigger: plays[.hop, default: 0], content: { Self.pose($0, $1) }) { _ in Self.hop }
-        .keyframeAnimator(initialValue: Pose(), trigger: plays[.skip, default: 0], content: { Self.pose($0, $1) }) { _ in Self.skip }
-        .keyframeAnimator(initialValue: Pose(), trigger: plays[.wiggle, default: 0], content: { Self.pose($0, $1) }) { _ in Self.wiggle }
-        .keyframeAnimator(initialValue: Pose(), trigger: plays[.flip, default: 0], content: { Self.pose($0, $1) }) { _ in Self.flip }
+        .keyframeAnimator(initialValue: Pose(), trigger: hops, content: { Self.pose($0, $1) }) { _ in Self.hop }
+        .keyframeAnimator(initialValue: Pose(), trigger: shakes, content: { Self.pose($0, $1) }) { _ in Self.shake }
         .onTapGesture {
-            last = Reaction.allCases.filter { $0 != last }.randomElement()!
-            plays[last, default: 0] += 1
+            switch clicks % 3 {
+            case 0: hops += 1
+            case 1: shines += 1
+            default: shakes += 1
+            }
+            clicks += 1
         }
     }
 
@@ -365,8 +364,7 @@ struct GlassChestnut: View {
             .offset(y: v.y)
     }
 
-    // Heights are in points for the 46-point logo.
-
+    /// Squish, jump, land. Heights are in points for the 46-point logo.
     @KeyframesBuilder<Pose> static var hop: some Keyframes<Pose> {
         KeyframeTrack(\Pose.sy) {
             SpringKeyframe(0.84, duration: 0.1)
@@ -390,70 +388,37 @@ struct GlassChestnut: View {
             SpringKeyframe(0, duration: 0.4, spring: .bouncy)
         }
     }
+}
 
-    @KeyframesBuilder<Pose> static var skip: some Keyframes<Pose> {
-        KeyframeTrack(\Pose.sy) {
-            SpringKeyframe(0.88, duration: 0.08)
-            SpringKeyframe(1.05, duration: 0.12)
-            SpringKeyframe(0.9, duration: 0.2)
-            SpringKeyframe(1.03, duration: 0.1)
-            SpringKeyframe(1, duration: 0.4, spring: .bouncy)
-        }
-        KeyframeTrack(\Pose.sx) {
-            SpringKeyframe(1.08, duration: 0.08)
-            SpringKeyframe(0.97, duration: 0.12)
-            SpringKeyframe(1.06, duration: 0.2)
-            SpringKeyframe(0.99, duration: 0.1)
-            SpringKeyframe(1, duration: 0.4, spring: .bouncy)
-        }
-        KeyframeTrack(\Pose.y) {
-            LinearKeyframe(0, duration: 0.08)
-            SpringKeyframe(-9, duration: 0.14)
-            SpringKeyframe(0, duration: 0.16)
-            SpringKeyframe(-5, duration: 0.12)
-            SpringKeyframe(0, duration: 0.4, spring: .bouncy)
+extension GlassChestnut {
+    /// A small no: left, right, settle. Rotation only, around the centre.
+    @KeyframesBuilder<Pose> static var shake: some Keyframes<Pose> {
+        KeyframeTrack(\Pose.r) {
+            SpringKeyframe(-7, duration: 0.08)
+            SpringKeyframe(6, duration: 0.11)
+            SpringKeyframe(-4, duration: 0.11)
+            SpringKeyframe(2, duration: 0.1)
+            SpringKeyframe(0, duration: 0.35, spring: .smooth)
         }
     }
+}
 
-    @KeyframesBuilder<Pose> static var wiggle: some Keyframes<Pose> {
-        KeyframeTrack(\Pose.r) {
-            SpringKeyframe(-11, duration: 0.09)
-            SpringKeyframe(10, duration: 0.12)
-            SpringKeyframe(-7, duration: 0.12)
-            SpringKeyframe(4, duration: 0.12)
-            SpringKeyframe(0, duration: 0.4, spring: .bouncy)
-        }
-        KeyframeTrack(\Pose.sy) {
-            SpringKeyframe(0.94, duration: 0.09)
-            SpringKeyframe(1, duration: 0.5, spring: .bouncy)
-        }
-    }
+/// A band of light crossing the logo diagonally, once per trigger.
+struct Shine: View {
+    let trigger: Int
 
-    @KeyframesBuilder<Pose> static var flip: some Keyframes<Pose> {
-        KeyframeTrack(\Pose.sy) {
-            SpringKeyframe(0.82, duration: 0.12)
-            SpringKeyframe(1.04, duration: 0.14)
-            CubicKeyframe(1, duration: 0.34)
-            SpringKeyframe(0.9, duration: 0.08)
-            SpringKeyframe(1, duration: 0.4, spring: .bouncy)
-        }
-        KeyframeTrack(\Pose.sx) {
-            SpringKeyframe(1.14, duration: 0.12)
-            SpringKeyframe(0.96, duration: 0.14)
-            CubicKeyframe(1, duration: 0.34)
-            SpringKeyframe(1.08, duration: 0.08)
-            SpringKeyframe(1, duration: 0.4, spring: .bouncy)
-        }
-        KeyframeTrack(\Pose.y) {
-            LinearKeyframe(0, duration: 0.12)
-            CubicKeyframe(-20, duration: 0.24)
-            CubicKeyframe(0, duration: 0.24)
-            SpringKeyframe(0, duration: 0.48, spring: .bouncy)
-        }
-        KeyframeTrack(\Pose.r) {
-            LinearKeyframe(0, duration: 0.14)
-            CubicKeyframe(360, duration: 0.46)
-            LinearKeyframe(360, duration: 0.48)
+    var body: some View {
+        GeometryReader { geometry in
+            let w = geometry.size.width
+            LinearGradient(colors: [.clear, .white.opacity(0.55), .clear], startPoint: .leading, endPoint: .trailing)
+                .frame(width: w * 0.45, height: w * 1.6)
+                .rotationEffect(.degrees(25))
+                .keyframeAnimator(initialValue: -w, trigger: trigger) { band, x in
+                    band.offset(x: x, y: -w * 0.3)
+                } keyframes: { _ in
+                    CubicKeyframe(-w, duration: 0.01)
+                    CubicKeyframe(w * 1.4, duration: Tune.shine)
+                }
         }
     }
 }
@@ -571,7 +536,7 @@ struct Conversation: View {
         } else {
             // Inline Markdown only; full Markdown is the first item of the UI roadmap.
             Text(LocalizedStringKey(message.text))
-                .font(Typeface.serif(16))
+                .font(Typeface.serif(15))
                 .lineSpacing(5)
                 .foregroundStyle(palette.ink)
                 .textSelection(.enabled)
@@ -589,7 +554,7 @@ struct UserCard: View {
     @Environment(\.palette) private var palette
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
         Text(text)
             .font(Typeface.sans(15.5))
             .lineSpacing(3)
@@ -600,8 +565,10 @@ struct UserCard: View {
             .padding(.vertical, 12)
             // The glass alone turns grey on a light surface: a warm fill inside
             // it sets the colour, the glass adds the edge light and depth.
-            .background(shape.fill(palette.cardTop.opacity(palette.dark ? 0.45 : 0.75)))
+            .background(shape.fill(palette.cardTop.opacity(palette.dark ? 0.85 : 0.92)))
             .glassEffect(.regular, in: shape)
+            // Tones down the glass's bright rim on the top and bottom edges.
+            .overlay(shape.strokeBorder(palette.cardTop.opacity(0.55), lineWidth: 1.5))
     }
 }
 
@@ -673,7 +640,7 @@ struct Composer: View {
 
     var body: some View {
         @Bindable var chat = chat
-        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
         VStack(alignment: .leading, spacing: 8) {
             TextField("Ask anything", text: $chat.draft, axis: .vertical)
                 .textFieldStyle(.plain)
@@ -772,8 +739,8 @@ struct SendButton: View {
             chat.busy ? chat.stop() : chat.send()
         } label: {
             ZStack {
-                Circle().fill(ready ? AnyShapeStyle(palette.accentFill) : AnyShapeStyle(palette.faint.opacity(0.45)))
-                Circle().strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(ready ? AnyShapeStyle(palette.accentFill) : AnyShapeStyle(palette.faint.opacity(0.45)))
+                RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
                 ZStack {
                     if chat.busy {
                         RoundedRectangle(cornerRadius: 2.5, style: .continuous)
@@ -823,7 +790,7 @@ struct Sidebar: View {
             Button {} label: {
                 HStack(spacing: 8) {
                     PencilIcon(glyph: .compose, size: 17, color: palette.ink)
-                    Text("New chat").font(Typeface.sans(14.5).weight(.medium)).foregroundStyle(palette.ink)
+                    Text("New chat").font(Typeface.sans(14.5)).foregroundStyle(palette.ink)
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 8)
@@ -844,7 +811,7 @@ struct HoverWash<S: Shape>: ViewModifier {
     @Environment(\.palette) private var palette
     @State private var hovering = false
 
-    init(shape: S = Capsule()) { self.shape = shape }
+    init(shape: S) { self.shape = shape }
 
     func body(content: Content) -> some View {
         content
@@ -853,6 +820,10 @@ struct HoverWash<S: Shape>: ViewModifier {
             .onHover { hovering = $0 }
             .animation(Tune.hover, value: hovering)
     }
+}
+
+extension HoverWash where S == RoundedRectangle {
+    init() { self.init(shape: RoundedRectangle(cornerRadius: 7, style: .continuous)) }
 }
 
 /// Presses sink a little and spring back.
