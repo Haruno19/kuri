@@ -82,11 +82,50 @@ extension EnvironmentValues {
     }
 }
 
-/// Placeholders until the author picks the final pair: a humanist serif for
-/// the model and accents, a humanist sans for everything else.
+/// The type, switchable in the sketch (top right) until the author picks:
+/// a serif for the model and accents, a sans for everything else, a mono for
+/// code. Each list holds font families; "SF Mono" means the system's.
+@MainActor @Observable final class Fonts {
+    static let shared = Fonts()
+
+    static let serifs = ["Iowan Old Style", "Publico Text", "Charter"]
+    static let sanses = ["Instrument Sans", "PT Sans", "Seravek"]
+    static let monos = ["iA Writer Mono S", "Victor Mono", "SF Mono"]
+
+    var serif = serifs[0]
+    var sans = sanses[0]
+    var mono = monos[0]
+
+    init() {
+        Self.registerBundled()
+        if !Self.installed(sans) { sans = Self.sanses[1] }
+    }
+
+    static func installed(_ family: String) -> Bool {
+        family == "SF Mono" || NSFontManager.shared.availableMembers(ofFontFamily: family) != nil
+    }
+
+    /// Fonts dropped in Sketches/Fonts are loaded for this process only, the
+    /// way the app would load fonts it bundles.
+    private static func registerBundled() {
+        let folder = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "Fonts")
+        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        for file in files where ["ttf", "otf"].contains(file.pathExtension.lowercased()) {
+            CTFontManagerRegisterFontsForURL(file as CFURL, .process, nil)
+        }
+    }
+}
+
 enum Typeface {
-    static func serif(_ size: CGFloat) -> Font { .custom("Iowan Old Style", size: size) }
-    static func sans(_ size: CGFloat) -> Font { .custom("Seravek", size: size) }
+    @MainActor static func serif(_ size: CGFloat) -> Font { .custom(Fonts.shared.serif, size: size) }
+    @MainActor static func sans(_ size: CGFloat) -> Font { .custom(Fonts.shared.sans, size: size) }
+    /// Code is set smaller than the text around it: monospaced faces look
+    /// bigger at the same point size.
+    @MainActor static func mono(_ size: CGFloat) -> Font {
+        let family = Fonts.shared.mono
+        return family == "SF Mono" ? .system(size: size, design: .monospaced) : .custom(family, size: size)
+    }
+    static let monoScale: CGFloat = 0.86
 }
 
 // MARK: - Fake conversation
@@ -214,7 +253,13 @@ struct Root: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                ThemeButton(theme: $theme).padding(.top, 10).padding(.trailing, 14)
+                HStack(spacing: 2) {
+                    FontButton(role: "Serif", choices: Fonts.serifs, choice: Bindable(Fonts.shared).serif)
+                    FontButton(role: "Sans", choices: Fonts.sanses, choice: Bindable(Fonts.shared).sans)
+                    FontButton(role: "Mono", choices: Fonts.monos, choice: Bindable(Fonts.shared).mono)
+                    ThemeButton(theme: $theme)
+                }
+                .padding(.top, 10).padding(.trailing, 14)
             }
             // Only the top: the content stays beside the sidebar, so the
             // chat shifts right when it opens instead of sliding under it.
@@ -250,6 +295,32 @@ struct Root: View {
                 }
             }
         }
+    }
+}
+
+/// Sketch only: cycles one role through its candidate fonts. The label is
+/// set in the font it names; fonts that aren't installed are skipped.
+struct FontButton: View {
+    let role: String
+    let choices: [String]
+    @Binding var choice: String
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        Button {
+            let available = choices.filter(Fonts.installed)
+            guard let i = available.firstIndex(of: choice) else { choice = available.first ?? choice; return }
+            choice = available[(i + 1) % available.count]
+        } label: {
+            Text(choice)
+                .font(role == "Mono" ? Typeface.mono(12) : role == "Serif" ? Typeface.serif(13) : Typeface.sans(13))
+                .foregroundStyle(palette.secondary)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .modifier(HoverWash())
+        }
+        .buttonStyle(Squish())
+        .help("Sketch only: next \(role.lowercased()) font")
     }
 }
 
@@ -543,6 +614,16 @@ struct Conversation: View {
         }
     }
 
+    /// Inline Markdown, with code in the mono face at a smaller size.
+    private func reply(_ text: String, size: CGFloat) -> AttributedString {
+        var string = (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+            ?? AttributedString(text)
+        for run in string.runs where run.inlinePresentationIntent?.contains(.code) == true {
+            string[run.range].font = Typeface.mono(size * Typeface.monoScale)
+        }
+        return string
+    }
+
     @ViewBuilder private func row(_ message: Chat.Message) -> some View {
         if message.fromUser {
             UserCard(text: message.text)
@@ -551,7 +632,7 @@ struct Conversation: View {
                     removal: .opacity))
         } else {
             // Inline Markdown only; full Markdown is the first item of the UI roadmap.
-            Text(LocalizedStringKey(message.text))
+            Text(reply(message.text, size: 15))
                 .font(Typeface.serif(15))
                 .lineSpacing(5)
                 .foregroundStyle(palette.ink)
