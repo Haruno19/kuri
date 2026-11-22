@@ -24,6 +24,9 @@ public actor Engine {
     private let broadcaster: EventBroadcaster
     private let factory: ProviderFactory
     private var providers: [String: any InferenceProvider] = [:]
+    /// Models listed by providers that have `discoverModels: true`.
+    private var discovered: [String: [String]] = [:]
+    private var discovery: Task<Void, Never>?
     private var running: [UUID: Task<Void, Never>] = [:]
     private var watcher: Task<Void, Never>?
 
@@ -63,12 +66,14 @@ public actor Engine {
         await registry.onChange { [broadcaster] in broadcaster.emit(.toolsChanged) }
         await applyToolPolicies()
         await mcp.apply(mcpConfig)
+        refreshDiscoveredModels()
         startWatching()
     }
 
     /// Disconnects MCP servers and stops their processes. Call on quit.
     public func shutdown() async {
         watcher?.cancel()
+        discovery?.cancel()
         for task in running.values { task.cancel() }
         await mcp.shutdown()
     }
@@ -79,7 +84,17 @@ public actor Engine {
 
     // MARK: Configuration
 
-    public var models: [ModelRef] { config.declaredModels }
+    /// Every model the user can pick: the ones declared in `config.json`,
+    /// plus the ones served by providers with `discoverModels: true`.
+    public var models: [ModelRef] {
+        var models = config.declaredModels
+        for (provider, ids) in discovered.sorted(by: { $0.key < $1.key }) {
+            for id in ids where !models.contains(ModelRef(provider: provider, model: id)) {
+                models.append(ModelRef(provider: provider, model: id))
+            }
+        }
+        return models
+    }
 
     public func reloadConfig() async {
         let loader = ConfigLoader(home: home)
@@ -89,6 +104,7 @@ public actor Engine {
             providers.removeAll()
             await applyToolPolicies()
             await mcp.apply(mcpConfig)
+            refreshDiscoveredModels()
             broadcaster.emit(.configReloaded)
         } catch {
             broadcaster.emit(.configFailed(error.localizedDescription))
@@ -117,6 +133,51 @@ public actor Engine {
         let provider = try factory.make(name: ref.provider, config: providerConfig)
         providers[ref.provider] = provider
         return provider
+    }
+
+    // MARK: Models
+
+    /// Asks a provider which models it serves, for the registration UI.
+    public func availableModels(provider name: String) async throws -> [String] {
+        guard let providerConfig = config.providers[name] else { throw KuriError.unknownProvider(name) }
+        return try await factory.discoverModels(name: name, config: providerConfig)
+    }
+
+    /// Adds (or replaces) a model in `config.json`.
+    public func register(_ model: ModelConfig, provider: String) async throws {
+        try ConfigEditor(home: home).register(model, provider: provider)
+        await reloadConfig()
+    }
+
+    public func unregister(model id: String, provider: String) async throws {
+        try ConfigEditor(home: home).unregister(model: id, provider: provider)
+        await reloadConfig()
+    }
+
+    public func setDefaultModel(_ ref: ModelRef?) async throws {
+        try ConfigEditor(home: home).setDefaultModel(ref)
+        await reloadConfig()
+    }
+
+    private func refreshDiscoveredModels() {
+        discovery?.cancel()
+        let targets = config.providers.filter { $0.value.discoverModels == true }
+        let factory = factory
+        discovery = Task { [weak self] in
+            var found: [String: [String]] = [:]
+            for (name, providerConfig) in targets {
+                // A provider that's offline just contributes nothing.
+                found[name] = try? await factory.discoverModels(name: name, config: providerConfig)
+            }
+            guard !Task.isCancelled else { return }
+            await self?.setDiscovered(found)
+        }
+    }
+
+    private func setDiscovered(_ found: [String: [String]]) {
+        guard found != discovered else { return }
+        discovered = found
+        broadcaster.emit(.configReloaded)
     }
 
     // MARK: Tools

@@ -33,7 +33,7 @@ let package = Package(
         .testTarget(name: "KuriCoreTests", dependencies: ["KuriCore"]),
         .testTarget(name: "KuriConfigTests", dependencies: ["KuriConfig"]),
         .testTarget(name: "KuriStoreTests", dependencies: ["KuriStore"]),
-        .testTarget(name: "KuriInferenceTests", dependencies: ["KuriInference"]),
+        .testTarget(name: "KuriInferenceTests", dependencies: ["KuriInference", "KuriConfig"]),
         .testTarget(name: "KuriToolsTests", dependencies: ["KuriTools"]),
         .testTarget(
             name: "KuriMCPTests",

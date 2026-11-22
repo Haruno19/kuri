@@ -9,6 +9,7 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             Tab("General", systemImage: "gearshape") { GeneralSettings() }
+            Tab("Models", systemImage: "cpu") { ModelsSettings() }
             Tab("Tools", systemImage: "wrench.and.screwdriver") { ToolsSettings() }
             Tab("Memory", systemImage: "brain") { MemorySettings() }
         }
@@ -35,14 +36,6 @@ private struct GeneralSettings: View {
                     }
                 }
             }
-            Section("Models") {
-                if model.models.isEmpty {
-                    Text("No models declared in config.json.").foregroundStyle(.secondary)
-                }
-                ForEach(model.models, id: \.self) { ref in
-                    Text(ref.description).font(.body.monospaced())
-                }
-            }
         }
         .formStyle(.grouped)
     }
@@ -51,6 +44,174 @@ private struct GeneralSettings: View {
         LabeledContent(title) {
             Button("Open \(url.lastPathComponent)") { NSWorkspace.shared.open(url) }
         }
+    }
+}
+
+// MARK: - Models
+
+private struct ModelsSettings: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("New conversations use", selection: Binding(
+                    get: { model.config.defaultModel },
+                    set: { ref in Task { await model.setDefaultModel(ref) } })
+                ) {
+                    Text("None").tag(ModelRef?.none)
+                    ForEach(model.models, id: \.self) { ref in
+                        Text(ref.description).tag(Optional(ref))
+                    }
+                }
+            }
+
+            ForEach(model.config.providers.keys.sorted(), id: \.self) { name in
+                if let provider = model.config.providers[name] {
+                    ProviderModelsSection(name: name, provider: provider)
+                }
+            }
+
+            Section {
+                if let home = model.engine?.home {
+                    LabeledContent(model.config.providers.isEmpty ? "No providers yet" : "Providers") {
+                        Button("Open config.json") { NSWorkspace.shared.open(home.configFile) }
+                    }
+                }
+            } footer: {
+                Text("""
+                    Providers are declared in config.json. Models you add here are written to it; \
+                    Kuri rewrites the file as tidy JSON5, so comments in it are not kept.
+                    """)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+private struct ProviderModelsSection: View {
+    @Environment(AppModel.self) private var model
+    let name: String
+    let provider: ProviderConfig
+
+    @State private var draft = ""
+    @State private var contextWindow = ""
+    @State private var available: [String] = []
+    @State private var discoveryError: String?
+    @State private var isDiscovering = false
+
+    private var registered: [ModelConfig] { provider.models ?? [] }
+
+    /// Served models not registered yet, narrowed by what's typed.
+    private var suggestions: [String] {
+        let ids = Set(registered.map(\.id))
+        let candidates = available.filter { !ids.contains($0) }
+        guard !draft.isEmpty else { return candidates }
+        return candidates.filter { $0.localizedCaseInsensitiveContains(draft) }
+    }
+
+    var body: some View {
+        Section {
+            ForEach(registered, id: \.id) { entry in
+                let ref = ModelRef(provider: name, model: entry.id)
+                HStack {
+                    Text(entry.id).font(.body.monospaced())
+                    if let window = entry.contextWindow {
+                        Text("\(window.formatted()) tokens").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if model.config.defaultModel == ref {
+                        Text("default").font(.caption.weight(.medium)).foregroundStyle(.tint)
+                    }
+                    Spacer()
+                    Menu {
+                        Button("Use for New Conversations") { Task { await model.setDefaultModel(ref) } }
+                        Button("Remove", role: .destructive) {
+                            Task { await model.unregister(model: entry.id, provider: name) }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                }
+            }
+            if provider.discoverModels == true {
+                Text("Every model this server lists is also available, without adding it (discoverModels).")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            HStack {
+                TextField("Model id", text: $draft, prompt: Text(available.isEmpty ? "Model id" : "Model id — start typing or pick one"))
+                    .textInputSuggestions {
+                        ForEach(suggestions, id: \.self) { id in
+                            Text(id).textInputCompletion(id)
+                        }
+                    }
+                    .onSubmit(add)
+                if !available.isEmpty {
+                    Menu {
+                        ForEach(suggestions, id: \.self) { id in
+                            Button(id) { draft = id }
+                        }
+                    } label: {
+                        Image(systemName: "chevron.up.chevron.down")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help("Models served by \(name)")
+                }
+                TextField("Context", text: $contextWindow, prompt: Text("Context"))
+                    .frame(width: 80)
+                    .help("Context window in tokens (optional)")
+                Button("Add", action: add)
+                    .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .labelsHidden()
+
+            if let discoveryError {
+                Text(discoveryError).font(.caption).foregroundStyle(.secondary)
+            }
+        } header: {
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(name)
+                    Text([provider.format.rawValue, provider.baseURL?.absoluteString].compactMap { $0 }.joined(separator: " · "))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if isDiscovering {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button("Refresh", systemImage: "arrow.clockwise") { Task { await discover() } }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .help("Ask \(name) which models it serves")
+                }
+            }
+        }
+        .task(id: name) { await discover() }
+    }
+
+    private func discover() async {
+        isDiscovering = true
+        defer { isDiscovering = false }
+        do {
+            available = try await model.availableModels(provider: name)
+            discoveryError = available.isEmpty ? "\(name) lists no models." : nil
+        } catch {
+            available = []
+            discoveryError = "Couldn't list models: \(error.localizedDescription) You can still type an id."
+        }
+    }
+
+    private func add() {
+        let id = draft.trimmingCharacters(in: .whitespaces)
+        guard !id.isEmpty else { return }
+        let entry = ModelConfig(id: id, contextWindow: Int(contextWindow.trimmingCharacters(in: .whitespaces)))
+        draft = ""
+        contextWindow = ""
+        Task { await model.register(entry, provider: name) }
     }
 }
 

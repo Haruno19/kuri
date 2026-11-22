@@ -1,4 +1,5 @@
 import Foundation
+import KuriConfig
 import KuriCore
 import Testing
 @testable import KuriInference
@@ -86,5 +87,39 @@ import Testing
         #expect(input.map { $0["type"]?.stringValue } == ["message", "function_call", "function_call_output", "message"])
         #expect(input[3]["content"] == [["type": "output_text", "text": "Done."]])
         #expect(body["tools"] == [["type": "function", "name": "tasklist", "description": "d", "parameters": ["type": "object"]]])
+    }
+}
+
+final class ModelsStub: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var authorization: String?
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "models.test" }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        Self.authorization = request.value(forHTTPHeaderField: "Authorization")
+        let body = #"{"object":"list","data":[{"id":"qwen3.5:2b"},{"id":"bonsai-2:9b"},{"id":"qwen3.5:2b"}]}"#
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                                              headerFields: nil)!, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+@Suite struct ModelDiscoveryTests {
+    @Test func listsModelsFromTheModelsEndpoint() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ModelsStub.self]
+        let factory = ProviderFactory(session: URLSession(configuration: configuration))
+        let models = try await factory.discoverModels(
+            name: "x", config: ProviderConfig(format: .openResponses, baseURL: URL(string: "http://models.test/v1"),
+                                             apiKey: .literal("k")))
+        #expect(models == ["bonsai-2:9b", "qwen3.5:2b"])
+        #expect(ModelsStub.authorization == "Bearer k")
+    }
+
+    @Test func saysWhenDiscoveryIsUnsupported() async {
+        await #expect(throws: KuriError.self) {
+            try await ProviderFactory().discoverModels(name: "a", config: ProviderConfig(format: .anthropicMessages))
+        }
     }
 }

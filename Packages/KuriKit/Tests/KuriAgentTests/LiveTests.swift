@@ -160,4 +160,35 @@ struct LiveTests {
         #expect(run.toolNames.contains("calc__add"))
         #expect(run.reply.contains("5555") || run.reply.contains("5,555"))
     }
+
+    @Test func discoversAndRegistersModels() async throws {
+        let model = try #require(Live.model)
+        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-live-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let home = KuriHome(root: root)
+        try home.prepare()
+        try Data("""
+            { providers: { \(model.provider): { format: "open-responses", baseURL: "\(Live.baseURL.absoluteString)", discoverModels: true } } }
+            """.utf8).write(to: home.configFile)
+        let engine = try await Engine.open(home: home)
+        defer { Task { await engine.shutdown() } }
+
+        let available = try await engine.availableModels(provider: model.provider)
+        print("\n── \(model.provider) serves: \(available.joined(separator: ", "))")
+        #expect(available.contains(model.model))
+
+        // discoverModels makes them pickable without registering.
+        for _ in 0..<100 {
+            if await engine.models.contains(model) { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(await engine.models.contains(model))
+
+        try await engine.register(ModelConfig(id: model.model, contextWindow: 32768), provider: model.provider)
+        try await engine.setDefaultModel(model)
+        let config = await engine.config
+        #expect(config.defaultModel == model)
+        #expect(config.modelConfig(for: model)?.contextWindow == 32768)
+        print(try String(contentsOf: home.configFile, encoding: .utf8))
+    }
 }

@@ -24,8 +24,6 @@ final class ScriptedProvider: InferenceProvider {
             continuation.finish()
         }
     }
-
-    func listModels() async throws -> [String] { [] }
 }
 
 struct Answering: UserInteraction {

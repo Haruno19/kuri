@@ -18,7 +18,7 @@ public enum KuriError: Error, LocalizedError, Sendable {
         switch self {
         case .unknownItemKind(let kind): "Unknown item kind “\(kind)”."
         case .unknownProvider(let name): "No provider named “\(name)” in config.json."
-        case .unsupportedWireFormat(let format): "The “\(format)” wire format isn't implemented yet."
+        case .unsupportedWireFormat(let feature): "“\(feature)” isn't implemented yet."
         case .missingSecret(let ref): "Secret “\(ref)” not found."
         case .invalidConfig(let file, let reason): "\(file): \(reason)"
         case .http(let status, let body): "HTTP \(status): \(body)"

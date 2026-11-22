@@ -6,9 +6,6 @@ import KuriCore
 /// format on the way out, and its stream back to `InferenceEvent`s.
 public protocol InferenceProvider: Sendable {
     func stream(_ request: InferenceRequest) -> AsyncThrowingStream<InferenceEvent, any Error>
-
-    /// The models the provider says it serves, for `discoverModels`.
-    func listModels() async throws -> [String]
 }
 
 /// Builds the provider for a `config.json` entry.
@@ -22,10 +19,7 @@ public struct ProviderFactory: Sendable {
     }
 
     public func make(name: String, config: ProviderConfig) throws -> any InferenceProvider {
-        var headers: [String: String] = [:]
-        for (key, ref) in config.headers ?? [:] {
-            headers[key] = try secrets.resolve(ref)
-        }
+        var headers = try resolveHeaders(config)
         let apiKey = try config.apiKey.map { try secrets.resolve($0) }
 
         switch config.format {
@@ -38,5 +32,35 @@ public struct ProviderFactory: Sendable {
         case .anthropicMessages, .gemini, .chatCompletions, .appleFoundationModels:
             throw KuriError.unsupportedWireFormat(config.format.rawValue)
         }
+    }
+
+    /// The models a provider says it serves (`GET <baseURL>/models`).
+    ///
+    /// Works for every OpenAI-style server: Ollama, LM Studio, vLLM,
+    /// OpenAI, OpenRouter… Other wire formats will get their own listing
+    /// along with their adapters.
+    public func discoverModels(name: String, config: ProviderConfig) async throws -> [String] {
+        switch config.format {
+        case .openResponses, .chatCompletions:
+            guard let baseURL = config.baseURL else {
+                throw KuriError.invalidConfig(file: "config.json", reason: "provider “\(name)” needs a baseURL")
+            }
+            var headers = try resolveHeaders(config)
+            if let apiKey = try config.apiKey.map({ try secrets.resolve($0) }) {
+                headers["Authorization"] = "Bearer \(apiKey)"
+            }
+            struct List: Decodable {
+                struct Model: Decodable { let id: String }
+                let data: [Model]
+            }
+            let data = try await HTTP.getJSON(session: session, url: baseURL.appending(path: "models"), headers: headers)
+            return Array(Set(try JSONDecoder().decode(List.self, from: data).data.map(\.id))).sorted()
+        case .anthropicMessages, .gemini, .appleFoundationModels:
+            throw KuriError.unsupportedWireFormat("\(config.format.rawValue) model discovery")
+        }
+    }
+
+    private func resolveHeaders(_ config: ProviderConfig) throws -> [String: String] {
+        try (config.headers ?? [:]).mapValues { try secrets.resolve($0) }
     }
 }

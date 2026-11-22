@@ -85,9 +85,9 @@ cd Packages/KuriKit && KURI_LIVE_MODEL=ollama/qwen3.5:2b swift test --filter Liv
 | Module | Responsibility | Depends on |
 |---|---|---|
 | `KuriCore` | `Item`, `ContentPart`, `ToolCall`, `ToolSpec`, `InferenceEvent`, `Usage`, `ModelRef`, `JSONValue` | — |
-| `KuriConfig` | Resolves `~/.config/kuri`, loads and watches `config.json` / `mcp.json`, resolves secrets from Keychain or environment | Core |
+| `KuriConfig` | Resolves `~/.config/kuri`, loads and watches `config.json` / `mcp.json`, edits `config.json` for the UI, resolves secrets from Keychain or environment | Core |
 | `KuriStore` | SQLite wrapper, migrations, conversations, turns, items, full-text search, memories | Core |
-| `KuriInference` | `InferenceProvider` protocol, SSE parser, one adapter per wire format | Core, Config |
+| `KuriInference` | `InferenceProvider` protocol, SSE parser, one adapter per wire format, model discovery | Core, Config |
 | `KuriTools` | `Tool` protocol, `ToolRegistry`, permission policy, built-in tools | Core, Store |
 | `KuriAgent` | `Engine` facade, `TurnRunner` (the agent loop), `InteractionBroker` (clarify/approval), event broadcasting | all of the above |
 | `KuriMCP` | MCP connections on the official Swift SDK: config diffing, discovery, process transport, MCP tools as `Tool`s | Core, Config, Tools |
@@ -154,7 +154,7 @@ Every tool implements `Tool`: a spec (name, description, JSON Schema), a default
 - `clarify` blocks the turn and shows a panel with the questions (and suggested answers, if the model gave any). The answers come back as the tool's result.
 - `tasklist` has no table: the current plan is the arguments of the latest successful call. The app pins it above the composer while it has open tasks.
 - `memory` entries appear in every conversation's instructions with a short id (`m12`), so the model edits them directly. All changes in a call land atomically, and the call fails if the entries would exceed 4,000 characters in total, so the model has to make room in the same call. The tool's description spells out what *not* to save. You can view and edit memories in Settings.
-- `conversation_search` matches any of the words (as prefixes, ranked by how many match), groups hits by conversation, and returns each hit with the messages before and after it. By default it searches the other conversations; `scope: "this_chat"` recovers exact details from the current conversation once they've been compacted away.
+- `conversation_search` matches any of the words (as prefixes, ranked by how many match), groups hits by conversation, and returns each hit with the messages before and after it. By default it searches the other conversations; `scope: "this_chat"` searches only the part of the current conversation that a summary replaced, to recover exact details after compaction. (If nothing was summarized yet, it searches the other conversations instead and says so.)
 
 **No file tools.** The shell lists, reads, searches and writes files; separate `read_file`/`write_file`/`edit_file` tools would only duplicate it. One tool, one path namespace, one place to sandbox.
 
@@ -243,6 +243,13 @@ Both config files are **JSON5**: comments, unquoted keys and trailing commas are
 }
 ```
 
+**Models.** Each provider lists its models under `models`, as bare ids or objects with optional `name`, `contextWindow`, `maxOutputTokens`, `reasoningEffort` and `fallbacks`. Two ways to fill that list without typing:
+
+- **Settings › Models** registers models per provider. The id field is a combobox pre-filled with what the provider serves (`GET <baseURL>/models`, available for every OpenAI-style server: Ollama, LM Studio, vLLM, OpenAI, OpenRouter…). You can still type any id. Removing a model and picking the default model live there too.
+- **`discoverModels: true`** on a provider makes every model it serves pickable without registering it. Handy for a local Ollama.
+
+When the app changes `config.json`, `ConfigEditor` edits it as a generic JSON tree, so keys Kuri doesn't know survive. It checks that the result still loads, then writes it back as tidy JSON5 with a stable key order. Hand-written comments and formatting are not kept; the file's header says so.
+
 **Secrets** are references, never values: `keychain:<name>` reads the generic password stored by Kuri under that name, `env:<VAR>` reads an environment variable. A literal string also works, but it then sits in a plain file.
 
 UI preferences (theme, window state, hotkey) are not configuration in this sense; they live in `UserDefaults` like any Mac app's.
@@ -270,7 +277,7 @@ memories             (id, content, source, status, supersedes_id, origin_convers
 - **Main window**: sidebar of conversations, transcript, composer.
 - **Menu bar** (`MenuBarExtra`): quick access and a compact chat; the app keeps running in the background with no windows open.
 - **Mini panel** *(planned)*: a floating, non-activating `NSPanel` summoned with a global hotkey.
-- **Settings**: shows where the config lives, opens it in your editor, and (planned) edits providers and MCP servers. Edits made from the UI rewrite the JSON5 file, so hand-written comments in it are not preserved.
+- **Settings**: *General* shows where the config lives; *Models* registers models per provider (with discovery) and sets the default; *Tools* lists built-in tools and MCP servers with their state and policies; *Memory* views and edits what Kuri remembers. Providers and MCP servers are still edited in their files.
 - **Styling**: every control gets its look from custom `ButtonStyle`/`ToggleStyle`/… implementations reading a theme from the environment, so the whole app can be re-skinned in one place. See `Sketches/` for what plain SwiftUI can do.
 
 ### Distribution and security

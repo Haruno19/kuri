@@ -42,15 +42,6 @@ public struct OpenResponsesProvider: InferenceProvider {
         }
     }
 
-    public func listModels() async throws -> [String] {
-        struct List: Decodable {
-            struct Model: Decodable { let id: String }
-            let data: [Model]
-        }
-        let data = try await HTTP.getJSON(session: session, url: baseURL.appending(path: "models"), headers: headers)
-        return try JSONDecoder().decode(List.self, from: data).data.map(\.id).sorted()
-    }
-
     // MARK: Request
 
     static func body(for request: InferenceRequest) -> JSONValue {

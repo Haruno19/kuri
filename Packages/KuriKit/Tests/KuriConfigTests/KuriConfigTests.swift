@@ -88,3 +88,71 @@ import Testing
         #expect(KuriHome.resolve(environment: [:]).root.path.hasSuffix("/.config/kuri"))
     }
 }
+
+@Suite struct ConfigEditorTests {
+    private func home(with text: String) throws -> KuriHome {
+        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-edit-\(UUID().uuidString)")
+        let home = KuriHome(root: root)
+        try home.prepare()
+        try Data(text.utf8).write(to: home.configFile)
+        return home
+    }
+
+    @Test func registersModelsAndKeepsUnknownKeys() throws {
+        let home = try home(with: """
+            // a comment that will be dropped
+            {
+              defaultModel: "ollama/a",
+              someFutureKey: { nested: true },
+              providers: { ollama: { format: "open-responses", baseURL: "http://localhost:11434/v1", models: ["a"], custom: 1 } },
+            }
+            """)
+        defer { try? FileManager.default.removeItem(at: home.root) }
+        let editor = ConfigEditor(home: home)
+
+        try editor.register(ModelConfig(id: "b", contextWindow: 32768), provider: "ollama")
+        try editor.register(ModelConfig(id: "a", reasoningEffort: "high"), provider: "ollama")  // replaces
+        try editor.unregister(model: "missing", provider: "ollama")
+        try editor.setDefaultModel(ModelRef("ollama/b"))
+
+        let text = try String(contentsOf: home.configFile, encoding: .utf8)
+        let config = try ConfigLoader.decode(Config.self, from: Data(text.utf8))
+        #expect(config.defaultModel == ModelRef("ollama/b"))
+        #expect(config.providers["ollama"]?.models == [ModelConfig(id: "a", reasoningEffort: "high"),
+                                                       ModelConfig(id: "b", contextWindow: 32768)])
+        #expect(text.contains("someFutureKey: { nested: true },"))
+        #expect(text.contains("custom: 1,"))
+        #expect(!text.contains("a comment that will be dropped"))
+        #expect(text.hasPrefix("// Kuri configuration."))
+
+        try editor.unregister(model: "a", provider: "ollama")
+        #expect(try ConfigLoader(home: home).loadConfig().providers["ollama"]?.models?.map(\.id) == ["b"])
+    }
+
+    @Test func refusesUnknownProviders() throws {
+        let home = try home(with: #"{ providers: {} }"#)
+        defer { try? FileManager.default.removeItem(at: home.root) }
+        #expect(throws: KuriError.self) { try ConfigEditor(home: home).register(ModelConfig(id: "x"), provider: "nope") }
+    }
+
+    @Test func writesReadableJSON5() throws {
+        let value: JSONValue = [
+            "providers": ["ollama": ["models": ["a", ["id": "b", "contextWindow": 65536]], "format": "open-responses"]],
+            "defaultModel": "ollama/a",
+            "weird key": 1.5,
+        ]
+        #expect(JSON5Writer.write(value) == """
+            {
+              defaultModel: "ollama/a",
+              providers: {
+                ollama: {
+                  format: "open-responses",
+                  models: ["a", { id: "b", contextWindow: 65536 }],
+                },
+              },
+              "weird key": 1.5,
+            }
+
+            """)
+    }
+}

@@ -1,5 +1,6 @@
 import Foundation
 import KuriAgent
+import KuriConfig
 import KuriCore
 import KuriMCP
 import KuriStore
@@ -33,6 +34,7 @@ final class AppModel {
     private(set) var running: Set<UUID> = []
     private(set) var inputRequests: [InputRequest] = []
     private(set) var models: [ModelRef] = []
+    private(set) var config = Config()
     private(set) var tools: [ToolInfo] = []
     private(set) var memories: [Memory] = []
     private(set) var mcpServers: [MCPServerStatus] = []
@@ -64,6 +66,7 @@ final class AppModel {
             self.engine = engine
             conversations = try await engine.store.conversations()
             models = await engine.models
+            config = await engine.config
             tools = await engine.toolCatalog()
             memories = try await engine.memories()
             mcpServers = await engine.mcpServers()
@@ -140,6 +143,38 @@ final class AppModel {
         await engine?.reconnectMCPServer(name)
     }
 
+    // MARK: Models
+
+    /// The models a provider serves, for the registration combobox.
+    func availableModels(provider: String) async throws -> [String] {
+        guard let engine else { return [] }
+        return try await engine.availableModels(provider: provider)
+    }
+
+    func register(_ model: ModelConfig, provider: String) async {
+        do {
+            try await engine?.register(model, provider: provider)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func unregister(model id: String, provider: String) async {
+        do {
+            try await engine?.unregister(model: id, provider: provider)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func setDefaultModel(_ ref: ModelRef?) async {
+        do {
+            try await engine?.setDefaultModel(ref)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     // MARK: Memory
 
     func changeMemories(_ changes: [MemoryChange]) async {
@@ -204,7 +239,11 @@ final class AppModel {
             inputRequests.removeAll { $0.id == id }
 
         case .configReloaded:
-            Task { models = await engine?.models ?? [] }
+            Task {
+                guard let engine else { return }
+                models = await engine.models
+                config = await engine.config
+            }
 
         case .configFailed(let message):
             errorMessage = message
