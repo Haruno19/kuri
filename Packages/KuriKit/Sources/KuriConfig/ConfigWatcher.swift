@@ -1,6 +1,6 @@
 import Foundation
 
-/// Signals when anything in the `~/.kuri` folder changes.
+/// Signals when anything in the `~/.config/kuri` folder changes.
 ///
 /// Watches the folder rather than the files: editors save by writing a new
 /// file and renaming it over the old one, which a per-file watch would miss.

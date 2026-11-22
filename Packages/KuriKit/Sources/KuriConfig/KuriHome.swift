@@ -1,8 +1,8 @@
 import Foundation
 
-/// The `~/.kuri` folder and everything in it.
+/// The folder holding Kuri's configuration and data, `~/.config/kuri` by default.
 ///
-/// Override the location with the `KURI_HOME` environment variable.
+/// Resolution order: `KURI_HOME`, then `$XDG_CONFIG_HOME/kuri`, then `~/.config/kuri`.
 public struct KuriHome: Sendable {
     public let root: URL
 
@@ -14,7 +14,12 @@ public struct KuriHome: Sendable {
         if let custom = environment["KURI_HOME"], !custom.isEmpty {
             return KuriHome(root: URL(filePath: (custom as NSString).expandingTildeInPath, directoryHint: .isDirectory))
         }
-        return KuriHome(root: FileManager.default.homeDirectoryForCurrentUser.appending(path: ".kuri", directoryHint: .isDirectory))
+        let configRoot: URL = if let xdg = environment["XDG_CONFIG_HOME"], !xdg.isEmpty {
+            URL(filePath: (xdg as NSString).expandingTildeInPath, directoryHint: .isDirectory)
+        } else {
+            FileManager.default.homeDirectoryForCurrentUser.appending(path: ".config", directoryHint: .isDirectory)
+        }
+        return KuriHome(root: configRoot.appending(path: "kuri", directoryHint: .isDirectory))
     }
 
     public var configFile: URL { root.appending(path: "config.json") }

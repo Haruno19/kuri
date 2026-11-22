@@ -25,7 +25,7 @@ public actor Engine {
     private var running: [UUID: Task<Void, Never>] = [:]
     private var watcher: Task<Void, Never>?
 
-    /// Opens `~/.kuri` (creating it on first launch), loads the config and
+    /// Opens `~/.config/kuri` (creating it on first launch), loads the config and
     /// the database, and starts watching the config files.
     public static func open(home: KuriHome = .resolve()) async throws -> Engine {
         try home.prepare()

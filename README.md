@@ -31,7 +31,7 @@ Kuri/
 ├─ Packages/KuriKit/      Everything that is not UI, as a local Swift package
 │  ├─ Sources/
 │  │  ├─ KuriCore/        Domain types. No dependencies.
-│  │  ├─ KuriConfig/      ~/.kuri paths, JSON5 config, secrets
+│  │  ├─ KuriConfig/      ~/.config/kuri paths, JSON5 config, secrets
 │  │  ├─ KuriStore/       SQLite storage
 │  │  ├─ KuriInference/   Provider protocol, SSE, wire-format adapters
 │  │  ├─ KuriTools/       Tool protocol, registry, permissions, built-in tools
@@ -78,13 +78,13 @@ cd Packages/KuriKit && swift test
 | Module | Responsibility | Depends on |
 |---|---|---|
 | `KuriCore` | `Item`, `ContentPart`, `ToolCall`, `ToolSpec`, `InferenceEvent`, `Usage`, `ModelRef`, `JSONValue` | — |
-| `KuriConfig` | Resolves `~/.kuri`, loads and watches `config.json` / `mcp.json`, resolves secrets from Keychain or environment | Core |
+| `KuriConfig` | Resolves `~/.config/kuri`, loads and watches `config.json` / `mcp.json`, resolves secrets from Keychain or environment | Core |
 | `KuriStore` | SQLite wrapper, migrations, conversations, turns, items, full-text search, memories | Core |
 | `KuriInference` | `InferenceProvider` protocol, SSE parser, one adapter per wire format | Core, Config |
 | `KuriTools` | `Tool` protocol, `ToolRegistry`, permission policy, built-in tools | Core, Store |
 | `KuriAgent` | `Engine` facade, `TurnRunner` (the agent loop), `InteractionBroker` (clarify/approval), event broadcasting | all of the above |
 | `KuriMCP` *(planned)* | MCP client manager on the official Swift SDK; turns MCP tools into `Tool`s | Core, Config, Tools |
-| `KuriSandbox` *(planned)* | Container lifecycle on Apple Containerization; `shell` tool | Core, Config, Tools |
+| `KuriSandbox` *(planned)* | Container lifecycle on Apple Containerization; the `shell` tool | Core, Config, Tools |
 | `KuriMarkdown` *(planned)* | Streaming Markdown → SwiftUI renderer on `swift-markdown` | — |
 
 Dependencies point one way: down towards `KuriCore`. Nothing in the package imports SwiftUI.
@@ -137,12 +137,14 @@ Every tool implements `Tool`: a spec (name, description, JSON Schema), a default
 | `tasklist` | Write the current task list (the whole list each call) | allow |
 | `memory` | Add, update, remove or list long-term memories | allow |
 | `conversation_search` | Full-text search over past conversations | allow |
-| `read_file`, `list_files`, `search_files` *(planned)* | Read inside the attached folders | allow |
-| `write_file`, `edit_file` *(planned)* | Change files inside the attached folders | ask |
 | `shell` *(planned)* | Run a command in the conversation's container | allow (it's sandboxed) |
 | MCP tools *(planned)* | Discovered at runtime, named `server__tool` | per `mcp.json`, else ask |
 
 The task list has no table: the current list is the arguments of the latest `tasklist` call.
+
+**No file tools.** The shell lists, reads, searches and writes files; separate `read_file`/`write_file`/`edit_file` tools would only duplicate it. One tool, one path namespace, one place to sandbox.
+
+**No artifacts.** A file the model creates is just a file, in an attached folder or in the conversation's scratch folder. There is no separate concept of generated documents to store, list or preview.
 
 ### MCP (planned)
 
@@ -158,19 +160,19 @@ Built on the official [MCP Swift SDK](https://github.com/modelcontextprotocol/sw
 One container type, one container per conversation, built on Apple's [Containerization](https://github.com/apple/containerization) package (each container is its own lightweight VM).
 
 - Started lazily on the first `shell` call, stopped after a period of inactivity.
-- **The container is disposable; the folders are not.** Attached folders are mounted at `/work/<name>` (or `/work` if there's only one); with no folder attached, a per-conversation scratch folder in `~/.kuri/scratch/` is mounted instead. Edits land directly on disk.
+- **The container is disposable; the folders are not.** Attached folders are mounted at `/work/<name>` (or `/work` if there's only one); with no folder attached, a per-conversation scratch folder in `~/.config/kuri/scratch/` is mounted instead. Edits land directly on disk.
 - Network is off by default; it can be turned on per conversation.
-- File tools run on the host, but only inside the attached folders, using the same `/work/...` paths the shell sees — one path namespace for the model.
+- The shell is the only way the model touches files: listing, reading, searching and editing all happen in the container, on the mounted folders.
 - The image is configurable in `config.json`; once pulled it is cached, so the sandbox works offline.
 - Runs in an XPC service inside the app bundle, so a misbehaving VM can't take the app down.
 - Not covered by design: macOS-native commands (`xcodebuild`, `open`…). A host-side shell with approval may come later.
 
 ### Configuration
 
-Everything lives in `~/.kuri` (override with the `KURI_HOME` environment variable):
+Everything lives in `~/.config/kuri`. The location resolves in this order: the `KURI_HOME` environment variable, then `$XDG_CONFIG_HOME/kuri`, then `~/.config/kuri`.
 
 ```
-~/.kuri/
+~/.config/kuri/
 ├─ config.json     providers, models, defaults, sandbox settings
 ├─ mcp.json        MCP servers
 ├─ kuri.sqlite     conversations, turns, items, memories
@@ -251,7 +253,7 @@ memories             (id, content, source, status, supersedes_id, origin_convers
 ### Distribution and security
 
 - Distributed outside the Mac App Store: Developer ID signing, Hardened Runtime, notarization.
-- **No App Sandbox.** Child processes inherit it, which breaks stdio MCP servers (`npx`, `uvx`) and real shell work. Safety comes from Kuri's own layers instead: the container VM, tools confined to attached folders, and the permission policy.
+- **No App Sandbox.** Child processes inherit it, which breaks stdio MCP servers (`npx`, `uvx`) and real shell work. Safety comes from Kuri's own layers instead: the container VM (which only sees the attached folders) and the permission policy.
 - Entitlements: `com.apple.security.virtualization` once the sandbox lands.
 - Secrets in the Keychain; logs through `os.Logger`.
 
@@ -272,10 +274,13 @@ memories             (id, content, source, status, supersedes_id, origin_convers
 
 ## Roadmap
 
-1. **Foundations** — domain model, config, storage, Open Responses adapter, agent loop, app shell. *(this draft)*
-2. **A usable chat** — streaming Markdown renderer, conversation management, settings, title generation.
-3. **More providers** — Anthropic Messages, Gemini, Chat Completions, Apple Foundation Models.
-4. **MCP** — client, hot-reload, per-tool policies, approval UI.
-5. **Files and sandbox** — folder attachment, file tools, Containerization, `shell`.
-6. **Polish** — mini panel and hotkey, theming, compaction, fallback models, memory review.
-7. **Beyond** — sub-agents, iOS client.
+Done: **foundations** — domain model, config, storage, Open Responses adapter, agent loop, app shell.
+
+The core, in order:
+
+1. **Built-in tools** — `clarify`, `tasklist`, `memory`, `conversation_search`, complete end to end, UI included.
+2. **MCP** — configurable servers with runtime discovery, hot-reload, per-tool policies, approval UI.
+3. **Durable turns and compaction** — resume pending questions and approvals after a relaunch; automatic and on-demand compaction.
+4. **Sandbox** — folder attachment, Containerization, the `shell` tool.
+
+Then embellishments, in no particular order: generated titles, streaming Markdown renderer, UI polish and theming, mini panel and hotkey, more providers (Anthropic Messages, Gemini, Chat Completions, Apple Foundation Models), fallback models, memory review, sub-agents, iOS client.

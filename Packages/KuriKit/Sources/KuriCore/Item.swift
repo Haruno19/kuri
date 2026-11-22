@@ -67,7 +67,7 @@ public enum ContentPart: Sendable, Hashable {
     case attachment(Attachment)
 }
 
-/// A file stored in `~/.kuri/blobs/`, addressed by its SHA-256.
+/// A file stored in `~/.config/kuri/blobs/`, addressed by its SHA-256.
 public struct Attachment: Codable, Sendable, Hashable {
     public var sha256: String
     public var mimeType: String

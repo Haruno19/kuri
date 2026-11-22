@@ -81,8 +81,10 @@ import Testing
         #expect(throws: KuriError.self) { try secrets.resolve(.environment("MISSING")) }
     }
 
-    @Test func homeHonoursOverride() {
-        let home = KuriHome.resolve(environment: ["KURI_HOME": "/tmp/kuri-home"])
-        #expect(home.database.path == "/tmp/kuri-home/kuri.sqlite")
+    @Test func homeResolutionOrder() {
+        #expect(KuriHome.resolve(environment: ["KURI_HOME": "/tmp/kuri-home", "XDG_CONFIG_HOME": "/tmp/xdg"])
+            .database.path == "/tmp/kuri-home/kuri.sqlite")
+        #expect(KuriHome.resolve(environment: ["XDG_CONFIG_HOME": "/tmp/xdg"]).root.path == "/tmp/xdg/kuri")
+        #expect(KuriHome.resolve(environment: [:]).root.path.hasSuffix("/.config/kuri"))
     }
 }
