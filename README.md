@@ -1,30 +1,23 @@
-# Kuri
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/56c09707-d1ec-466f-88b1-f9454fdf3280" width="128" alt="Kuri app icon">
+</p>
 
-A native macOS app for working with language models — local or hosted — that can chat, think, and act on your files from a sandbox.
+<h1 align="center">Kuri</h1>
 
-Kuri is a single app that is both the engine and the interface: no server to deploy, no database service, no Docker. It runs offline with local models, talks to any hosted provider when you want it to, discovers MCP servers at runtime, and runs the model's commands inside a lightweight Linux VM. It needs an Apple silicon Mac with macOS 26 and Xcode 26.
+A lightweight, local-first, macOS native, human-designed & Claude-coded app for working with language models, that can chat, think, and act on your files from a sandbox.
 
-> Status: early. Working: the Open Responses and Apple on-device adapters, the agent loop, the built-in tools, MCP servers with runtime discovery, durable turns, compaction, a message queue, generated titles, the Linux sandbox with its `shell` tool, and a basic app whose UI will be redesigned once the engine is complete.
-
-| Document | What's in it |
-|---|---|
-| [docs/design.md](docs/design.md) | How each part works, in detail |
-| [docs/flows.html](docs/flows.html) | Every flow as a sequence diagram, and the event and protocol reference (open it in a browser) |
-| [docs/config.md](docs/config.md) | Every configuration key |
-| [docs/decisions/](docs/decisions/) | Why things are the way they are |
-| [docs/roadmap.md](docs/roadmap.md) | What's done and what comes next |
-| [CLAUDE.md](CLAUDE.md) | Working agreements, build and test commands |
+Kuri is a single app that contains both the engine and the interface. It runs offline with local models, talks to any hosted provider when you want it to, discovers MCP servers at runtime, and runs the model's commands inside a lightweight Linux VM. 
 
 ---
 
 ## Principles
 
-- **Essential.** Few features, done well. Few dependencies, and only official ones (Apple, or the protocol's own SDK). No "personal" or small third-party libraries.
+- **Essential.** Few features, done well. Few dependencies, and only official ones (Apple, or the protocol's own SDK).
 - **Local-first.** Works with no network. Hosted providers are opt-in.
 - **Mac-only, Mac-native.** SwiftUI + AppKit, Apple frameworks, macOS conventions. No cross-platform abstractions.
 - **Hackable.** Providers, models and MCP servers live in plain JSON5 files you can edit by hand. The database is a plain SQLite file with a small, readable schema.
 - **Provider-agnostic.** Every major wire format is a first-class adapter. Switching model mid-conversation just works.
-- **One mode.** There is no "chat mode" vs "code mode". Every conversation has the same tools; attaching a folder is what lets the model work on your files.
+- **One mode.** There is no "chat mode" or "code mode". Every conversation has the same tools; attaching a folder lets the model work on your files.
 
 ## Architecture
 
@@ -100,11 +93,7 @@ Policies (`allow`, `ask`, `deny`) can be set per tool in `config.json` and per M
 |---|---|
 | `open-responses` | OpenAI, Ollama, LM Studio, vLLM, and anything else speaking the Open Responses spec |
 | `anthropic-messages` | Anthropic's API, and servers that copy it (Ollama among them) |
-| `gemini` | Google's native API *(planned)* |
-| `chat-completions` | Legacy fallback for servers that only speak `/v1/chat/completions` *(planned)* |
 | `apple-foundation-models` | Apple's on-device model (FoundationModels): offline and free, text only, a natural utility model |
-
-Every adapter turns its wire format into the same item model and event stream; no official Swift SDK exists for these providers, so the adapters are hand-written over `URLSession`.
 
 ## Footprint
 
@@ -125,6 +114,17 @@ Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026, as the m
 5. The Linux guest doesn't hand freed memory back to macOS, so a VM holds its peak until it stops: after `idleMinutes` (10 by default), on Stop, or on quit. `sandbox.memoryMiB` (2 GB by default) caps it.
 
 Neither column includes a model's weights. A local model runs in its own process (`qwen3.5:2b` takes about 3 GB in Ollama); a hosted one costs nothing locally. Other clients (ChatGPT, LM Studio) and Docker Desktop (2.1 GB on disk, a shared VM with its own memory limit) weren't installed or running on this Mac, so they aren't measured here.
+
+## Documentation
+
+| Document | What's in it |
+|---|---|
+| [docs/design.md](docs/design.md) | How each part works, in detail |
+| [docs/flows.html](docs/flows.html) | Every flow as a sequence diagram, and the event and protocol reference (open it in a browser) |
+| [docs/config.md](docs/config.md) | Every configuration key |
+| [docs/decisions/](docs/decisions/) | Why things are the way they are |
+| [docs/roadmap.md](docs/roadmap.md) | What's done and what comes next |
+| [CLAUDE.md](CLAUDE.md) | Working agreements, build and test commands |
 
 ## Dependencies
 
