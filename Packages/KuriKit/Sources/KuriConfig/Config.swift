@@ -46,6 +46,12 @@ public struct Config: Codable, Sendable, Hashable {
     public func modelConfig(for ref: ModelRef) -> ModelConfig? {
         providers[ref.provider]?.models?.first { $0.id == ref.model }
     }
+
+    /// The model's context window: as declared, or the format's own when
+    /// it's fixed (Apple's on-device model).
+    public func contextWindow(for ref: ModelRef) -> Int? {
+        modelConfig(for: ref)?.contextWindow ?? providers[ref.provider]?.format.fixedContextWindow
+    }
 }
 
 /// The wire format a provider speaks. Picks the adapter.
@@ -55,6 +61,11 @@ public enum WireFormat: String, Codable, Sendable, Hashable, CaseIterable {
     case gemini = "gemini"
     case chatCompletions = "chat-completions"
     case appleFoundationModels = "apple-foundation-models"
+
+    /// Formats whose single model has a known, fixed context window.
+    public var fixedContextWindow: Int? {
+        self == .appleFoundationModels ? 4_096 : nil
+    }
 }
 
 public struct ProviderConfig: Codable, Sendable, Hashable {

@@ -400,7 +400,7 @@ public actor Engine {
                              resuming: Bool) async throws {
         let folders = try await store.folders(of: conversation.id)
         let modelConfig = config.modelConfig(for: turn.model)
-        let toolNames = Set(await registry.specs().map(\.name))
+        let toolNames = provider.supportsTools ? Set(await registry.specs().map(\.name)) : []
         let mounts = SandboxMounts.plan(folders: folders, scratch: home.scratchFolder(for: conversation.id))
         let runner = TurnRunner(
             conversationID: conversation.id,
@@ -408,7 +408,7 @@ public actor Engine {
             provider: provider,
             modelConfig: ModelConfigSnapshot(maxOutputTokens: modelConfig?.maxOutputTokens,
                                              reasoningEffort: modelConfig?.reasoningEffort,
-                                             contextWindow: modelConfig?.contextWindow),
+                                             contextWindow: config.contextWindow(for: turn.model)),
             instructions: Instructions.build(conversation: conversation, folders: folders, mounts: mounts,
                                              memories: try await store.memories(), tools: toolNames),
             folders: folders,
@@ -418,6 +418,7 @@ public actor Engine {
             limits: limits,
             compactor: compactor(for: turn.model, fallback: provider),
             takeQueued: { [weak self] in await self?.takeQueued(conversation.id) ?? [] },
+            useTools: provider.supportsTools,
             emit: { [broadcaster] event in
                 broadcaster.emit(event)
                 if case .toolFinished(_, let call, let output) = event, call.name == MemoryTool().spec.name,
@@ -489,13 +490,15 @@ public actor Engine {
         let items = try await store.items(of: conversationID)
         let model = conversation.model ?? config.defaultModel
         let folders = try await store.folders(of: conversationID)
+        let usesTools = model.flatMap { try? provider(for: $0) }?.supportsTools ?? true
+        let tools = usesTools ? await registry.specs() : []
         let instructions = Instructions.build(
             conversation: conversation, folders: folders,
             mounts: SandboxMounts.plan(folders: folders, scratch: home.scratchFolder(for: conversationID)),
-            memories: try await store.memories(), tools: Set(await registry.specs().map(\.name)))
+            memories: try await store.memories(), tools: Set(tools.map(\.name)))
         let request = InferenceRequest(model: model?.model ?? "", instructions: instructions,
-                                       items: TurnRunner.history(from: items), tools: await registry.specs())
-        return (ContextEstimate.tokens(request), model.flatMap { config.modelConfig(for: $0)?.contextWindow })
+                                       items: TurnRunner.history(from: items), tools: tools)
+        return (ContextEstimate.tokens(request), model.flatMap { config.contextWindow(for: $0) })
     }
 
     /// Summaries come from the utility model when one is set, otherwise from

@@ -38,6 +38,8 @@ struct TurnRunner {
     /// Messages the user sent while this turn was running, taken at each
     /// step boundary so they join the turn.
     var takeQueued: @Sendable () async -> [String] = { [] }
+    /// False for models that can't be offered tools.
+    var useTools = true
     let emit: @Sendable (EngineEvent) -> Void
 
     /// - Parameter resuming: The turn was waiting for the user when Kuri
@@ -76,7 +78,7 @@ struct TurnRunner {
             try Task.checkCancellation()
             try await deliverQueued()
             var items = try await store.items(of: conversationID)
-            var request = makeRequest(items: items, tools: await registry.specs())
+            var request = makeRequest(items: items, tools: useTools ? await registry.specs() : [])
 
             if let window = modelConfig.contextWindow, let compactor, !compactionFailed,
                ContextEstimate.tokens(request) > Int(Double(window) * limits.compactionThreshold),

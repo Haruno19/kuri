@@ -130,3 +130,21 @@ extension EngineTests {
         #expect(try await engine.store.turns(of: conversation.id).count == 1)  // joined the same turn
     }
 }
+
+@Suite struct ToolSupportTests {
+    @Test func modelsWithoutToolsGetNone() async throws {
+        let store = try Store(url: nil)
+        let conversation = Conversation(model: ModelRef(provider: "test", model: "m"))
+        try await store.createConversation(conversation)
+        try await store.append(Item(conversationID: conversation.id, payload: .message(Message(role: .user, text: "Hi"))))
+        let turn = try await store.beginTurn(conversationID: conversation.id, model: ModelRef(provider: "test", model: "m"))
+        let provider = ScriptedProvider([[.itemCompleted(.message(Message(role: .assistant, text: "Hello"))), .finished(.endTurn)]])
+        let runner = TurnRunner(
+            conversationID: conversation.id, turn: turn, provider: provider, modelConfig: ModelConfigSnapshot(),
+            instructions: "test", folders: [], registry: ToolRegistry(BuiltInTools.all), store: store,
+            interaction: Answering(), limits: TurnLimits(), compactor: nil, useTools: false, emit: { _ in })
+        _ = await runner.run()
+        #expect(provider.requests.withLock { $0.first?.tools.isEmpty } == true)
+    }
+}
+

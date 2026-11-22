@@ -6,6 +6,14 @@ import KuriCore
 /// format on the way out, and its stream back to `InferenceEvent`s.
 public protocol InferenceProvider: Sendable {
     func stream(_ request: InferenceRequest) -> AsyncThrowingStream<InferenceEvent, any Error>
+
+    /// Whether the model can be offered tools. When it can't, requests carry
+    /// none and the instructions don't mention any.
+    var supportsTools: Bool { get }
+}
+
+extension InferenceProvider {
+    public var supportsTools: Bool { true }
 }
 
 /// Builds the provider for a `config.json` entry.
@@ -29,7 +37,9 @@ public struct ProviderFactory: Sendable {
             }
             if let apiKey { headers["Authorization"] = "Bearer \(apiKey)" }
             return OpenResponsesProvider(name: name, baseURL: baseURL, headers: headers, session: session)
-        case .anthropicMessages, .gemini, .chatCompletions, .appleFoundationModels:
+        case .appleFoundationModels:
+            return AppleFoundationModelsProvider()
+        case .anthropicMessages, .gemini, .chatCompletions:
             throw KuriError.unsupportedWireFormat(config.format.rawValue)
         }
     }
@@ -55,7 +65,9 @@ public struct ProviderFactory: Sendable {
             }
             let data = try await HTTP.getJSON(session: session, url: baseURL.appending(path: "models"), headers: headers)
             return Array(Set(try JSONDecoder().decode(List.self, from: data).data.map(\.id))).sorted()
-        case .anthropicMessages, .gemini, .appleFoundationModels:
+        case .appleFoundationModels:
+            return try AppleFoundationModelsProvider.availableModels()
+        case .anthropicMessages, .gemini:
             throw KuriError.unsupportedWireFormat("\(config.format.rawValue) model discovery")
         }
     }

@@ -62,12 +62,22 @@ Anywhere a secret is accepted (`apiKey`, `headers`, an MCP server's `env`), the 
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `format` | string | required | The wire format: `open-responses`. Recognized but not implemented yet: `anthropic-messages`, `gemini`, `chat-completions`, `apple-foundation-models`. |
-| `baseURL` | URL | required for HTTP formats | E.g. `http://localhost:11434/v1`. Requests go to `<baseURL>/responses`, model discovery to `<baseURL>/models`. |
+| `format` | string | required | The wire format: `open-responses` or `apple-foundation-models`. Recognized but not implemented yet: `anthropic-messages`, `gemini`, `chat-completions`. |
+| `baseURL` | URL | required for HTTP formats | E.g. `http://localhost:11434/v1`. Requests go to `<baseURL>/responses`, model discovery to `<baseURL>/models`. Not used by `apple-foundation-models`. |
 | `apiKey` | secret | none | Sent as `Authorization: Bearer <key>`. |
 | `headers` | object of secrets | none | Extra HTTP headers on every request. |
 | `models` | array | `[]` | Registered models: bare ids (`"qwen3.5:2b"`) or objects (below). Settings › Models edits this list. |
 | `discoverModels` | bool | `false` | Also offer every model the provider lists at `<baseURL>/models`, without registering them. Refreshed at launch and on every reload. |
+
+### Apple's on-device model
+
+```json5
+apple: { format: "apple-foundation-models", models: ["default"] },
+```
+
+- The only model id is `default` (the system model). Discovery lists it when the model can run on this Mac; otherwise it says why (Apple Intelligence off, Mac not eligible, model still downloading).
+- It gets no tools, and its instructions don't mention any. Its context window is 4,096 tokens unless `contextWindow` says otherwise, so automatic compaction works without configuration.
+- A natural `utilityModel`: `"apple/default"`.
 
 ### Model objects
 

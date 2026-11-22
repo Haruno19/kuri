@@ -101,7 +101,7 @@ Policies (`allow`, `ask`, `deny`) can be set per tool in `config.json` and per M
 | `anthropic-messages` | Anthropic's API *(planned)* |
 | `gemini` | Google's native API *(planned)* |
 | `chat-completions` | Legacy fallback for servers that only speak `/v1/chat/completions` *(planned)* |
-| `apple-foundation-models` | Apple's on-device model, used for small jobs: titles, summaries, memory review *(planned)* |
+| `apple-foundation-models` | Apple's on-device model (FoundationModels): offline and free, text only, a natural utility model |
 
 Every adapter turns its wire format into the same item model and event stream; no official Swift SDK exists for these providers, so the adapters are hand-written over `URLSession`.
 
@@ -109,7 +109,7 @@ Every adapter turns its wire format into the same item model and event stream; n
 
 | Dependency | Why | When |
 |---|---|---|
-| Apple frameworks (SwiftUI, AppKit, Foundation, Security, SQLite3, Virtualization) | Everything | Now |
+| Apple frameworks (SwiftUI, AppKit, Foundation, Security, SQLite3, Virtualization, FoundationModels) | Everything | Now |
 | [modelcontextprotocol/swift-sdk](https://github.com/modelcontextprotocol/swift-sdk) | MCP client | Now |
 | [apple/swift-log](https://github.com/apple/swift-log) | The SDK's logging API, which a custom transport has to implement | Now |
 | [apple/containerization](https://github.com/apple/containerization) | Sandbox (pinned to an exact version: its API moves between minor versions) | Now |
@@ -128,7 +128,7 @@ Done, the core: foundations (domain model, config, storage, Open Responses adapt
 **Next: finish the engine.** The UI stays functional and minimal until then.
 
 1. **Message queue** — type while a turn runs: the message joins the running turn at its next step, after the current tool round, or starts the next turn if it ends first. *(done)*
-2. **Apple's on-device model** as a provider (`apple-foundation-models`), offline and free, a natural utility model.
+2. **Apple's on-device model** as a provider (`apple-foundation-models`), offline and free, a natural utility model. *(done)*
 3. **Generated titles**, switchable in Settings.
 4. **Read-only tool calls in parallel.**
 

@@ -123,3 +123,49 @@ final class ModelsStub: URLProtocol, @unchecked Sendable {
         }
     }
 }
+
+@Suite struct AppleFoundationModelsTests {
+    @Test func historyBecomesAlternatingTextEndingInThePrompt() {
+        let request = InferenceRequest(model: "default", instructions: "Be brief.", items: [
+            .compaction(Compaction(summary: "Talked about chestnuts.")),
+            .message(Message(role: .user, text: "And in Japanese?")),
+            .reasoning(Reasoning(text: "skip me")),
+            .toolCall(ToolCall(id: "c", name: "conversation_search", arguments: #"{"query":"kuri"}"#)),
+            .toolResult(ToolResult(callID: "c", output: "栗")),
+            .message(Message(role: .assistant, text: "Kuri, 栗.")),
+            .message(Message(role: .user, text: "Thanks!")),
+        ])
+        let conversation = AppleFoundationModelsProvider.conversation(for: request)
+        #expect(conversation.instructions == "Be brief.")
+        #expect(conversation.prompt == "Thanks!")
+        #expect(conversation.turns.map(\.side) == [.user, .assistant, .user, .assistant])
+        #expect(conversation.turns[0].text == "Summary of the conversation so far:\nTalked about chestnuts.\n\nAnd in Japanese?")
+        #expect(conversation.turns[1].text.contains("conversation_search"))
+        #expect(conversation.turns[2].text == "(Tool result: 栗)")
+        // A transcript builds from it (instructions + four entries).
+        #expect(AppleFoundationModelsProvider.transcript(for: conversation).count == 5)
+    }
+
+    @Test func endingOnTheAssistantPromptsToContinue() {
+        let request = InferenceRequest(model: "default", instructions: "", items: [
+            .message(Message(role: .user, text: "Hi")), .message(Message(role: .assistant, text: "Hello")),
+        ])
+        let conversation = AppleFoundationModelsProvider.conversation(for: request)
+        #expect(conversation.prompt == "Continue.")
+        #expect(conversation.turns.count == 2)
+    }
+
+    @Test func factoryAndDiscoveryFollowAvailability() async throws {
+        let config = ProviderConfig(format: .appleFoundationModels)
+        let provider = try ProviderFactory().make(name: "apple", config: config)
+        #expect(!provider.supportsTools)
+        // Whether the model is ready depends on the Mac; either way the answer is clear.
+        do {
+            #expect(try await ProviderFactory().discoverModels(name: "apple", config: config) == ["default"])
+        } catch let error as KuriError {
+            #expect(error.localizedDescription.contains("Apple"))
+        }
+        let window = Config(providers: ["apple": config]).contextWindow(for: ModelRef(provider: "apple", model: "default"))
+        #expect(window == 4_096)
+    }
+}

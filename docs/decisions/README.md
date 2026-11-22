@@ -18,3 +18,4 @@ To change one, write a new record that supersedes it, and mark the old one *Supe
 | [0010](0010-durable-turns-without-tables.md) | Durable turns without extra tables |
 | [0011](0011-compaction-marks-what-it-covers.md) | A compaction names the last item it covers |
 | [0012](0012-sandbox-on-containerization.md) | The sandbox: Containerization, one VM per conversation, no network |
+| [0013](0013-apple-model-text-only.md) | Apple's on-device model is text only |

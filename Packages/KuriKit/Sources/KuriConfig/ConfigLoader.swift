@@ -72,6 +72,10 @@ public struct ConfigLoader: Sendable {
             //   discoverModels: true,
             // },
 
+            // Apple's on-device model: offline and free, text only (no tools), a 4,096-token context.
+            // A good utilityModel: utilityModel: "apple/default".
+            // apple: { format: "apple-foundation-models", models: ["default"] },
+
             // Secrets are references: "keychain:<name>" or "env:<VAR>".
             // openai: {
             //   format: "open-responses",
