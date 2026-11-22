@@ -25,6 +25,8 @@ enum Tune {
     static let hover = Animation.easeOut(duration: 0.14)
     /// Pressed buttons.
     static let press = Animation.spring(response: 0.22, dampingFraction: 0.65)
+    /// Seconds for the light to cross the status text once.
+    static let shimmer = 3.6
     /// Seconds per word while a fake reply streams.
     static let wordDelay = 0.028
 }
@@ -45,8 +47,8 @@ struct Palette {
     var faint: Color { dark ? hex(0x78766F) : hex(0x9C9A92) }
 
     /// Accent for the send button and the working dots: chestnut, toned down.
-    var accent: Color { dark ? hex(0xB89474) : hex(0x9C7556) }
-    var accentLight: Color { dark ? hex(0xCDB091) : hex(0xB8987A) }
+    var accent: Color { dark ? hex(0xC08452) : hex(0xA4693D) }
+    var accentLight: Color { dark ? hex(0xD6A06F) : hex(0xC18A5B) }
     var accentFill: LinearGradient { LinearGradient(colors: [accentLight, accent], startPoint: .top, endPoint: .bottom) }
 
     /// The icon's own gradient, for the logo only.
@@ -197,8 +199,7 @@ struct Root: View {
         let palette = Palette(scheme: scheme)
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar()
-                .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 320)
-                .toolbar(removing: .sidebarToggle)
+                .navigationSplitViewColumnWidth(min: 240, ideal: 290, max: 380)
         } detail: {
             ZStack {
                 palette.background.ignoresSafeArea()
@@ -211,19 +212,13 @@ struct Root: View {
             .overlay(alignment: .topTrailing) {
                 ThemeButton(theme: $theme).padding(.top, 10).padding(.trailing, 14)
             }
-            .ignoresSafeArea()
-        }
-        .overlay(alignment: .topLeading) {
-            // Below the traffic lights, in line with the first one.
-            FloatingButton(glyph: .sidebar) {
-                withAnimation { columns = columns == .detailOnly ? .all : .detailOnly }
-            }
-            .padding(.leading, 12)
-            .padding(.top, 36)
-            .ignoresSafeArea()
+            // Only the top: the content stays beside the sidebar, so the
+            // chat shifts right when it opens instead of sliding under it.
+            .ignoresSafeArea(edges: .top)
         }
         // A toolbar that's there but invisible: macOS draws its standard
-        // sidebar, and nothing shows above the content.
+        // sidebar and its own sidebar toggle next to the traffic lights,
+        // and nothing else shows above the content.
         .toolbar(removing: .title)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .environment(\.palette, palette)
@@ -282,11 +277,11 @@ struct NewChat: View {
     @Environment(\.palette) private var palette
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 26) {
-            HStack(spacing: 18) {
-                GlassChestnut(size: 56)
+        VStack(alignment: .leading, spacing: 24) {
+            HStack(spacing: 16) {
+                GlassChestnut(size: 46)
                 Text(greeting)
-                    .font(Typeface.serif(32))
+                    .font(Typeface.serif(30))
                     .foregroundStyle(palette.ink)
             }
             .padding(.leading, 4)
@@ -312,13 +307,27 @@ struct NewChat: View {
 // MARK: - Logo
 
 /// The chestnut from the app icon, in Liquid Glass tinted with the icon's
-/// gradient. Still at rest; a click squishes it and it hops.
+/// gradient. Still at rest; each click plays one of a few small reactions,
+/// never the same twice in a row.
 struct GlassChestnut: View {
     let size: CGFloat
     @Environment(\.palette) private var palette
-    @State private var pokes = 0
+    /// One counter per reaction; bumping one plays it.
+    @State private var plays: [Reaction: Int] = [:]
+    @State private var last = Reaction.hop
 
-    struct Poke { var sx = 1.0, sy = 1.0, y = 0.0 }
+    enum Reaction: CaseIterable {
+        /// Squish, jump, land.
+        case hop
+        /// Two small hops, the second smaller.
+        case skip
+        /// Shakes its head, like a jelly.
+        case wiggle
+        /// A jump with a full turn in the air.
+        case flip
+    }
+
+    struct Pose { var sx = 1.0, sy = 1.0, y = 0.0, r = 0.0 }
 
     var body: some View {
         let shape = ChestnutShape()
@@ -336,30 +345,115 @@ struct GlassChestnut: View {
         }
         .frame(width: size, height: size)
         .compositingGroup()
-        .shadow(color: palette.shadow.opacity(palette.dark ? 0.35 : 0.1), radius: 5, y: 3)
+        .shadow(color: palette.shadow.opacity(palette.dark ? 0.35 : 0.1), radius: 4, y: 2)
         .contentShape(shape)
-        .keyframeAnimator(initialValue: Poke(), trigger: pokes) { content, v in
-            content
-                .scaleEffect(x: v.sx, y: v.sy, anchor: .bottom)
-                .offset(y: v.y)
-        } keyframes: { _ in
-            KeyframeTrack(\.sy) {
-                SpringKeyframe(0.9, duration: 0.09)
-                SpringKeyframe(1.04, duration: 0.15)
-                SpringKeyframe(1, duration: 0.45, spring: .bouncy)
-            }
-            KeyframeTrack(\.sx) {
-                SpringKeyframe(1.07, duration: 0.09)
-                SpringKeyframe(0.98, duration: 0.15)
-                SpringKeyframe(1, duration: 0.45, spring: .bouncy)
-            }
-            KeyframeTrack(\.y) {
-                LinearKeyframe(0, duration: 0.09)
-                SpringKeyframe(-8, duration: 0.16)
-                SpringKeyframe(0, duration: 0.45, spring: .bouncy)
-            }
+        .keyframeAnimator(initialValue: Pose(), trigger: plays[.hop, default: 0], content: pose) { _ in Self.hop }
+        .keyframeAnimator(initialValue: Pose(), trigger: plays[.skip, default: 0], content: pose) { _ in Self.skip }
+        .keyframeAnimator(initialValue: Pose(), trigger: plays[.wiggle, default: 0], content: pose) { _ in Self.wiggle }
+        .keyframeAnimator(initialValue: Pose(), trigger: plays[.flip, default: 0], content: pose) { _ in Self.flip }
+        .onTapGesture {
+            last = Reaction.allCases.filter { $0 != last }.randomElement()!
+            plays[last, default: 0] += 1
         }
-        .onTapGesture { pokes += 1 }
+    }
+
+    private func pose(_ content: PlaceholderContentView<some View>, _ v: Pose) -> some View {
+        content
+            .scaleEffect(x: v.sx, y: v.sy, anchor: .bottom)
+            .rotationEffect(.degrees(v.r))
+            .offset(y: v.y)
+    }
+
+    // Heights are in points for the 46-point logo.
+
+    @KeyframesBuilder<Pose> static var hop: some Keyframes<Pose> {
+        KeyframeTrack(\Pose.sy) {
+            SpringKeyframe(0.84, duration: 0.1)
+            SpringKeyframe(1.08, duration: 0.16)
+            SpringKeyframe(1, duration: 0.5, spring: .bouncy)
+        }
+        KeyframeTrack(\Pose.sx) {
+            SpringKeyframe(1.12, duration: 0.1)
+            SpringKeyframe(0.95, duration: 0.16)
+            SpringKeyframe(1, duration: 0.5, spring: .bouncy)
+        }
+        KeyframeTrack(\Pose.y) {
+            LinearKeyframe(0, duration: 0.1)
+            SpringKeyframe(-12, duration: 0.18)
+            SpringKeyframe(0, duration: 0.5, spring: .bouncy)
+        }
+        KeyframeTrack(\Pose.r) {
+            LinearKeyframe(0, duration: 0.12)
+            SpringKeyframe(-6, duration: 0.14)
+            SpringKeyframe(4, duration: 0.18)
+            SpringKeyframe(0, duration: 0.4, spring: .bouncy)
+        }
+    }
+
+    @KeyframesBuilder<Pose> static var skip: some Keyframes<Pose> {
+        KeyframeTrack(\Pose.sy) {
+            SpringKeyframe(0.88, duration: 0.08)
+            SpringKeyframe(1.05, duration: 0.12)
+            SpringKeyframe(0.9, duration: 0.2)
+            SpringKeyframe(1.03, duration: 0.1)
+            SpringKeyframe(1, duration: 0.4, spring: .bouncy)
+        }
+        KeyframeTrack(\Pose.sx) {
+            SpringKeyframe(1.08, duration: 0.08)
+            SpringKeyframe(0.97, duration: 0.12)
+            SpringKeyframe(1.06, duration: 0.2)
+            SpringKeyframe(0.99, duration: 0.1)
+            SpringKeyframe(1, duration: 0.4, spring: .bouncy)
+        }
+        KeyframeTrack(\Pose.y) {
+            LinearKeyframe(0, duration: 0.08)
+            SpringKeyframe(-9, duration: 0.14)
+            SpringKeyframe(0, duration: 0.16)
+            SpringKeyframe(-5, duration: 0.12)
+            SpringKeyframe(0, duration: 0.4, spring: .bouncy)
+        }
+    }
+
+    @KeyframesBuilder<Pose> static var wiggle: some Keyframes<Pose> {
+        KeyframeTrack(\Pose.r) {
+            SpringKeyframe(-11, duration: 0.09)
+            SpringKeyframe(10, duration: 0.12)
+            SpringKeyframe(-7, duration: 0.12)
+            SpringKeyframe(4, duration: 0.12)
+            SpringKeyframe(0, duration: 0.4, spring: .bouncy)
+        }
+        KeyframeTrack(\Pose.sy) {
+            SpringKeyframe(0.94, duration: 0.09)
+            SpringKeyframe(1, duration: 0.5, spring: .bouncy)
+        }
+    }
+
+    @KeyframesBuilder<Pose> static var flip: some Keyframes<Pose> {
+        KeyframeTrack(\Pose.sy) {
+            SpringKeyframe(0.82, duration: 0.12)
+            SpringKeyframe(1.04, duration: 0.14)
+            CubicKeyframe(1, duration: 0.34)
+            SpringKeyframe(0.9, duration: 0.08)
+            SpringKeyframe(1, duration: 0.4, spring: .bouncy)
+        }
+        KeyframeTrack(\Pose.sx) {
+            SpringKeyframe(1.14, duration: 0.12)
+            SpringKeyframe(0.96, duration: 0.14)
+            CubicKeyframe(1, duration: 0.34)
+            SpringKeyframe(1.08, duration: 0.08)
+            SpringKeyframe(1, duration: 0.4, spring: .bouncy)
+        }
+        KeyframeTrack(\Pose.y) {
+            LinearKeyframe(0, duration: 0.12)
+            CubicKeyframe(-20, duration: 0.24)
+            CubicKeyframe(0, duration: 0.24)
+            SpringKeyframe(0, duration: 0.48, spring: .bouncy)
+        }
+        KeyframeTrack(\Pose.r) {
+            LinearKeyframe(0, duration: 0.14)
+            CubicKeyframe(360, duration: 0.46)
+            LinearKeyframe(360, duration: 0.48)
+        }
     }
 }
 
@@ -445,16 +539,15 @@ struct Conversation: View {
         .safeAreaPadding(.top, 56)
         .scrollEdgeEffectStyle(.soft, for: .top)
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            geometry.containerSize.height - geometry.contentInsets.top - geometry.contentInsets.bottom
+            // Already without the top margin and the composer.
+            geometry.containerSize.height
         } action: { _, height in
             visible = max(0, height)
-            if ProcessInfo.processInfo.environment["AUTUMN_DEBUG"] != nil { print("visible", height) }
         }
         .onChange(of: chat.messages.last?.id) {
             guard let last = chat.messages.last, last.fromUser else { return }
             // Next pass, once the new exchange (and its height) is laid out.
             DispatchQueue.main.async {
-                if ProcessInfo.processInfo.environment["AUTUMN_DEBUG"] != nil { print("scroll to", last.id) }
                 withAnimation(Tune.scroll) { proxy.scrollTo(last.id, anchor: .top) }
             }
         }
@@ -477,8 +570,8 @@ struct Conversation: View {
         } else {
             // Inline Markdown only; full Markdown is the first item of the UI roadmap.
             Text(LocalizedStringKey(message.text))
-                .font(Typeface.serif(17.5))
-                .lineSpacing(6)
+                .font(Typeface.serif(16))
+                .lineSpacing(5)
                 .foregroundStyle(palette.ink)
                 .textSelection(.enabled)
                 .padding(.horizontal, 6)
@@ -488,32 +581,26 @@ struct Conversation: View {
     }
 }
 
-/// A user message: a slab of paper resting on the surface.
+/// A user message: a pane of tinted glass on the surface. The glass gives
+/// the edge light and the depth; no drawn shadows.
 struct UserCard: View {
     let text: String
     @Environment(\.palette) private var palette
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
         Text(text)
-            .font(Typeface.sans(16))
+            .font(Typeface.sans(15.5))
             .lineSpacing(3)
             .foregroundStyle(palette.ink)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .background {
-                ZStack {
-                    // The slab's thickness, showing below its face.
-                    shape.fill(palette.cardEdge).offset(y: 2)
-                    shape.fill(LinearGradient(colors: [palette.cardTop, palette.cardBottom], startPoint: .top, endPoint: .bottom))
-                    shape.strokeBorder(LinearGradient(colors: [palette.highlight, .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
-                }
-                .compositingGroup()
-                .shadow(color: palette.shadow.opacity(palette.dark ? 0.3 : 0.05), radius: 1, y: 1)
-                .shadow(color: palette.shadow.opacity(palette.dark ? 0.25 : 0.05), radius: 10, y: 5)
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            // The glass alone turns grey on a light surface: a warm fill inside
+            // it sets the colour, the glass adds the edge light and depth.
+            .background(shape.fill(palette.cardTop.opacity(palette.dark ? 0.45 : 0.75)))
+            .glassEffect(.regular, in: shape)
     }
 }
 
@@ -528,14 +615,14 @@ struct Working: View {
             OrbitingDots()
             TimelineView(.animation) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
-                let p = (t.truncatingRemainder(dividingBy: 2.2)) / 2.2 * 1.6 - 0.3
+                let p = (t.truncatingRemainder(dividingBy: Tune.shimmer)) / Tune.shimmer * 1.8 - 0.4
                 Text(status)
-                    .font(Typeface.serif(16.5).italic())
+                    .font(Typeface.sans(15))
                     .foregroundStyle(LinearGradient(stops: [
                         .init(color: palette.faint, location: 0),
-                        .init(color: palette.faint, location: clamp(p - 0.18)),
-                        .init(color: palette.ink, location: clamp(p)),
-                        .init(color: palette.faint, location: clamp(p + 0.18)),
+                        .init(color: palette.faint, location: clamp(p - 0.25)),
+                        .init(color: palette.secondary, location: clamp(p)),
+                        .init(color: palette.faint, location: clamp(p + 0.25)),
                         .init(color: palette.faint, location: 1),
                     ], startPoint: .leading, endPoint: .trailing))
             }
@@ -688,7 +775,9 @@ struct SendButton: View {
                 Circle().strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
                 ZStack {
                     if chat.busy {
-                        PencilIcon(glyph: .stop, size: 16, color: .white, weight: 1.7)
+                        RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                            .fill(.white)
+                            .frame(width: 10, height: 10)
                             .transition(.scale(scale: 0.5).combined(with: .opacity))
                     } else {
                         PencilIcon(glyph: .arrowUp, size: 16, color: .white, weight: 1.7)
@@ -709,31 +798,40 @@ struct SendButton: View {
 
 // MARK: - Sidebar
 
-/// The standard macOS sidebar, with the sketch's type.
+/// The standard macOS sidebar, with the sketch's type. New chat sits above
+/// the list, aligned with the section titles and a size up from the chats.
 struct Sidebar: View {
     @Environment(\.palette) private var palette
     @State private var selection: String? = "Moving the sandbox module"
 
     var body: some View {
         List(selection: $selection) {
-            Label { Text("New chat").font(Typeface.sans(14).weight(.medium)) } icon: {
-                PencilIcon(glyph: .plus, size: 15, color: palette.ink)
-            }
-            .tag("new")
             Section("Today") {
                 ForEach(["Moving the sandbox module", "Fallback models", "Flows with code references"], id: \.self) { title in
-                    Text(title).font(Typeface.sans(14)).lineLimit(1).tag(title)
+                    Text(title).font(Typeface.sans(13)).lineLimit(1).tag(title)
                 }
             }
             Section("Earlier") {
                 ForEach(["Anthropic adapter", "Parallel read-only tools", "Titles on the Apple model", "Queueing messages"], id: \.self) { title in
-                    Text(title).font(Typeface.sans(14)).lineLimit(1).tag(title)
+                    Text(title).font(Typeface.sans(13)).lineLimit(1).tag(title)
                 }
             }
         }
         .listStyle(.sidebar)
-        // Room for the sidebar toggle under the traffic lights.
-        .safeAreaPadding(.top, 30)
+        .safeAreaInset(edge: .top, spacing: 4) {
+            Button {} label: {
+                HStack(spacing: 8) {
+                    PencilIcon(glyph: .compose, size: 17, color: palette.ink)
+                    Text("New chat").font(Typeface.sans(14.5).weight(.medium)).foregroundStyle(palette.ink)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .modifier(HoverWash(shape: RoundedRectangle(cornerRadius: 8, style: .continuous)))
+            }
+            .buttonStyle(Squish())
+            .padding(.horizontal, 10)
+        }
     }
 }
 
@@ -786,28 +884,12 @@ struct QuietButton: View {
     }
 }
 
-/// A round glass button floating over everything (the sidebar toggle).
-struct FloatingButton: View {
-    let glyph: Glyph
-    let action: () -> Void
-    @Environment(\.palette) private var palette
-
-    var body: some View {
-        Button(action: action) {
-            PencilIcon(glyph: glyph, size: 16, color: palette.ink.opacity(0.75))
-                .frame(width: 28, height: 28)
-                .glassEffect(.regular.interactive(), in: Circle())
-        }
-        .buttonStyle(Squish())
-    }
-}
-
 // MARK: - Pencil icons
 
 /// Icons drawn as if with a pencil: strokes through slightly wobbly points,
 /// round caps, and a second faint pass for the graphite.
 enum Glyph {
-    case sidebar, paperclip, folder, arrowUp, stop, chevron, plus
+    case sidebar, paperclip, folder, arrowUp, stop, chevron, plus, compose
 
     /// Strokes on a 24-point grid.
     var strokes: [[CGPoint]] {
@@ -829,6 +911,10 @@ enum Glyph {
             return [[p(7, 9.5), p(12, 14.5), p(17, 9.5)]]
         case .plus:
             return [[p(12, 5.5), p(12, 18.5)], [p(5.5, 12), p(18.5, 12)]]
+        case .compose:
+            // A sheet open at the top right, and a pencil writing into it.
+            return [[p(12, 4.5), p(6.5, 4.5), p(4.5, 6.5), p(4.5, 17.5), p(6.5, 19.5), p(17.5, 19.5), p(19.5, 17.5), p(19.5, 12)],
+                    [p(10, 14), p(10.6, 11.2), p(17.8, 4), p(20, 6.2), p(12.8, 13.4), p(10, 14)]]
         }
     }
 }
