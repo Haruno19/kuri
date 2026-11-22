@@ -8,6 +8,10 @@ A lightweight, local-first, macOS native, human-designed & Claude-coded app for 
 
 Kuri is a single app that contains both the engine and the interface. It runs offline with local models, talks to any hosted provider when you want it to, discovers MCP servers at runtime, and runs the model's commands inside a lightweight Linux VM. 
 
+<p align="center">
+  <img width="700" alt="Sample screenshot of Kuri's welcome page in dark mode" src="https://github.com/user-attachments/assets/ab748295-5679-4eda-81ed-a1920bfe86dd" />
+</p>
+
 ---
 
 ## Principles
