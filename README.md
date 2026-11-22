@@ -331,4 +331,4 @@ The core, in order:
 3. **Durable turns and compaction** — resume pending questions and approvals after a relaunch; automatic and on-demand compaction. *(done)*
 4. **Sandbox** — folder attachment, Containerization, the `shell` tool.
 
-Then embellishments, in no particular order: generated titles, streaming Markdown renderer, UI polish and theming, mini panel and hotkey, more providers (Anthropic Messages, Gemini, Chat Completions, Apple Foundation Models), fallback models, memory review, sub-agents, iOS client.
+Then embellishments, in no particular order: **message queue** (type while a turn runs: the message joins the running turn at its next step, after the current tool round, or waits for the next turn if it ends first), generated titles, streaming Markdown renderer, UI polish and theming, mini panel and hotkey, more providers (Anthropic Messages, Gemini, Chat Completions, Apple Foundation Models), fallback models, memory review, sub-agents, iOS client.
