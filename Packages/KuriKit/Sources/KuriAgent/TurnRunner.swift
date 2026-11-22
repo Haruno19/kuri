@@ -243,8 +243,21 @@ struct TurnRunner {
         var payloads = items.map(\.payload)
         if let last = items.lastIndex(where: { if case .compaction = $0.payload { true } else { false } }) {
             let start = Compactor.activeStart(in: items)
-            let kept = items[start...].filter { if case .compaction = $0.payload { false } else { true } }
-            payloads = [items[last].payload] + kept.map(\.payload)
+            let kept = items.indices[start...].compactMap { index -> Item.Payload? in
+                switch items[index].payload {
+                case .compaction:
+                    return nil
+                case .reasoning(var reasoning) where index < last:
+                    // Its opaque state belongs to the history the summary
+                    // replaced; providers that check it would refuse it.
+                    reasoning.opaque = nil
+                    reasoning.provider = nil
+                    return .reasoning(reasoning)
+                case let payload:
+                    return payload
+                }
+            }
+            payloads = [items[last].payload] + kept
         }
         let answered = Set(payloads.compactMap { if case .toolResult(let r) = $0 { r.callID } else { nil } })
 

@@ -111,6 +111,20 @@ struct Answering: UserInteraction {
         #expect(history.map(\.kind) == ["compaction", "toolCall", "toolResult", "message"])
     }
 
+    @Test func reasoningFromBeforeACompactionLosesItsOpaqueState() {
+        let id = UUID()
+        func item(_ payload: Item.Payload) -> Item { Item(conversationID: id, payload: payload) }
+        let old = item(.message(Message(role: .user, text: "old")))
+        let now = item(.message(Message(role: .user, text: "now")))
+        let before = item(.reasoning(Reasoning(text: "a", opaque: "s1", provider: "p")))
+        let summary = item(.compaction(Compaction(summary: "sum", throughItemID: old.id)))
+        let after = item(.reasoning(Reasoning(text: "b", opaque: "s2", provider: "p")))
+        // `before` is kept verbatim, but it was produced from the history
+        // the summary replaced: its text stays, its opaque state doesn't.
+        let history = TurnRunner.history(from: [old, now, before, summary, after])
+        #expect(history == [summary.payload, now.payload, .reasoning(Reasoning(text: "a")), after.payload])
+    }
+
     @Test func capsLongToolOutput() {
         let capped = TurnRunner.cap(ToolOutput(String(repeating: "a", count: 50)), at: 10)
         #expect(capped.text.hasPrefix("aaaaaaaaaa\n\n[Output truncated: 40 more"))

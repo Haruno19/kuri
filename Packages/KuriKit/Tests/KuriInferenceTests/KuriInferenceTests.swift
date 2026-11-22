@@ -76,7 +76,7 @@ import Testing
                 .message(Message(role: .assistant, text: "Done.")),
             ],
             tools: [ToolSpec(name: "tasklist", description: "d", parameters: ["type": "object"])])
-        let body = OpenResponsesProvider.body(for: request)
+        let body = OpenResponsesProvider.body(for: request, provider: "ollama")
 
         #expect(body["store"] == false)
         #expect(body["stream"] == true)

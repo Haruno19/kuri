@@ -23,7 +23,7 @@ public struct OpenResponsesProvider: InferenceProvider {
     public func stream(_ request: InferenceRequest) -> AsyncThrowingStream<InferenceEvent, any Error> {
         let events = HTTP.eventStream(
             session: session, url: baseURL.appending(path: "responses"), headers: headers,
-            body: Self.body(for: request))
+            body: Self.body(for: request, provider: name))
         let provider = name
         return AsyncThrowingStream { continuation in
             let task = Task {
@@ -44,11 +44,11 @@ public struct OpenResponsesProvider: InferenceProvider {
 
     // MARK: Request
 
-    static func body(for request: InferenceRequest) -> JSONValue {
+    static func body(for request: InferenceRequest, provider: String) -> JSONValue {
         var body: [String: JSONValue] = [
             "model": .string(request.model),
             "instructions": .string(request.instructions),
-            "input": .array(request.items.compactMap(input)),
+            "input": .array(request.items.compactMap { input($0, provider: provider) }),
             "stream": true,
             "store": false,
         ]
@@ -63,7 +63,7 @@ public struct OpenResponsesProvider: InferenceProvider {
         return .object(body)
     }
 
-    private static func input(_ payload: Item.Payload) -> JSONValue? {
+    private static func input(_ payload: Item.Payload, provider: String) -> JSONValue? {
         switch payload {
         case .message(let message):
             let partType = message.role == .user ? "input_text" : "output_text"
@@ -73,8 +73,9 @@ public struct OpenResponsesProvider: InferenceProvider {
             }
             return ["type": "message", "role": .string(message.role.rawValue), "content": .array(parts)]
         case .reasoning(let reasoning):
-            // Only worth sending back when there's opaque state to resume from.
-            guard let opaque = reasoning.opaque else { return nil }
+            // Only worth sending back when there's opaque state to resume
+            // from, and only to the provider that produced it.
+            guard let opaque = reasoning.opaque, reasoning.provider == provider else { return nil }
             return ["type": "reasoning", "summary": [], "encrypted_content": .string(opaque)]
         case .toolCall(let call):
             return ["type": "function_call", "call_id": .string(call.id), "name": .string(call.name),
