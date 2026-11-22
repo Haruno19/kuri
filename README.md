@@ -4,7 +4,7 @@ A native macOS app for working with language models — local or hosted — that
 
 Kuri is a single app that is both the engine and the interface: no server to deploy, no database service, no Docker. It runs offline with local models, talks to any hosted provider when you want it to, discovers MCP servers at runtime, and runs the model's commands inside a lightweight Linux VM.
 
-> Status: early. Working: the Open Responses adapter, the agent loop, the built-in tools, MCP servers with runtime discovery, and a basic app. Sections marked *(planned)* describe what comes next.
+> Status: early. Working: the Open Responses adapter, the agent loop, the built-in tools, MCP servers with runtime discovery, durable turns, compaction, and a basic app. Sections marked *(planned)* describe what comes next.
 
 ---
 
@@ -81,7 +81,7 @@ cd Packages/KuriKit && KURI_LIVE_MODEL=ollama/qwen3.5:2b swift test --filter Liv
 
 **The engine is in-process.** The SwiftUI layer talks to `Engine` directly and subscribes to its event stream. A future network server (for an iOS client) is just another subscriber to the same stream — the local UI never goes through HTTP.
 
-**Flows.** [`docs/flows.html`](docs/flows.html) documents every flow as a sequence diagram: startup and quit, a turn, tool rounds, approval, clarify, cancellation, MCP connection, calls, runtime tool changes and crashes, config hot-reload, model registration and memory edits, plus a reference of every engine event and external protocol. It's a single self-contained page (open it in a browser); each diagram is data in the page, rendered to SVG by a small script, so updating a flow means editing a few lines. Keep it in step with the code when a flow changes.
+**Flows.** [`docs/flows.html`](docs/flows.html) documents every flow as a sequence diagram: startup and quit, a turn, tool rounds, approval, clarify, cancellation, resuming after a relaunch, Continue, compaction, MCP connection, calls, runtime tool changes and crashes, config hot-reload, model registration and memory edits, plus a reference of every engine event and external protocol. It's a single self-contained page (open it in a browser); each diagram is data in the page, rendered to SVG by a small script, so updating a flow means editing a few lines. Keep it in step with the code when a flow changes.
 
 ### Modules
 
@@ -109,21 +109,33 @@ A conversation is an ordered list of **items**, close to the Open Responses item
 | `reasoning` | The model's reasoning: readable text plus optional opaque provider data |
 | `toolCall` | The model asked to run a tool: call id, tool name, raw JSON arguments |
 | `toolResult` | The output for a call id, with an error flag |
-| `compaction` | A summary that replaces everything before it when building the next request |
+| `compaction` | A summary that stands in for the start of the conversation, up to the item it names |
 
 Kuri is **stateless towards providers**: every request carries the history it needs, rebuilt from the database. That keeps behaviour identical across providers (local runtimes don't support server-side state anyway), works offline, and makes switching model mid-conversation trivial. The database is the source of truth.
 
 ### A turn
 
 1. The user's message is stored as an item and a `turn` row is opened.
-2. `TurnRunner` builds the request: instructions (base prompt, memories, attached folders, date) + items since the last `compaction` + the specs of enabled tools.
+2. `TurnRunner` builds the request: instructions (base prompt, memories, attached folders, date) + the history (the latest summary, then everything it doesn't cover) + the specs of enabled tools. If that would overflow the model's context, it compacts first.
 3. The provider streams `InferenceEvent`s. Deltas go straight to the UI; completed items are persisted as they arrive.
 4. If the model called tools: each call is checked against its permission policy (`allow` / `ask` / `deny`), run, its output capped, and stored as a `toolResult`. Back to step 2.
 5. Otherwise the turn closes with its stop reason and token usage.
 
-Guards against runaway turns: a round limit per turn, detection of identical repeated calls, a cap on tool output size, and (planned) compaction when the context approaches the model's window, plus fallback models.
+Guards against runaway turns: a round limit per turn, detection of identical repeated calls, and a cap on tool output size. Fallback models are planned.
 
-**Clarify suspends the turn.** The `clarify` tool asks the user and *waits*: the answer is the tool's return value, so the model continues the same turn. The tool call is already persisted, so a pending question survives a relaunch — a `toolCall` with no matching `toolResult` *is* the pending state.
+**Clarify and approvals suspend the turn.** The `clarify` tool asks the user and *waits*: the answer is the tool's return value, so the model continues the same turn. A tool whose policy is `ask` waits the same way for Allow or Deny. While waiting, the turn's status is `awaiting_input`.
+
+**Turns survive a relaunch.** Nothing extra is stored for a pending question: the tool call is already persisted, and a `toolCall` with no matching `toolResult` in an `awaiting_input` turn *is* the pending state. On launch, `Engine.resumePendingTurns()` re-runs those calls through the normal path, which asks the question (or for approval) again, and the turn carries on. Turns that were mid-stream when Kuri quit can't be resumed safely (a tool might have half-run), so they're marked failed with "Interrupted". **Continue** (`Engine.continueConversation`) starts a turn without a new message, after an interrupted, failed or stopped turn; a call left without a result gets a placeholder result, so the model knows and moves on.
+
+### Compaction
+
+A long conversation is summarized so it keeps fitting in the model's context.
+
+- **When.** Before each request, if it would fill 75% of the model's `contextWindow` (set per model in `config.json`; estimated at about four characters per token). Without a `contextWindow`, only on demand: the toolbar's context meter has a Compact action.
+- **What's kept.** The latest exchange stays verbatim: everything from the latest user message on. If that alone is too big, only its tail is kept, cut where it doesn't separate a tool call from its result.
+- **How it's stored.** The summary is a `compaction` item appended at the end, naming the last item it covers (`throughItemID`). The next request carries the summary, then every item after that one. Storage stays append-only and the transcript keeps everything; only the model's view shrinks. The next compaction folds the previous summary into the new one.
+- **Who writes it.** The `utilityModel` if one is set, otherwise the conversation's model, from a plain-text transcript (tool results truncated) and instructions to keep goals, decisions, facts verbatim, tool outcomes, plan state and open questions.
+- **Exact details after the fact.** `conversation_search` with `scope: "this_chat"` searches what a summary replaced.
 
 ### Providers and wire formats
 
@@ -273,11 +285,11 @@ memories             (id, content, source, status, supersedes_id, origin_convers
 
 - `items.payload` is the item's JSON; `items.text` is its searchable text, extracted on insert.
 - `parent_id` is for forks and, later, sub-agent conversations.
-- Things that *don't* need tables: pending clarifications and the task list (derived from items), MCP tool discovery (in memory), usage reports (aggregated from `turns`), attachments (files in `blobs/`, referenced from the payload).
+- Things that *don't* need tables: pending questions and approvals and the task list (derived from items), MCP tool discovery (in memory), usage reports (aggregated from `turns`), attachments (files in `blobs/`, referenced from the payload).
 
 ### App shell
 
-- **Main window**: sidebar of conversations, transcript, composer.
+- **Main window**: sidebar of conversations, transcript, composer. The toolbar shows the model and an estimated context meter (with Compact); a turn that didn't complete ends with a Continue bar; pending questions and approvals sit above the composer and come back after a relaunch.
 - **Menu bar** (`MenuBarExtra`): quick access and a compact chat; the app keeps running in the background with no windows open.
 - **Mini panel** *(planned)*: a floating, non-activating `NSPanel` summoned with a global hotkey.
 - **Settings**: *General* shows where the config lives; *Models* registers models per provider (with discovery) and sets the default; *Tools* lists built-in tools and MCP servers with their state and policies; *Memory* views and edits what Kuri remembers. Providers and MCP servers are still edited in their files.
@@ -316,7 +328,7 @@ The core, in order:
 
 1. **Built-in tools** — `clarify`, `tasklist`, `memory`, `conversation_search`, complete end to end, UI included. *(done)*
 2. **MCP** — configurable servers with runtime discovery, hot-reload, per-tool policies, approval UI. *(done)*
-3. **Durable turns and compaction** — resume pending questions and approvals after a relaunch; automatic and on-demand compaction.
+3. **Durable turns and compaction** — resume pending questions and approvals after a relaunch; automatic and on-demand compaction. *(done)*
 4. **Sandbox** — folder attachment, Containerization, the `shell` tool.
 
 Then embellishments, in no particular order: generated titles, streaming Markdown renderer, UI polish and theming, mini panel and hotkey, more providers (Anthropic Messages, Gemini, Chat Completions, Apple Foundation Models), fallback models, memory review, sub-agents, iOS client.

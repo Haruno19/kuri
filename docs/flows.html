@@ -104,7 +104,8 @@
         <tr><td><code>.itemAdded</code></td><td>Engine, TurnRunner</td><td>An item is stored: the user's message, a finished model output, a tool result</td><td>Appends to the transcript, ends streaming text</td></tr>
         <tr><td><code>.inference</code></td><td>TurnRunner</td><td>Every event streamed by the provider (deltas included)</td><td>Grows the streaming text and reasoning</td></tr>
         <tr><td><code>.turnStarted</code></td><td>Engine</td><td>A turn begins</td><td>Marks the conversation as running</td></tr>
-        <tr><td><code>.turnFinished</code></td><td>TurnRunner</td><td>A turn completes, fails or is cancelled</td><td>Clears running state; shows failures</td></tr>
+        <tr><td><code>.turnFinished</code></td><td>TurnRunner</td><td>A turn completes, fails or is cancelled</td><td>Clears running state; offers Continue when it didn't complete</td></tr>
+        <tr><td><code>.compacting</code></td><td>TurnRunner, Engine</td><td>A summary starts or ends</td><td>Shows “Summarizing…”</td></tr>
         <tr><td><code>.toolFinished</code></td><td>TurnRunner</td><td>A tool call has its result</td><td>— (the engine derives <code>.memoriesChanged</code> from it)</td></tr>
         <tr><td><code>.inputRequested</code></td><td>InteractionBroker</td><td>A tool waits for the user: <code>clarify</code> or an approval</td><td>Shows the panel and a sidebar badge</td></tr>
         <tr><td><code>.inputResolved</code></td><td>InteractionBroker</td><td>The request was answered or its turn cancelled</td><td>Removes the panel</td></tr>
@@ -149,7 +150,7 @@
     </table>
   </div>
 
-  <p class="meta">Not drawn yet, because they don't exist yet: resuming a pending question after a relaunch, compaction, and the sandbox with its <code>shell</code> tool. They'll be added here when they land.</p>
+  <p class="meta">Not drawn yet, because it doesn't exist yet: the sandbox and its <code>shell</code> tool. It'll be added here when it lands.</p>
 </main>
 
 <script>
@@ -165,6 +166,7 @@ const P = {
   appmodel:  ["AppModel", "App", "ui"],
   engine:    ["Engine", "KuriAgent", "agent"],
   runner:    ["TurnRunner", "KuriAgent", "agent"],
+  compactor: ["Compactor", "KuriAgent", "agent"],
   broker:    ["InteractionBroker", "KuriAgent", "agent"],
   watcher:   ["ConfigWatcher", "KuriConfig", "module"],
   loader:    ["ConfigLoader", "KuriConfig", "module"],
@@ -212,8 +214,10 @@ const FLOWS = [
       ["engine", "appmodel", "engine", "r"],
       ["appmodel", "engine", "conversations, models, tools,\nmemories, MCP servers"],
       ["appmodel", "engine", "`for await event in events()`", "a"],
+      ["appmodel", "engine", "`resumePendingTurns()` — see Resuming after a relaunch"],
     ],
-    notes: ["Turns left <code>running</code> by a crash or a force quit are marked failed; turns waiting for an answer are kept."] },
+    notes: ["Turns left <code>running</code> by a crash or a force quit are marked failed (“Interrupted”); turns waiting for an answer are kept and resumed.",
+            "The app subscribes before asking to resume, so re-asked questions can't be missed."] },
 
   { group: "Lifecycle", id: "quit", title: "Quit",
     summary: "On quit the engine stops what it started. The main thread waits up to two seconds; the engine is its own actor, so it can finish meanwhile.",
@@ -261,7 +265,8 @@ const FLOWS = [
       ["runner", "store", "`finishTurn(.completed)`"],
       ["runner", "appmodel", "`.turnFinished(.completed)`", "e"],
     ],
-    notes: ["Reasoning streams the same way (<code>.reasoningDelta</code>, then an item of kind <code>reasoning</code>).",
+    notes: ["Before each request the runner estimates its size and compacts first if it would overflow the model's context; see Automatic compaction.",
+            "Reasoning streams the same way (<code>.reasoningDelta</code>, then an item of kind <code>reasoning</code>).",
             "A provider error throws out of the stream: the turn is stored as failed and <code>.turnFinished(.failed)</code> carries the message."] },
 
   { group: "Turns", id: "tools", title: "A tool round",
@@ -291,9 +296,10 @@ const FLOWS = [
 
   { group: "Turns", id: "approval", title: "Approval",
     summary: "A tool whose policy is ask waits for the user. The broker parks the call on a continuation and publishes a request; the answer resumes it.",
-    participants: ["user", "panel", "appmodel", "engine", "broker", "runner", "registry", "tool"],
+    participants: ["user", "panel", "appmodel", "engine", "broker", "runner", "store", "registry", "tool"],
     steps: [
       ["runner", "registry", "`policy(for:)` → ask"],
+      ["runner", "store", "`setTurnStatus(.awaitingInput)`"],
       ["runner", "broker", "`approve(request)`"],
       ["broker", "appmodel", "`.inputRequested(.approval)`", "e"],
       ["appmodel", "panel", "shows tool and arguments"],
@@ -303,31 +309,36 @@ const FLOWS = [
       ["engine", "broker", "`respond(…)`"],
       ["broker", "appmodel", "`.inputResolved`", "e"],
       ["broker", "runner", "true / false", "r"],
+      ["runner", "store", "`setTurnStatus(.running)`"],
       { alt: [
         ["allowed", [["runner", "tool", "`run(…)`"]]],
         ["denied", [["runner", "runner", "error result: “The user declined this call.”"]]],
       ]},
     ],
-    notes: ["A tool whose policy is deny is never offered to the model: <code>specs()</code> leaves it out."] },
+    notes: ["A tool whose policy is deny is never offered to the model: <code>specs()</code> leaves it out.",
+            "The <code>awaiting_input</code> status is what lets the approval come back if Kuri quits meanwhile."] },
 
   { group: "Turns", id: "clarify", title: "Clarify",
     summary: "The model asks the user and waits. The answers are the tool's return value, not a new user message, so the model carries on in the same turn.",
     participants: ["user", "panel", "appmodel", "broker", "runner", "clarify", "store"],
     steps: [
       ["runner", "clarify", "`run({ questions })`"],
-      ["clarify", "store", "`setTurnStatus(.awaitingInput)`"],
-      ["clarify", "broker", "`clarify(request)`"],
+      ["clarify", "runner", "`context.interaction.clarify(…)`"],
+      ["runner", "store", "`setTurnStatus(.awaitingInput)`"],
+      ["runner", "broker", "`clarify(request)`"],
       ["broker", "appmodel", "`.inputRequested(.clarify)`", "e"],
       ["appmodel", "panel", "questions, suggested answers"],
       ["user", "panel", "answers"],
       ["panel", "appmodel", "`respond(.answers(…))`"],
       ["appmodel", "broker", "via `Engine.respond`"],
       ["broker", "appmodel", "`.inputResolved`", "e"],
-      ["broker", "clarify", "answers by question id", "r"],
-      ["clarify", "store", "`setTurnStatus(.running)`"],
+      ["broker", "runner", "answers by question id", "r"],
+      ["runner", "store", "`setTurnStatus(.running)`"],
+      ["runner", "clarify", "answers", "r"],
       ["clarify", "runner", "“question → answer” lines", "r"],
     ],
-    notes: ["The sidebar badges a conversation while its question is open."] },
+    notes: ["The sidebar badges a conversation while its question is open.",
+            "The tool asks through the runner's interaction, which marks the turn as awaiting input, so the question survives a relaunch."] },
 
   { group: "Turns", id: "cancel", title: "Cancel",
     summary: "Stop cancels the turn's task. Whatever it's waiting on gives way: the HTTP stream, a pending question, or an MCP call, which is cancelled on the server too.",
@@ -345,6 +356,82 @@ const FLOWS = [
       ["runner", "appmodel", "`.turnFinished(.cancelled)`", "e"],
     ],
     notes: ["A call left without a result gets a placeholder result (“Interrupted before completing.”) in the next request; providers reject dangling calls."] },
+
+  { group: "Resuming and compacting", id: "resume", title: "Resuming after a relaunch",
+    summary: "A turn that was waiting for the user when Kuri quit picks up where it was. Nothing extra was stored: its tool call has no result yet, so running that call again through the normal path asks the question, or for approval, again.",
+    participants: ["user", "appmodel", "engine", "store", "runner", "broker"],
+    steps: [
+      { note: "left by the previous launch: a turn with status awaiting_input,\nand a tool call of that turn without a result", over: ["store", "runner"] },
+      ["appmodel", "engine", "`events()`", "a"],
+      ["appmodel", "engine", "`resumePendingTurns()`"],
+      ["engine", "store", "`turns(withStatus: .awaitingInput)`"],
+      ["store", "engine", "turns", "r"],
+      { loop: "each turn", steps: [
+        ["engine", "appmodel", "`.turnStarted`", "e"],
+        ["engine", "runner", "`Task { run(resuming: true) }`", "a"],
+      ]},
+      ["runner", "store", "`items(of:)` → the turn's unanswered calls"],
+      ["runner", "broker", "run each again → `approve` / `clarify`"],
+      ["broker", "appmodel", "`.inputRequested`", "e"],
+      ["user", "appmodel", "answers, as usual"],
+      ["broker", "runner", "answer", "r"],
+      ["runner", "runner", "tool runs, result stored, the loop goes on"],
+    ],
+    notes: ["Policies are checked again: if a tool is now allowed, it simply runs.",
+            "If the turn's provider is no longer in config.json, the turn fails with “Couldn't resume”."] },
+
+  { group: "Resuming and compacting", id: "continue", title: "Continue",
+    summary: "After a turn that was interrupted, failed or stopped, Continue starts a turn without a new message. The model sees where things stand and goes on.",
+    participants: ["user", "appmodel", "engine", "store", "runner", "provider"],
+    steps: [
+      ["user", "appmodel", "Continue"],
+      ["appmodel", "engine", "`continueConversation(id)`"],
+      ["engine", "store", "`beginTurn` — no new message"],
+      ["engine", "appmodel", "`.turnStarted`", "e"],
+      ["engine", "runner", "`Task { run() }`", "a"],
+      ["runner", "store", "`items(of:)`"],
+      { note: "a call left without a result gets\n“Interrupted before completing.”", over: "runner" },
+      ["runner", "provider", "`stream(request)` — then as in A turn"],
+    ],
+    notes: ["Turns that were mid-stream at quit aren't resumed automatically: a tool may have half-run. Continue lets the model decide what to redo."] },
+
+  { group: "Resuming and compacting", id: "compaction", title: "Automatic compaction",
+    summary: "Before each request the runner estimates its size. Past 75% of the model's context window it summarizes the start of the conversation, keeping the latest exchange verbatim, then sends the summary plus what it doesn't cover.",
+    participants: ["appmodel", "runner", "compactor", "store", "provider", "llm"],
+    steps: [
+      ["runner", "store", "`items(of:)`"],
+      ["runner", "runner", "estimate > 75% of `contextWindow`"],
+      ["runner", "compactor", "`cut(in: items, budget: 50%)`"],
+      ["compactor", "runner", "keep from the latest user message", "r"],
+      ["runner", "appmodel", "`.compacting(true)`", "e"],
+      ["runner", "compactor", "`compact(items, keepingFrom: cut)`"],
+      ["compactor", "provider", "`stream(…)` — transcript as plain text, no tools"],
+      ["provider", "llm", "`POST /responses`"],
+      ["llm", "provider", "summary", "r"],
+      ["provider", "compactor", "`.itemCompleted(.message)`", "r"],
+      ["compactor", "store", "`append(.compaction(summary, throughItemID))`"],
+      ["compactor", "runner", "compaction item", "r"],
+      ["runner", "appmodel", "`.itemAdded`, `.compacting(false)`", "e"],
+      ["runner", "provider", "`stream(request)` — summary + kept items"],
+    ],
+    notes: ["The summary comes from <code>utilityModel</code> when one is set, otherwise from the conversation's model.",
+            "If the latest exchange alone is too big, only its tail is kept, never splitting a tool call from its result. If summarizing fails, the turn goes on uncompacted.",
+            "Storage stays append-only: the transcript keeps every item, only the model's view shrinks."] },
+
+  { group: "Resuming and compacting", id: "compact-now", title: "Compacting on demand",
+    summary: "The toolbar's context meter has a Compact action, the only way to compact when the model's context window isn't set in config.json.",
+    participants: ["user", "appmodel", "engine", "compactor", "store"],
+    steps: [
+      ["user", "appmodel", "Compact (toolbar)"],
+      ["appmodel", "engine", "`compact(id)`"],
+      ["engine", "compactor", "`cut(in: items, budget: .max)`"],
+      ["engine", "appmodel", "`.compacting(true)`", "e"],
+      ["engine", "compactor", "`compact(…)` — as in Automatic compaction"],
+      ["compactor", "store", "`append(.compaction)`"],
+      ["engine", "appmodel", "`.itemAdded`, `.compacting(false)`", "e"],
+    ],
+    notes: ["While it works the conversation counts as running: the composer waits and Stop cancels it.",
+            "A conversation that's a single exchange has nothing to summarize yet."] },
 
   { group: "MCP", id: "mcp-connect", title: "Connecting a server",
     summary: "MCPManager keeps connections in line with mcp.json. For each new or changed server it builds the environment, launches the transport, lets the SDK do the handshake, then lists the tools and registers them.",
