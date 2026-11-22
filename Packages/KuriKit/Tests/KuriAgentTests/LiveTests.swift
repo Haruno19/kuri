@@ -35,14 +35,18 @@ struct LiveTests {
         }
     }
 
-    private func makeEngine(mcp: MCPConfig = MCPConfig(), contextWindow: Int? = nil, root: URL? = nil) throws -> (Engine, KuriHome) {
+    /// Titles are off unless a test is about them: on a local server, a
+    /// background title request would compete with the test's own turns.
+    private func makeEngine(mcp: MCPConfig = MCPConfig(), contextWindow: Int? = nil, root: URL? = nil,
+                            titles: Bool = false) throws -> (Engine, KuriHome) {
         let model = try #require(Live.model)
         let home = KuriHome(root: root ?? FileManager.default.temporaryDirectory.appending(path: "kuri-live-\(UUID().uuidString)"))
         try home.prepare()
         let config = Config(
             defaultModel: model,
             providers: [model.provider: ProviderConfig(format: .openResponses, baseURL: Live.baseURL,
-                                                       models: [ModelConfig(id: model.model, contextWindow: contextWindow)])])
+                                                       models: [ModelConfig(id: model.model, contextWindow: contextWindow)])],
+            generateTitles: titles)
         let engine = Engine(home: home, store: try Store(url: home.database), config: config, mcpConfig: mcp)
         return (engine, home)
     }
@@ -247,26 +251,26 @@ struct LiveTests {
     }
 
     @Test func titlesAConversation() async throws {
-        let (engine, home) = try makeEngine()
+        let (engine, home) = try makeEngine(titles: true)
         defer { try? FileManager.default.removeItem(at: home.root) }
         let events = engine.events()
         let conversation = try await engine.newConversation()
         let question = "what does kuri mean in japanese and how is it written? also any recipes?"
         try await engine.send(question, to: conversation.id)
-        var title: String?
-        let deadline = Task { try await Task.sleep(for: .seconds(90)) }
-        for await event in events {
-            if case .conversationUpdated(let updated) = event, updated.id == conversation.id,
-               updated.title != Engine.provisionalTitle(for: question), !updated.title.isEmpty {
-                title = updated.title
-                break
+        // The title comes in the background, after the turn. Cancelling the
+        // watcher ends the event loop even when no further event arrives.
+        let watcher = Task { () -> String? in
+            for await event in events {
+                if case .conversationUpdated(let updated) = event, updated.id == conversation.id,
+                   updated.title != Engine.provisionalTitle(for: question), !updated.title.isEmpty {
+                    return updated.title
+                }
             }
-            if case .turnFinished = event {
-                // The title comes in the background, shortly after.
-                Task { try? await Task.sleep(for: .seconds(60)); deadline.cancel() }
-            }
-            if deadline.isCancelled { break }
+            return nil
         }
+        let deadline = Task { try await Task.sleep(for: .seconds(180)); watcher.cancel() }
+        let title = await watcher.value
+        deadline.cancel()
         print("\n── generated title: \(title ?? "none")")
         #expect(title != nil)
     }

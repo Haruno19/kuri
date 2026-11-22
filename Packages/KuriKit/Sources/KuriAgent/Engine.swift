@@ -30,6 +30,8 @@ public actor Engine {
     private var discovered: [String: [String]] = [:]
     private var discovery: Task<Void, Never>?
     private var running: [UUID: Task<Void, Never>] = [:]
+    /// Title requests in flight, by conversation, so shutdown can stop them.
+    private var titling: [UUID: Task<Void, Never>] = [:]
     /// Messages sent while their conversation was busy, oldest first.
     private var queues: [UUID: [QueuedMessage]] = [:]
     private var watcher: Task<Void, Never>?
@@ -84,6 +86,7 @@ public actor Engine {
         watcher?.cancel()
         discovery?.cancel()
         for task in running.values { task.cancel() }
+        for task in titling.values { task.cancel() }
         await mcp.shutdown()
         await sandbox.stopAll()
     }
@@ -475,13 +478,15 @@ public actor Engine {
         let target = config.utilityModel ?? model
         guard let provider = try? provider(for: target) else { return }
         let generator = TitleGenerator(provider: provider, model: target.model)
-        Task { [weak self] in
-            guard let title = try? await generator.title(question: question, answer: answer) else { return }
-            await self?.applyTitle(title, to: conversationID, ifStill: conversation.title)
+        titling[conversationID] = Task { [weak self] in
+            let title = try? await generator.title(question: question, answer: answer)
+            await self?.titled(conversationID, title: title, ifStill: conversation.title)
         }
     }
 
-    private func applyTitle(_ title: String, to conversationID: UUID, ifStill provisional: String) async {
+    private func titled(_ conversationID: UUID, title: String?, ifStill provisional: String) async {
+        titling[conversationID] = nil
+        guard let title, !Task.isCancelled else { return }
         // The user may have renamed it meanwhile.
         guard var conversation = try? await store.conversation(conversationID), conversation.title == provisional else { return }
         conversation.title = title

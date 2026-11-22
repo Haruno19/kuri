@@ -405,7 +405,8 @@ const FLOWS = [
       ["engine", "appmodel", "`.conversationUpdated`", "e"],
     ],
     notes: ["<code>generateTitles: false</code> in config.json (or the toggle in Settings › General) turns it off.",
-            "A failure keeps the provisional title: the first line of the first message."] },
+            "A failure keeps the provisional title: the first line of the first message.",
+            "<code>shutdown()</code> cancels a title still being written, which also stops the server generating it."] },
 
   { group: "Resuming and compacting", id: "resume", title: "Resuming after a relaunch",
     summary: "A turn that was waiting for the user when Kuri quit picks up where it was. Nothing extra was stored: its tool call has no result yet, so running that call again through the normal path asks the question, or for approval, again.",
