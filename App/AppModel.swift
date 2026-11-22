@@ -33,6 +33,8 @@ final class AppModel {
     private(set) var streamingReasoning = ""
 
     private(set) var running: Set<UUID> = []
+    /// Messages waiting for each busy conversation's next step.
+    private(set) var queues: [UUID: [QueuedMessage]] = [:]
     /// Conversations whose start is being summarized right now.
     private(set) var compacting: Set<UUID> = []
     /// The selected conversation's latest turn, for the Continue bar.
@@ -124,6 +126,15 @@ final class AppModel {
         guard let engine, var conversation = selectedConversation else { return }
         conversation.model = model
         try? await engine.update(conversation)
+    }
+
+    var selectedQueue: [QueuedMessage] {
+        selection.flatMap { queues[$0] } ?? []
+    }
+
+    func unqueue(_ message: QueuedMessage) async {
+        guard let engine, let id = selection else { return }
+        await engine.unqueue(message.id, in: id)
     }
 
     func cancel() async {
@@ -356,6 +367,9 @@ final class AppModel {
 
         case .sandboxChanged(let status):
             sandboxStatus = status
+
+        case .queueChanged(let id, let queue):
+            queues[id] = queue.isEmpty ? nil : queue
 
         case .foldersChanged(let id, let updated):
             if id == selection {

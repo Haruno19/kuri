@@ -30,6 +30,8 @@ public enum EngineEvent: Sendable {
     case memoriesChanged
     case mcpServersChanged([MCPServerStatus])
     case sandboxChanged(SandboxStatus)
+    /// Messages waiting for a running turn's next step.
+    case queueChanged(conversationID: UUID, [QueuedMessage])
     case foldersChanged(conversationID: UUID, [ConversationFolder])
 }
 
@@ -60,6 +62,17 @@ public struct InputRequest: Identifiable, Sendable, Hashable {
 public enum InputResponse: Sendable, Hashable {
     case answers([String: String])
     case approved(Bool)
+}
+
+/// A message sent while its conversation was busy.
+public struct QueuedMessage: Identifiable, Sendable, Hashable {
+    public var id: UUID
+    public var text: String
+
+    public init(id: UUID = UUID(), text: String) {
+        self.id = id
+        self.text = text
+    }
 }
 
 /// Fans events out to any number of subscribers.

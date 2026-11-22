@@ -35,6 +35,9 @@ struct TurnRunner {
     let limits: TurnLimits
     /// Summarizes the conversation when it outgrows the context window.
     let compactor: Compactor?
+    /// Messages the user sent while this turn was running, taken at each
+    /// step boundary so they join the turn.
+    var takeQueued: @Sendable () async -> [String] = { [] }
     let emit: @Sendable (EngineEvent) -> Void
 
     /// - Parameter resuming: The turn was waiting for the user when Kuri
@@ -71,6 +74,7 @@ struct TurnRunner {
         var compactionFailed = false
         for _ in 0..<limits.maxRounds {
             try Task.checkCancellation()
+            try await deliverQueued()
             var items = try await store.items(of: conversationID)
             var request = makeRequest(items: items, tools: await registry.specs())
 
@@ -111,10 +115,24 @@ struct TurnRunner {
                 }
             }
 
-            guard !calls.isEmpty else { return stop }
+            if calls.isEmpty {
+                // Messages that arrived during the answer keep the turn going.
+                guard try await deliverQueued() else { return stop }
+                continue
+            }
             try await runCalls(calls, counts: &callCounts, interaction: interaction)
         }
         return .other("max_rounds")
+    }
+
+    /// Appends queued messages to the conversation. Returns whether there were any.
+    @discardableResult
+    private func deliverQueued() async throws -> Bool {
+        let messages = await takeQueued()
+        for text in messages {
+            try await append(.message(Message(role: .user, text: text)))
+        }
+        return !messages.isEmpty
     }
 
     private func makeRequest(items: [Item], tools: [ToolSpec]) -> InferenceRequest {

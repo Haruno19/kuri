@@ -127,7 +127,7 @@ Done, the core: foundations (domain model, config, storage, Open Responses adapt
 
 **Next: finish the engine.** The UI stays functional and minimal until then.
 
-1. **Message queue** — type while a turn runs: the message joins the running turn at its next step, after the current tool round, or starts the next turn if it ends first.
+1. **Message queue** — type while a turn runs: the message joins the running turn at its next step, after the current tool round, or starts the next turn if it ends first. *(done)*
 2. **Apple's on-device model** as a provider (`apple-foundation-models`), offline and free, a natural utility model.
 3. **Generated titles**, switchable in Settings.
 4. **Read-only tool calls in parallel.**

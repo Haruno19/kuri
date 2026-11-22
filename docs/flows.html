@@ -107,6 +107,7 @@
         <tr><td><code>.turnFinished</code></td><td>TurnRunner</td><td>A turn completes, fails or is cancelled</td><td>Clears running state; offers Continue when it didn't complete</td></tr>
         <tr><td><code>.compacting</code></td><td>TurnRunner, Engine</td><td>A summary starts or ends</td><td>Shows “Summarizing…”</td></tr>
         <tr><td><code>.toolFinished</code></td><td>TurnRunner</td><td>A tool call has its result</td><td>— (the engine derives <code>.memoriesChanged</code> from it)</td></tr>
+        <tr><td><code>.queueChanged</code></td><td>Engine</td><td>A message is queued, removed, or taken by the running turn</td><td>Shows the queue above the composer</td></tr>
         <tr><td><code>.inputRequested</code></td><td>InteractionBroker</td><td>A tool waits for the user: <code>clarify</code> or an approval</td><td>Shows the panel and a sidebar badge</td></tr>
         <tr><td><code>.inputResolved</code></td><td>InteractionBroker</td><td>The request was answered or its turn cancelled</td><td>Removes the panel</td></tr>
         <tr><td><code>.configReloaded</code></td><td>Engine</td><td>Config files reloaded, or discovered models changed</td><td>Refreshes models and config</td></tr>
@@ -367,6 +368,27 @@ const FLOWS = [
       ["runner", "appmodel", "`.turnFinished(.cancelled)`", "e"],
     ],
     notes: ["A call left without a result gets a placeholder result (“Interrupted before completing.”) in the next request; providers reject dangling calls."] },
+
+  { group: "Turns", id: "queue", title: "Queueing a message",
+    summary: "While a conversation is busy, sending queues the message. The running turn takes the queue at its next step, after the current tool round or when its answer would end the turn, so the message joins the same turn.",
+    participants: ["user", "chat", "appmodel", "engine", "runner", "store"],
+    steps: [
+      ["user", "chat", "types while the turn runs, ⌘↩"],
+      ["chat", "appmodel", "`send(text)`"],
+      ["appmodel", "engine", "`send(text, to: id)`"],
+      ["engine", "engine", "busy → append to the queue"],
+      ["engine", "appmodel", "`.queueChanged([text])`", "e"],
+      { note: "next step boundary: after the tool round,\nor when the answer would end the turn", over: "runner" },
+      ["runner", "engine", "`takeQueued()`"],
+      ["engine", "appmodel", "`.queueChanged([])`", "e"],
+      ["engine", "runner", "texts", "r"],
+      ["runner", "store", "`append(user message)`"],
+      ["runner", "appmodel", "`.itemAdded`", "e"],
+      ["runner", "runner", "the next request includes it"],
+    ],
+    notes: ["A queued message can be removed before delivery (<code>unqueue</code>).",
+            "A message that arrives after the turn has ended, or was queued before Stop, starts the next turn as soon as the conversation is free; that's usually the redirection Stop was for.",
+            "Queued messages live in memory: if Kuri quits first, they're gone."] },
 
   { group: "Resuming and compacting", id: "resume", title: "Resuming after a relaunch",
     summary: "A turn that was waiting for the user when Kuri quit picks up where it was. Nothing extra was stored: its tool call has no result yet, so running that call again through the normal path asks the question, or for approval, again.",

@@ -52,6 +52,19 @@ struct ChatView: View {
 
             TaskListPanel(entries: model.taskList)
 
+            ForEach(model.selectedQueue) { message in
+                HStack(spacing: 8) {
+                    Image(systemName: "clock").foregroundStyle(.secondary)
+                    Text(message.text).lineLimit(2)
+                    Spacer()
+                    Button("Remove", systemImage: "xmark") { Task { await model.unqueue(message) } }
+                        .labelStyle(.iconOnly).buttonStyle(.borderless)
+                }
+                .font(.callout)
+                .padding(.horizontal, 16).padding(.bottom, 4)
+                .help("Queued: joins the turn at its next step")
+            }
+
             FolderBar()
 
             composer
@@ -71,11 +84,11 @@ struct ChatView: View {
                 .onSubmit(send)
             if model.isSelectedBusy {
                 Button("Stop", systemImage: "stop.fill") { Task { await model.cancel() } }
-            } else {
-                Button("Send", systemImage: "arrow.up") { send() }
-                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .keyboardShortcut(.return, modifiers: .command)
             }
+            // While busy, sending queues the message for the turn's next step.
+            Button(model.isSelectedBusy ? "Queue" : "Send", systemImage: model.isSelectedBusy ? "text.append" : "arrow.up") { send() }
+                .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .keyboardShortcut(.return, modifiers: .command)
         }
         .labelStyle(.iconOnly)
         .padding(12)

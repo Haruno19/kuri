@@ -30,6 +30,8 @@ public actor Engine {
     private var discovered: [String: [String]] = [:]
     private var discovery: Task<Void, Never>?
     private var running: [UUID: Task<Void, Never>] = [:]
+    /// Messages sent while their conversation was busy, oldest first.
+    private var queues: [UUID: [QueuedMessage]] = [:]
     private var watcher: Task<Void, Never>?
 
     /// Opens `~/.config/kuri` (creating it on first launch), loads the
@@ -288,13 +290,44 @@ public actor Engine {
     // MARK: Turns
 
     /// Adds the user's message and starts a turn. Returns once the turn is
-    /// running; follow it through `events()`.
+    /// running; follow it through `events()`. While the conversation is
+    /// busy, the message is queued instead: it joins the running turn at
+    /// its next step, or starts the next turn.
     public func send(_ text: String, to conversationID: UUID) async throws {
-        var (conversation, model, provider) = try await prepareTurn(in: conversationID)
+        if running[conversationID] != nil {
+            queues[conversationID, default: []].append(QueuedMessage(text: text))
+            broadcaster.emit(.queueChanged(conversationID: conversationID, queues[conversationID] ?? []))
+            return
+        }
+        try await startTurn(with: [text], in: conversationID)
+    }
 
-        let message = Item(conversationID: conversationID, payload: .message(Message(role: .user, text: text)))
-        try await store.append(message)
-        broadcaster.emit(.itemAdded(message))
+    /// Removes a queued message before it's delivered.
+    public func unqueue(_ messageID: UUID, in conversationID: UUID) {
+        guard let index = queues[conversationID]?.firstIndex(where: { $0.id == messageID }) else { return }
+        queues[conversationID]?.remove(at: index)
+        broadcaster.emit(.queueChanged(conversationID: conversationID, queues[conversationID] ?? []))
+    }
+
+    public func queuedMessages(in conversationID: UUID) -> [QueuedMessage] {
+        queues[conversationID] ?? []
+    }
+
+    /// Hands the queue to the running turn and empties it.
+    private func takeQueued(_ conversationID: UUID) -> [String] {
+        guard let queue = queues.removeValue(forKey: conversationID), !queue.isEmpty else { return [] }
+        broadcaster.emit(.queueChanged(conversationID: conversationID, []))
+        return queue.map(\.text)
+    }
+
+    private func startTurn(with texts: [String], in conversationID: UUID) async throws {
+        var (conversation, model, provider) = try await prepareTurn(in: conversationID)
+        for text in texts {
+            let message = Item(conversationID: conversationID, payload: .message(Message(role: .user, text: text)))
+            try await store.append(message)
+            broadcaster.emit(.itemAdded(message))
+        }
+        let text = texts[0]
 
         if conversation.title.isEmpty {
             // Placeholder until title generation with the utility model lands.
@@ -384,6 +417,7 @@ public actor Engine {
             interaction: broker,
             limits: limits,
             compactor: compactor(for: turn.model, fallback: provider),
+            takeQueued: { [weak self] in await self?.takeQueued(conversation.id) ?? [] },
             emit: { [broadcaster] event in
                 broadcaster.emit(event)
                 if case .toolFinished(_, let call, let output) = event, call.name == MemoryTool().spec.name,
@@ -399,8 +433,17 @@ public actor Engine {
         }
     }
 
-    private func turnEnded(_ conversationID: UUID) {
+    /// Clears the running state, then starts a turn for anything queued
+    /// too late to join (or queued before Stop: probably a redirection).
+    private func turnEnded(_ conversationID: UUID) async {
         running[conversationID] = nil
+        let queued = takeQueued(conversationID)
+        guard !queued.isEmpty else { return }
+        do {
+            try await startTurn(with: queued, in: conversationID)
+        } catch {
+            broadcaster.emit(.configFailed(error.localizedDescription))
+        }
     }
 
     // MARK: Compaction
@@ -426,12 +469,17 @@ public actor Engine {
         running[conversationID] = Task {
             await withTaskCancellationHandler { _ = try? await task.value } onCancel: { task.cancel() }
         }
-        defer {
-            running[conversationID] = nil
+        let item: Item
+        do {
+            item = try await task.value
+        } catch {
             broadcaster.emit(.compacting(conversationID: conversationID, false))
+            await turnEnded(conversationID)
+            throw error
         }
-        let item = try await task.value
         broadcaster.emit(.itemAdded(item))
+        broadcaster.emit(.compacting(conversationID: conversationID, false))
+        await turnEnded(conversationID)
     }
 
     /// An estimate of how much of the model's context the conversation
