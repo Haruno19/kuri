@@ -16,6 +16,8 @@ public enum EngineEvent: Sendable {
     case inference(conversationID: UUID, InferenceEvent)
     case turnStarted(Turn)
     case turnFinished(conversationID: UUID, turnID: UUID, TurnOutcome)
+    /// A summary of the conversation is being written (true) or done (false).
+    case compacting(conversationID: UUID, Bool)
     /// A tool call finished; its result also arrives as `itemAdded`.
     case toolFinished(conversationID: UUID, call: ToolCall, output: ToolOutput)
     case inputRequested(InputRequest)

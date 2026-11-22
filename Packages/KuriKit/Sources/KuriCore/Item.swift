@@ -125,11 +125,20 @@ public struct ToolResult: Codable, Sendable, Hashable {
     }
 }
 
+/// A summary standing in for the start of a conversation.
+///
+/// The item is appended at the end like any other, but it replaces only
+/// the items up to and including `throughItemID`; the ones after that stay
+/// verbatim. That keeps storage append-only while the latest exchange
+/// survives compaction word for word.
 public struct Compaction: Codable, Sendable, Hashable {
     public var summary: String
+    /// The last item the summary covers. `nil`: everything before this item.
+    public var throughItemID: UUID?
 
-    public init(summary: String) {
+    public init(summary: String, throughItemID: UUID? = nil) {
         self.summary = summary
+        self.throughItemID = throughItemID
     }
 }
 

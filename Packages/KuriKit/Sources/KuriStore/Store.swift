@@ -147,11 +147,19 @@ public actor Store {
         }
     }
 
-    /// The position of the latest compaction in a conversation, if any.
-    /// Everything before it is no longer in the model's context.
-    public func lastCompactionSeq(in conversationID: UUID) throws -> Int? {
-        try db.query("SELECT MAX(seq) FROM items WHERE conversation_id = ? AND kind = 'compaction'",
-                     .uuid(conversationID)) { $0.optionalInt(0) }.first ?? nil
+    /// The position of the last item the latest compaction summarized, if
+    /// the conversation was ever compacted. Items up to it are no longer in
+    /// the model's context.
+    public func compactedThroughSeq(in conversationID: UUID) throws -> Int? {
+        let latest = try db.query("""
+            SELECT seq, payload FROM items WHERE conversation_id = ? AND kind = 'compaction'
+            ORDER BY seq DESC LIMIT 1
+            """, .uuid(conversationID)) { (seq: $0.int(0), payload: $0.string(1)) }.first
+        guard let latest else { return nil }
+        guard let compaction = try? JSONDecoder().decode(Compaction.self, from: Data(latest.payload.utf8)),
+              let through = compaction.throughItemID
+        else { return latest.seq - 1 }
+        return try db.query("SELECT seq FROM items WHERE id = ?", .uuid(through)) { $0.int(0) }.first ?? latest.seq - 1
     }
 
     /// The messages just before and after `seq` in a conversation, for
@@ -202,20 +210,29 @@ public actor Store {
     }
 
     public func turns(of conversationID: UUID) throws -> [Turn] {
-        try db.query("""
-            SELECT id, conversation_id, model, status, stop_reason, error, input_tokens, output_tokens,
-                   reasoning_tokens, cached_tokens, started_at, ended_at
-            FROM turns WHERE conversation_id = ? ORDER BY started_at
-            """, .uuid(conversationID)) { row in
-            Turn(
-                id: row.uuid(0), conversationID: row.uuid(1),
-                model: ModelRef(row.string(2)) ?? ModelRef(provider: "?", model: row.string(2)),
-                status: Turn.Status(rawValue: row.string(3)) ?? .failed,
-                stopReason: row.optionalString(4).map(StopReason.init(rawValue:)), error: row.optionalString(5),
-                usage: Usage(inputTokens: row.int(6), outputTokens: row.int(7),
-                             reasoningTokens: row.int(8), cachedInputTokens: row.int(9)),
-                startedAt: row.date(10), endedAt: row.optionalDate(11))
-        }
+        try db.query("SELECT \(Self.turnColumns) FROM turns WHERE conversation_id = ? ORDER BY started_at",
+                     .uuid(conversationID), map: Self.turn)
+    }
+
+    public func turns(withStatus status: Turn.Status) throws -> [Turn] {
+        try db.query("SELECT \(Self.turnColumns) FROM turns WHERE status = ? ORDER BY started_at",
+                     .text(status.rawValue), map: Self.turn)
+    }
+
+    private static let turnColumns = """
+        id, conversation_id, model, status, stop_reason, error, input_tokens, output_tokens,
+        reasoning_tokens, cached_tokens, started_at, ended_at
+        """
+
+    private static func turn(_ row: Row) -> Turn {
+        Turn(
+            id: row.uuid(0), conversationID: row.uuid(1),
+            model: ModelRef(row.string(2)) ?? ModelRef(provider: "?", model: row.string(2)),
+            status: Turn.Status(rawValue: row.string(3)) ?? .failed,
+            stopReason: row.optionalString(4).map(StopReason.init(rawValue:)), error: row.optionalString(5),
+            usage: Usage(inputTokens: row.int(6), outputTokens: row.int(7),
+                         reasoningTokens: row.int(8), cachedInputTokens: row.int(9)),
+            startedAt: row.date(10), endedAt: row.optionalDate(11))
     }
 
     /// Marks turns left `running` by a previous launch as failed. Turns

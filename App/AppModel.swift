@@ -32,6 +32,12 @@ final class AppModel {
     private(set) var streamingReasoning = ""
 
     private(set) var running: Set<UUID> = []
+    /// Conversations whose start is being summarized right now.
+    private(set) var compacting: Set<UUID> = []
+    /// The selected conversation's latest turn, for the Continue bar.
+    private(set) var lastTurn: Turn?
+    /// Estimated tokens the selected conversation fills, and the model's window if known.
+    private(set) var contextUsage: (tokens: Int, window: Int?)?
     private(set) var inputRequests: [InputRequest] = []
     private(set) var models: [ModelRef] = []
     private(set) var config = Config()
@@ -71,15 +77,14 @@ final class AppModel {
             memories = try await engine.memories()
             mcpServers = await engine.mcpServers()
             phase = .ready
-            Task { await observe(engine) }
+            // Subscribe before resuming, so re-asked questions aren't missed.
+            let events = engine.events()
+            Task {
+                for await event in events { handle(event) }
+            }
+            await engine.resumePendingTurns()
         } catch {
             phase = .failed(error.localizedDescription)
-        }
-    }
-
-    private func observe(_ engine: Engine) async {
-        for await event in engine.events() {
-            handle(event)
         }
     }
 
@@ -121,6 +126,29 @@ final class AppModel {
         await engine.cancel(id)
     }
 
+    /// Picks up after a failed, stopped or interrupted turn.
+    func continueSelected() async {
+        guard let engine, let id = selection else { return }
+        do {
+            try await engine.continueConversation(id)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func compactSelected() async {
+        guard let engine, let id = selection else { return }
+        do {
+            try await engine.compact(id)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    var isSelectedBusy: Bool {
+        selection.map { running.contains($0) || compacting.contains($0) } ?? false
+    }
+
     func delete(_ id: UUID) async {
         try? await engine?.delete(id)
     }
@@ -134,9 +162,18 @@ final class AppModel {
         streamingReasoning = ""
         guard let engine, let id = selection else {
             items = []
+            lastTurn = nil
+            contextUsage = nil
             return
         }
         items = (try? await engine.store.items(of: id)) ?? []
+        await refreshTurnState()
+    }
+
+    private func refreshTurnState() async {
+        guard let engine, let id = selection else { return }
+        lastTurn = (try? await engine.store.turns(of: id))?.last
+        contextUsage = try? await engine.contextUsage(id)
     }
 
     func reconnect(mcpServer name: String) async {
@@ -207,6 +244,7 @@ final class AppModel {
             switch item.payload {
             case .message: streamingText = ""
             case .reasoning: streamingReasoning = ""
+            case .compaction: Task { await refreshTurnState() }
             default: break
             }
 
@@ -220,14 +258,18 @@ final class AppModel {
 
         case .turnStarted(let turn):
             running.insert(turn.conversationID)
+            if turn.conversationID == selection { lastTurn = turn }
 
-        case .turnFinished(let id, _, let outcome):
+        case .turnFinished(let id, _, _):
             running.remove(id)
             if id == selection {
                 streamingText = ""
                 streamingReasoning = ""
+                Task { await refreshTurnState() }
             }
-            if case .failed(let message) = outcome { errorMessage = message }
+
+        case .compacting(let id, let active):
+            if active { compacting.insert(id) } else { compacting.remove(id) }
 
         case .toolFinished:
             break
@@ -243,6 +285,7 @@ final class AppModel {
                 guard let engine else { return }
                 models = await engine.models
                 config = await engine.config
+                await refreshTurnState()
             }
 
         case .configFailed(let message):

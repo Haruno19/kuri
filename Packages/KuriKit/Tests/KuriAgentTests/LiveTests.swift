@@ -35,15 +35,14 @@ struct LiveTests {
         }
     }
 
-    private func makeEngine(mcp: MCPConfig = MCPConfig()) throws -> (Engine, KuriHome) {
+    private func makeEngine(mcp: MCPConfig = MCPConfig(), contextWindow: Int? = nil, root: URL? = nil) throws -> (Engine, KuriHome) {
         let model = try #require(Live.model)
-        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-live-\(UUID().uuidString)")
-        let home = KuriHome(root: root)
+        let home = KuriHome(root: root ?? FileManager.default.temporaryDirectory.appending(path: "kuri-live-\(UUID().uuidString)"))
         try home.prepare()
         let config = Config(
             defaultModel: model,
             providers: [model.provider: ProviderConfig(format: .openResponses, baseURL: Live.baseURL,
-                                                       models: [ModelConfig(id: model.model)])])
+                                                       models: [ModelConfig(id: model.model, contextWindow: contextWindow)])])
         let engine = Engine(home: home, store: try Store(url: home.database), config: config, mcpConfig: mcp)
         return (engine, home)
     }
@@ -190,5 +189,60 @@ struct LiveTests {
         #expect(config.defaultModel == model)
         #expect(config.modelConfig(for: model)?.contextWindow == 32768)
         print(try String(contentsOf: home.configFile, encoding: .utf8))
+    }
+
+    @Test func compactsAndStillRemembers() async throws {
+        let (engine, home) = try makeEngine(contextWindow: 2_500)
+        defer { try? FileManager.default.removeItem(at: home.root) }
+        let conversation = try await engine.newConversation()
+        let filler = String(repeating: "We talked at length about the weather, the trains and the price of rice. ", count: 25)
+        let seeded: [(Role, String)] = [
+            (.user, "Hi! My cat is called Miso. " + filler), (.assistant, "Nice to meet Miso. " + filler),
+            (.user, "Let's plan my week. " + filler), (.assistant, "Sure. " + filler),
+        ]
+        for (role, text) in seeded {
+            try await engine.store.append(Item(conversationID: conversation.id, payload: .message(Message(role: role, text: text))))
+        }
+        let run = try await run("What's my cat's name? Answer in one word.", engine: engine, in: conversation)
+        let compactions = run.items.compactMap { if case .compaction(let c) = $0.payload { c } else { nil } }
+        print("── summary: \(compactions.first?.summary ?? "none")")
+        #expect(compactions.count == 1)
+        #expect(run.reply.localizedCaseInsensitiveContains("miso"))
+    }
+
+    @Test func resumesAQuestionAfterARelaunch() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-live-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        // First launch: the model asks, and Kuri "quits" before the answer.
+        let (first, home) = try makeEngine(root: root)
+        let firstEvents = first.events()
+        let conversation = try await first.newConversation()
+        try await first.send("Help me plan a weekend trip. Before anything else, use the clarify tool to ask me which city.",
+                             to: conversation.id)
+        for await event in firstEvents {
+            if case .inputRequested = event { break }
+            if case .turnFinished = event { Issue.record("the model didn't ask"); return }
+        }
+        #expect(try await first.store.turns(of: conversation.id).last?.status == .awaitingInput)
+
+        // Second launch on the same database: the question comes back.
+        let (second, _) = try makeEngine(root: home.root)
+        let events = second.events()
+        await second.resumePendingTurns()
+        var asked = false
+        var outcome: TurnOutcome?
+        for await event in events {
+            if case .inputRequested(let request) = event, case .clarify(let clarify) = request.kind {
+                asked = true
+                await second.respond(to: request.id, with: .answers(Dictionary(uniqueKeysWithValues: clarify.questions.map { ($0.id, "Kyoto") })))
+            }
+            if case .turnFinished(_, _, let finished) = event { outcome = finished; break }
+        }
+        #expect(asked)
+        // A small model may keep asking after that; what matters is that the
+        // question came back and the turn went on to finish.
+        if case .completed = outcome {} else { Issue.record("turn ended with \(String(describing: outcome))") }
+        let items = try await second.store.items(of: conversation.id)
+        print("\n── after relaunch\n" + items.map(Self.describe).joined(separator: "\n"))
     }
 }

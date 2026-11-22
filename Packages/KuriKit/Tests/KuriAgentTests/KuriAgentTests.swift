@@ -43,7 +43,7 @@ struct Answering: UserInteraction {
             conversationID: conversation.id, turn: turn, provider: provider,
             modelConfig: ModelConfigSnapshot(), instructions: "test", folders: [],
             registry: ToolRegistry(BuiltInTools.all), store: store, interaction: Answering(),
-            limits: limits, emit: { _ in })
+            limits: limits, compactor: nil, emit: { _ in })
     }
 
     @Test func runsToolsUntilTheModelAnswers() async throws {

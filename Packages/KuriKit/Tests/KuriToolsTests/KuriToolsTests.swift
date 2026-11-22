@@ -109,3 +109,17 @@ private func context(_ store: Store, conversation: UUID = UUID()) -> ToolContext
         #expect(excerpt.hasPrefix("…") && excerpt.hasSuffix("…"))
     }
 }
+
+@Suite struct ClarifyArgumentTests {
+    @Test func acceptsWhatSmallModelsSend() throws {
+        let strict = #"{"questions":[{"id":"city","question":"Which city?","options":["Kyoto","Lisbon"]}]}"#
+        let stringified = #"{"questions":"[{\"id\": \"city\", \"question\": \"Which city?\", \"options\": [\"Kyoto\"]}]"}"#
+        let objectOptions = #"{"questions":[{"question":"Which city?","options":[{"id":"k","name":"Kyoto"},{"label":"Lisbon"}]}]}"#
+        let decoder = JSONDecoder()
+        #expect(try decoder.decode(ClarifyTool.Arguments.self, from: Data(strict.utf8)).questions.first?.options == ["Kyoto", "Lisbon"])
+        #expect(try decoder.decode(ClarifyTool.Arguments.self, from: Data(stringified.utf8)).questions.first?.id == "city")
+        let fixed = try decoder.decode(ClarifyTool.Arguments.self, from: Data(objectOptions.utf8)).questions
+        #expect(fixed.first?.id == "q1")
+        #expect(fixed.first?.options == ["Kyoto", "Lisbon"])
+    }
+}

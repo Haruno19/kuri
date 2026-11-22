@@ -62,9 +62,9 @@ public struct ConversationSearchTool: Tool {
         // What's after the last summary is already in the model's context,
         // so this_chat only searches before it. A conversation that was
         // never summarized has nothing to recover: search the others.
-        if thisChat, let summarized = try await context.store.lastCompactionSeq(in: context.conversationID) {
-            boundary = summarized
-            hits = try await context.store.search(args.query, in: context.conversationID, before: summarized, limit: limit)
+        if thisChat, let summarized = try await context.store.compactedThroughSeq(in: context.conversationID) {
+            boundary = summarized + 1
+            hits = try await context.store.search(args.query, in: context.conversationID, before: summarized + 1, limit: limit)
         } else {
             if thisChat {
                 note = "This conversation hasn't been summarized, so all of it is already in your context. Searched your other conversations instead.\n"

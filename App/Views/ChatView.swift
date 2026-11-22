@@ -1,5 +1,6 @@
 import KuriAgent
 import KuriCore
+import KuriStore
 import KuriTools
 import SwiftUI
 
@@ -26,6 +27,16 @@ struct ChatView: View {
                         Text(model.streamingText)
                             .textSelection(.enabled)
                     }
+                    if let id = model.selection, model.compacting.contains(id) {
+                        Label {
+                            Text("Summarizing earlier messages…")
+                        } icon: {
+                            ProgressView().controlSize(.small)
+                        }
+                        .font(.callout).foregroundStyle(.secondary)
+                    } else if !model.isSelectedRunning, let turn = model.lastTurn {
+                        TurnEndBar(turn: turn)
+                    }
                 }
                 .padding(20)
                 .frame(maxWidth: 760)
@@ -51,7 +62,7 @@ struct ChatView: View {
                 .textFieldStyle(.plain)
                 .lineLimit(1...8)
                 .onSubmit(send)
-            if model.isSelectedRunning {
+            if model.isSelectedBusy {
                 Button("Stop", systemImage: "stop.fill") { Task { await model.cancel() } }
             } else {
                 Button("Send", systemImage: "arrow.up") { send() }
@@ -67,6 +78,9 @@ struct ChatView: View {
 
     @ToolbarContentBuilder
     private var modelPicker: some ToolbarContent {
+        ToolbarItem {
+            ContextMeter()
+        }
         ToolbarItem {
             Menu {
                 ForEach(model.models, id: \.self) { ref in
@@ -150,8 +164,14 @@ private struct ItemView: View {
             }
             .font(.callout).foregroundStyle(.secondary)
 
-        case .compaction:
-            Divider().overlay(Text("Earlier messages summarized").font(.caption).foregroundStyle(.secondary))
+        case .compaction(let compaction):
+            DisclosureGroup {
+                Text(compaction.summary)
+                    .font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+            } label: {
+                Label("Earlier messages summarized", systemImage: "arrow.down.right.and.arrow.up.left")
+            }
+            .font(.callout).foregroundStyle(.secondary)
 
         default:
             EmptyView()
@@ -161,6 +181,77 @@ private struct ItemView: View {
     static func inlineMarkdown(_ text: String) -> AttributedString {
         (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
             ?? AttributedString(text)
+    }
+}
+
+/// After a turn that didn't complete: what happened, and a way to go on.
+private struct TurnEndBar: View {
+    @Environment(AppModel.self) private var model
+    let turn: Turn
+
+    var body: some View {
+        if let message {
+            HStack(spacing: 10) {
+                Image(systemName: turn.status == .failed ? "exclamationmark.triangle" : "pause.circle")
+                    .foregroundStyle(turn.status == .failed ? .orange : .secondary)
+                Text(message)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                Spacer()
+                Button("Continue") { Task { await model.continueSelected() } }
+                    .help("Let the model pick up where this turn left off")
+            }
+            .font(.callout)
+            .padding(10)
+            .background(.background.secondary, in: .rect(cornerRadius: 10))
+        }
+    }
+
+    private var message: String? {
+        switch turn.status {
+        case .cancelled: "Stopped."
+        case .failed where turn.error == "Interrupted": "Interrupted: Kuri quit during this turn."
+        case .failed: turn.error ?? "This turn failed."
+        default: nil
+        }
+    }
+}
+
+/// How full the model's context is, and a way to compact it.
+private struct ContextMeter: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        if let usage = model.contextUsage {
+            Menu {
+                Button("Compact Conversation", systemImage: "arrow.down.right.and.arrow.up.left") {
+                    Task { await model.compactSelected() }
+                }
+                .disabled(model.isSelectedBusy)
+            } label: {
+                HStack(spacing: 6) {
+                    if let window = usage.window {
+                        Gauge(value: min(Double(usage.tokens) / Double(window), 1)) {}
+                            .gaugeStyle(.accessoryCircularCapacity)
+                            .scaleEffect(0.45)
+                            .frame(width: 18, height: 18)
+                        Text("\(Self.short(usage.tokens)) / \(Self.short(window))")
+                    } else {
+                        Text("≈ \(Self.short(usage.tokens)) tokens")
+                    }
+                }
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+            }
+            .menuIndicator(.hidden)
+            .help(usage.window == nil
+                ? "Estimated context size. Set contextWindow for this model in config.json to compact automatically."
+                : "Estimated context size. Kuri summarizes earlier messages at 75%.")
+        }
+    }
+
+    static func short(_ tokens: Int) -> String {
+        tokens < 1_000 ? "\(tokens)" : String(format: "%.1fk", Double(tokens) / 1_000)
     }
 }
 

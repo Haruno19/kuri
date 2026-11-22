@@ -12,6 +12,10 @@ public struct TurnLimits: Sendable {
     public var maxIdenticalCalls = 3
     /// Characters of tool output passed back to the model.
     public var maxToolOutputCharacters = 30_000
+    /// Compact when a request would fill this share of the context window.
+    public var compactionThreshold = 0.75
+    /// After compacting, what's kept verbatim should fit in this share.
+    public var compactionKeepShare = 0.5
 
     public init() {}
 }
@@ -29,14 +33,18 @@ struct TurnRunner {
     let store: Store
     let interaction: any UserInteraction
     let limits: TurnLimits
+    /// Summarizes the conversation when it outgrows the context window.
+    let compactor: Compactor?
     let emit: @Sendable (EngineEvent) -> Void
 
-    func run() async -> TurnOutcome {
+    /// - Parameter resuming: The turn was waiting for the user when Kuri
+    ///   quit. Its unanswered calls run again first — which asks again —
+    ///   then the turn goes on as usual.
+    func run(resuming: Bool = false) async -> TurnOutcome {
         var usage = Usage()
-        var stop: StopReason = .endTurn
         let outcome: TurnOutcome
         do {
-            stop = try await loop(usage: &usage)
+            let stop = try await loop(usage: &usage, resuming: resuming)
             outcome = .completed(stop)
             try? await store.finishTurn(turn.id, status: .completed, stopReason: stop, usage: usage)
         } catch is CancellationError {
@@ -51,18 +59,40 @@ struct TurnRunner {
         return outcome
     }
 
-    private func loop(usage: inout Usage) async throws -> StopReason {
+    private func loop(usage: inout Usage, resuming: Bool) async throws -> StopReason {
         var callCounts: [String: Int] = [:]
+        let interaction = TurnInteraction(base: interaction, store: store, turnID: turn.id)
 
+        if resuming {
+            let pending = Self.unansweredCalls(in: try await store.items(of: conversationID), turnID: turn.id)
+            try await runCalls(pending, counts: &callCounts, interaction: interaction)
+        }
+
+        var compactionFailed = false
         for _ in 0..<limits.maxRounds {
             try Task.checkCancellation()
-            let request = InferenceRequest(
-                model: turn.model.model,
-                instructions: instructions,
-                items: Self.history(from: try await store.items(of: conversationID)),
-                tools: await registry.specs(),
-                maxOutputTokens: modelConfig.maxOutputTokens,
-                reasoningEffort: modelConfig.reasoningEffort)
+            var items = try await store.items(of: conversationID)
+            var request = makeRequest(items: items, tools: await registry.specs())
+
+            if let window = modelConfig.contextWindow, let compactor, !compactionFailed,
+               ContextEstimate.tokens(request) > Int(Double(window) * limits.compactionThreshold),
+               let cut = Compactor.cut(in: items, budget: Int(Double(window) * limits.compactionKeepShare)) {
+                emit(.compacting(conversationID: conversationID, true))
+                do {
+                    let item = try await compactor.compact(items, keepingFrom: cut, conversationID: conversationID,
+                                                           turnID: turn.id)
+                    emit(.itemAdded(item))
+                    items = try await store.items(of: conversationID)
+                    request = makeRequest(items: items, tools: request.tools)
+                } catch is CancellationError {
+                    emit(.compacting(conversationID: conversationID, false))
+                    throw CancellationError()
+                } catch {
+                    // Carry on uncompacted; the provider may still cope.
+                    compactionFailed = true
+                }
+                emit(.compacting(conversationID: conversationID, false))
+            }
 
             var calls: [ToolCall] = []
             var stop: StopReason = .endTurn
@@ -82,22 +112,35 @@ struct TurnRunner {
             }
 
             guard !calls.isEmpty else { return stop }
-
-            // Sequential for now. Read-only tools (`Tool.isReadOnly`) could
-            // run in parallel; worth it once file tools and MCP land.
-            for call in calls {
-                try Task.checkCancellation()
-                let signature = call.name + "\u{0}" + call.arguments
-                callCounts[signature, default: 0] += 1
-                let output = await execute(call, repeatCount: callCounts[signature]!)
-                try await append(.toolResult(ToolResult(callID: call.id, output: output.text, isError: output.isError)))
-                emit(.toolFinished(conversationID: conversationID, call: call, output: output))
-            }
+            try await runCalls(calls, counts: &callCounts, interaction: interaction)
         }
         return .other("max_rounds")
     }
 
-    private func execute(_ call: ToolCall, repeatCount: Int) async -> ToolOutput {
+    private func makeRequest(items: [Item], tools: [ToolSpec]) -> InferenceRequest {
+        InferenceRequest(
+            model: turn.model.model,
+            instructions: instructions,
+            items: Self.history(from: items),
+            tools: tools,
+            maxOutputTokens: modelConfig.maxOutputTokens,
+            reasoningEffort: modelConfig.reasoningEffort)
+    }
+
+    /// Sequential for now. Read-only tools (`Tool.isReadOnly`) could run in
+    /// parallel; worth it once the shell lands.
+    private func runCalls(_ calls: [ToolCall], counts: inout [String: Int], interaction: TurnInteraction) async throws {
+        for call in calls {
+            try Task.checkCancellation()
+            let signature = call.name + "\u{0}" + call.arguments
+            counts[signature, default: 0] += 1
+            let output = await execute(call, repeatCount: counts[signature]!, interaction: interaction)
+            try await append(.toolResult(ToolResult(callID: call.id, output: output.text, isError: output.isError)))
+            emit(.toolFinished(conversationID: conversationID, call: call, output: output))
+        }
+    }
+
+    private func execute(_ call: ToolCall, repeatCount: Int, interaction: TurnInteraction) async -> ToolOutput {
         guard let tool = await registry.tool(named: call.name) else {
             return .error("There is no tool named “\(call.name)”.")
         }
@@ -132,13 +175,17 @@ struct TurnRunner {
         emit(.itemAdded(item))
     }
 
-    /// The items a request should carry: everything since the last
-    /// compaction (the compaction included), with a placeholder result for
-    /// any call left unanswered by an interrupted turn — providers reject
-    /// histories with dangling calls.
+    /// The items a request should carry: the latest summary, then every item
+    /// after what it covers. A call left unanswered by an interrupted turn
+    /// gets a placeholder result; providers reject histories with dangling
+    /// calls.
     static func history(from items: [Item]) -> [Item.Payload] {
-        let start = items.lastIndex { if case .compaction = $0.payload { true } else { false } } ?? items.startIndex
-        let payloads = items[start...].map(\.payload)
+        var payloads = items.map(\.payload)
+        if let last = items.lastIndex(where: { if case .compaction = $0.payload { true } else { false } }) {
+            let start = Compactor.activeStart(in: items)
+            let kept = items[start...].filter { if case .compaction = $0.payload { false } else { true } }
+            payloads = [items[last].payload] + kept.map(\.payload)
+        }
         let answered = Set(payloads.compactMap { if case .toolResult(let r) = $0 { r.callID } else { nil } })
 
         var result: [Item.Payload] = []
@@ -149,6 +196,15 @@ struct TurnRunner {
             }
         }
         return result
+    }
+
+    /// Calls made in `turnID` that have no result yet, in order.
+    static func unansweredCalls(in items: [Item], turnID: UUID) -> [ToolCall] {
+        let answered = Set(items.compactMap { if case .toolResult(let r) = $0.payload { r.callID } else { nil } })
+        return items.compactMap { item in
+            guard item.turnID == turnID, case .toolCall(let call) = item.payload, !answered.contains(call.id) else { return nil }
+            return call
+        }
     }
 
     static func cap(_ output: ToolOutput, at limit: Int) -> ToolOutput {
@@ -163,4 +219,28 @@ struct TurnRunner {
 struct ModelConfigSnapshot: Sendable {
     var maxOutputTokens: Int?
     var reasoningEffort: String?
+    var contextWindow: Int?
+}
+
+/// Marks the turn as awaiting input while a tool waits for the user, so a
+/// relaunch knows to resume it.
+struct TurnInteraction: UserInteraction {
+    let base: any UserInteraction
+    let store: Store
+    let turnID: UUID
+
+    func clarify(_ request: ClarifyRequest) async throws -> [String: String] {
+        try await waiting { try await base.clarify(request) }
+    }
+
+    func approve(_ request: ApprovalRequest) async throws -> Bool {
+        try await waiting { try await base.approve(request) }
+    }
+
+    private func waiting<T: Sendable>(_ ask: () async throws -> T) async throws -> T {
+        try await store.setTurnStatus(turnID, .awaitingInput)
+        let answer = try await ask()
+        try await store.setTurnStatus(turnID, .running)
+        return answer
+    }
 }

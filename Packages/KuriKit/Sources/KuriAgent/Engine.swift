@@ -239,16 +239,7 @@ public actor Engine {
     /// Adds the user's message and starts a turn. Returns once the turn is
     /// running; follow it through `events()`.
     public func send(_ text: String, to conversationID: UUID) async throws {
-        guard running[conversationID] == nil else {
-            throw KuriError.provider("This conversation is already running.")
-        }
-        guard var conversation = try await store.conversation(conversationID) else {
-            throw KuriError.database("No conversation with id \(conversationID).")
-        }
-        guard let model = conversation.model ?? config.defaultModel else {
-            throw KuriError.invalidConfig(file: "config.json", reason: "no model selected and no defaultModel set")
-        }
-        let provider = try provider(for: model)
+        var (conversation, model, provider) = try await prepareTurn(in: conversationID)
 
         let message = Item(conversationID: conversationID, payload: .message(Message(role: .user, text: text)))
         try await store.append(message)
@@ -263,34 +254,34 @@ public actor Engine {
 
         let turn = try await store.beginTurn(conversationID: conversationID, model: model)
         broadcaster.emit(.turnStarted(turn))
+        try await startRunner(for: turn, in: conversation, provider: provider, resuming: false)
+    }
 
-        let folders = try await store.folders(of: conversationID)
-        let modelConfig = config.modelConfig(for: model)
-        let toolNames = Set(await registry.specs().map(\.name))
-        let runner = TurnRunner(
-            conversationID: conversationID,
-            turn: turn,
-            provider: provider,
-            modelConfig: ModelConfigSnapshot(maxOutputTokens: modelConfig?.maxOutputTokens,
-                                             reasoningEffort: modelConfig?.reasoningEffort),
-            instructions: Instructions.build(conversation: conversation, folders: folders,
-                                             memories: try await store.memories(), tools: toolNames),
-            folders: folders,
-            registry: registry,
-            store: store,
-            interaction: broker,
-            limits: limits,
-            emit: { [broadcaster] event in
-                broadcaster.emit(event)
-                if case .toolFinished(_, let call, let output) = event, call.name == MemoryTool().spec.name,
-                   !output.isError {
-                    broadcaster.emit(.memoriesChanged)
-                }
-            })
+    /// Starts a turn without a new message, so the model picks up where a
+    /// failed, stopped or interrupted turn left off.
+    public func continueConversation(_ conversationID: UUID) async throws {
+        let (conversation, model, provider) = try await prepareTurn(in: conversationID)
+        let turn = try await store.beginTurn(conversationID: conversationID, model: model)
+        broadcaster.emit(.turnStarted(turn))
+        try await startRunner(for: turn, in: conversation, provider: provider, resuming: false)
+    }
 
-        running[conversationID] = Task { [weak self] in
-            _ = await runner.run()
-            await self?.turnEnded(conversationID)
+    /// Picks up turns that were waiting for the user when Kuri quit: their
+    /// questions and approvals are asked again. Call once subscribed to
+    /// `events()`, so the requests aren't missed.
+    public func resumePendingTurns() async {
+        guard let pending = try? await store.turns(withStatus: .awaitingInput) else { return }
+        for turn in pending where running[turn.conversationID] == nil {
+            do {
+                guard let conversation = try await store.conversation(turn.conversationID) else { continue }
+                let provider = try provider(for: turn.model)
+                broadcaster.emit(.turnStarted(turn))
+                try await startRunner(for: turn, in: conversation, provider: provider, resuming: true)
+            } catch {
+                let message = "Couldn't resume: \(error.localizedDescription)"
+                try? await store.finishTurn(turn.id, status: .failed, stopReason: nil, usage: turn.usage, error: message)
+                broadcaster.emit(.turnFinished(conversationID: turn.conversationID, turnID: turn.id, .failed(message)))
+            }
         }
     }
 
@@ -306,8 +297,111 @@ public actor Engine {
         await broker.openRequests
     }
 
+    public var runningConversations: Set<UUID> { Set(running.keys) }
+
+    private func prepareTurn(in conversationID: UUID) async throws -> (Conversation, ModelRef, any InferenceProvider) {
+        guard running[conversationID] == nil else {
+            throw KuriError.provider("This conversation is already running.")
+        }
+        guard let conversation = try await store.conversation(conversationID) else {
+            throw KuriError.database("No conversation with id \(conversationID).")
+        }
+        guard let model = conversation.model ?? config.defaultModel else {
+            throw KuriError.invalidConfig(file: "config.json", reason: "no model selected and no defaultModel set")
+        }
+        return (conversation, model, try provider(for: model))
+    }
+
+    private func startRunner(for turn: Turn, in conversation: Conversation, provider: any InferenceProvider,
+                             resuming: Bool) async throws {
+        let folders = try await store.folders(of: conversation.id)
+        let modelConfig = config.modelConfig(for: turn.model)
+        let toolNames = Set(await registry.specs().map(\.name))
+        let runner = TurnRunner(
+            conversationID: conversation.id,
+            turn: turn,
+            provider: provider,
+            modelConfig: ModelConfigSnapshot(maxOutputTokens: modelConfig?.maxOutputTokens,
+                                             reasoningEffort: modelConfig?.reasoningEffort,
+                                             contextWindow: modelConfig?.contextWindow),
+            instructions: Instructions.build(conversation: conversation, folders: folders,
+                                             memories: try await store.memories(), tools: toolNames),
+            folders: folders,
+            registry: registry,
+            store: store,
+            interaction: broker,
+            limits: limits,
+            compactor: compactor(for: turn.model, fallback: provider),
+            emit: { [broadcaster] event in
+                broadcaster.emit(event)
+                if case .toolFinished(_, let call, let output) = event, call.name == MemoryTool().spec.name,
+                   !output.isError {
+                    broadcaster.emit(.memoriesChanged)
+                }
+            })
+
+        let conversationID = conversation.id
+        running[conversationID] = Task { [weak self] in
+            _ = await runner.run(resuming: resuming)
+            await self?.turnEnded(conversationID)
+        }
+    }
+
     private func turnEnded(_ conversationID: UUID) {
         running[conversationID] = nil
+    }
+
+    // MARK: Compaction
+
+    /// Summarizes the conversation up to its latest exchange, which stays
+    /// verbatim. Returns when done.
+    public func compact(_ conversationID: UUID) async throws {
+        guard running[conversationID] == nil else {
+            throw KuriError.provider("This conversation is running.")
+        }
+        guard let conversation = try await store.conversation(conversationID),
+              let model = conversation.model ?? config.defaultModel
+        else { throw KuriError.invalidConfig(file: "config.json", reason: "no model selected and no defaultModel set") }
+        let compactor = compactor(for: model, fallback: try provider(for: model))
+        let items = try await store.items(of: conversationID)
+        guard let cut = Compactor.cut(in: items, budget: .max) else {
+            throw KuriError.provider("Nothing to summarize yet: the conversation is a single exchange.")
+        }
+
+        broadcaster.emit(.compacting(conversationID: conversationID, true))
+        let task = Task { try await compactor.compact(items, keepingFrom: cut, conversationID: conversationID, turnID: nil) }
+        // Registered as running, so the composer waits and Stop cancels it.
+        running[conversationID] = Task {
+            await withTaskCancellationHandler { _ = try? await task.value } onCancel: { task.cancel() }
+        }
+        defer {
+            running[conversationID] = nil
+            broadcaster.emit(.compacting(conversationID: conversationID, false))
+        }
+        let item = try await task.value
+        broadcaster.emit(.itemAdded(item))
+    }
+
+    /// An estimate of how much of the model's context the conversation
+    /// fills, in tokens. `window` is `nil` when config.json doesn't say.
+    public func contextUsage(_ conversationID: UUID) async throws -> (tokens: Int, window: Int?) {
+        guard let conversation = try await store.conversation(conversationID) else { return (0, nil) }
+        let items = try await store.items(of: conversationID)
+        let model = conversation.model ?? config.defaultModel
+        let instructions = Instructions.build(conversation: conversation, folders: try await store.folders(of: conversationID),
+                                              memories: try await store.memories(), tools: Set(await registry.specs().map(\.name)))
+        let request = InferenceRequest(model: model?.model ?? "", instructions: instructions,
+                                       items: TurnRunner.history(from: items), tools: await registry.specs())
+        return (ContextEstimate.tokens(request), model.flatMap { config.modelConfig(for: $0)?.contextWindow })
+    }
+
+    /// Summaries come from the utility model when one is set, otherwise from
+    /// the conversation's own model.
+    private func compactor(for model: ModelRef, fallback: any InferenceProvider) -> Compactor {
+        if let utility = config.utilityModel, let provider = try? provider(for: utility) {
+            return Compactor(provider: provider, model: utility.model, store: store)
+        }
+        return Compactor(provider: fallback, model: model.model, store: store)
     }
 
     static func provisionalTitle(for text: String) -> String {
