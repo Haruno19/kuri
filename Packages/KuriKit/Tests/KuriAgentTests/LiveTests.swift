@@ -245,4 +245,30 @@ struct LiveTests {
         let items = try await second.store.items(of: conversation.id)
         print("\n── after relaunch\n" + items.map(Self.describe).joined(separator: "\n"))
     }
+
+    @Test func titlesAConversation() async throws {
+        let (engine, home) = try makeEngine()
+        defer { try? FileManager.default.removeItem(at: home.root) }
+        let events = engine.events()
+        let conversation = try await engine.newConversation()
+        let question = "what does kuri mean in japanese and how is it written? also any recipes?"
+        try await engine.send(question, to: conversation.id)
+        var title: String?
+        let deadline = Task { try await Task.sleep(for: .seconds(90)) }
+        for await event in events {
+            if case .conversationUpdated(let updated) = event, updated.id == conversation.id,
+               updated.title != Engine.provisionalTitle(for: question), !updated.title.isEmpty {
+                title = updated.title
+                break
+            }
+            if case .turnFinished = event {
+                // The title comes in the background, shortly after.
+                Task { try? await Task.sleep(for: .seconds(60)); deadline.cancel() }
+            }
+            if deadline.isCancelled { break }
+        }
+        print("\n── generated title: \(title ?? "none")")
+        #expect(title != nil)
+    }
 }
+

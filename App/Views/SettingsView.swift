@@ -26,6 +26,13 @@ private struct GeneralSettings: View {
 
     var body: some View {
         Form {
+            Section("Conversations") {
+                Toggle("Generate titles", isOn: Binding(
+                    get: { model.config.generateTitles ?? true },
+                    set: { enabled in Task { await model.setGenerateTitles(enabled) } }))
+                Text("After the first answer, the utility model (or the conversation's model) names the conversation.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             if let home = model.engine?.home {
                 Section("Configuration") {
                     fileRow("Providers, models, tool policies", url: home.configFile)

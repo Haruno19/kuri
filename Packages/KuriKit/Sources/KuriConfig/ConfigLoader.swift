@@ -58,6 +58,10 @@ public struct ConfigLoader: Sendable {
           // "<provider>/<model>". Everything after the first slash is the model id.
           defaultModel: "ollama/qwen3.5:2b",
 
+          // Name conversations after their first exchange, with utilityModel if set
+          // (otherwise the conversation's own model). Settings › General toggles it.
+          generateTitles: true,
+
           providers: {
             // Anything that speaks Open Responses: Ollama, LM Studio, vLLM, OpenAI…
             ollama: {

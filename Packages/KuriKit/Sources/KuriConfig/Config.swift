@@ -12,19 +12,23 @@ public struct Config: Codable, Sendable, Hashable {
     /// sees (`memory`, `github__create_issue`). Wins over `mcp.json`.
     public var tools: [String: ToolPolicy]?
     public var sandbox: SandboxConfig?
+    /// Name conversations after their first exchange. Default `true`.
+    public var generateTitles: Bool?
 
     public init(
         defaultModel: ModelRef? = nil,
         utilityModel: ModelRef? = nil,
         providers: [String: ProviderConfig] = [:],
         tools: [String: ToolPolicy]? = nil,
-        sandbox: SandboxConfig? = nil
+        sandbox: SandboxConfig? = nil,
+        generateTitles: Bool? = nil
     ) {
         self.defaultModel = defaultModel
         self.utilityModel = utilityModel
         self.providers = providers
         self.tools = tools
         self.sandbox = sandbox
+        self.generateTitles = generateTitles
     }
 
     public init(from decoder: any Decoder) throws {
@@ -34,6 +38,7 @@ public struct Config: Codable, Sendable, Hashable {
         providers = try container.decodeIfPresent([String: ProviderConfig].self, forKey: .providers) ?? [:]
         tools = try container.decodeIfPresent([String: ToolPolicy].self, forKey: .tools)
         sandbox = try container.decodeIfPresent(SandboxConfig.self, forKey: .sandbox)
+        generateTitles = try container.decodeIfPresent(Bool.self, forKey: .generateTitles)
     }
 
     /// Every model declared in the file, in a stable order.

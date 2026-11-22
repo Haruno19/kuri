@@ -222,6 +222,14 @@ final class AppModel {
         }
     }
 
+    func setGenerateTitles(_ enabled: Bool) async {
+        do {
+            try await engine?.setGenerateTitles(enabled)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func setDefaultModel(_ ref: ModelRef?) async {
         do {
             try await engine?.setDefaultModel(ref)

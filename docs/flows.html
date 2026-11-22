@@ -390,6 +390,22 @@ const FLOWS = [
             "A message that arrives after the turn has ended, or was queued before Stop, starts the next turn as soon as the conversation is free; that's usually the redirection Stop was for.",
             "Queued messages live in memory: if Kuri quits first, they're gone."] },
 
+  { group: "Turns", id: "title", title: "Generated title",
+    summary: "After a conversation's first completed turn, a small request names it, in the background, if titles are on and the user hasn't renamed it.",
+    participants: ["appmodel", "engine", "runner", "store", "provider", "llm"],
+    steps: [
+      ["runner", "engine", "`.completed` — the first completed turn", "r"],
+      ["engine", "store", "first exchange; title still provisional?"],
+      ["engine", "provider", "`stream(title request)` — utility model, else the conversation's", "a"],
+      ["provider", "llm", "`POST /responses`"],
+      ["llm", "provider", "“Chestnuts in Japanese”", "r"],
+      ["provider", "engine", "text → cleaned (labels, quotes, final period)", "r"],
+      ["engine", "store", "`updateConversation` — unless renamed meanwhile"],
+      ["engine", "appmodel", "`.conversationUpdated`", "e"],
+    ],
+    notes: ["<code>generateTitles: false</code> in config.json (or the toggle in Settings › General) turns it off.",
+            "A failure keeps the provisional title: the first line of the first message."] },
+
   { group: "Resuming and compacting", id: "resume", title: "Resuming after a relaunch",
     summary: "A turn that was waiting for the user when Kuri quit picks up where it was. Nothing extra was stored: its tool call has no result yet, so running that call again through the normal path asks the question, or for approval, again.",
     participants: ["user", "appmodel", "engine", "store", "runner", "broker"],

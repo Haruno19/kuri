@@ -429,7 +429,8 @@ public actor Engine {
 
         let conversationID = conversation.id
         running[conversationID] = Task { [weak self] in
-            _ = await runner.run(resuming: resuming)
+            let outcome = await runner.run(resuming: resuming)
+            if case .completed = outcome { await self?.generateTitleIfNeeded(conversationID) }
             await self?.turnEnded(conversationID)
         }
     }
@@ -445,6 +446,46 @@ public actor Engine {
         } catch {
             broadcaster.emit(.configFailed(error.localizedDescription))
         }
+    }
+
+    // MARK: Titles
+
+    public func setGenerateTitles(_ enabled: Bool) async throws {
+        try ConfigEditor(home: home).setGenerateTitles(enabled)
+        await reloadConfig()
+    }
+
+    /// After the first completed turn, replaces the provisional title (the
+    /// first line of the first message) with a generated one. In the
+    /// background; a failure just leaves the provisional title.
+    private func generateTitleIfNeeded(_ conversationID: UUID) async {
+        guard config.generateTitles != false,
+              let conversation = try? await store.conversation(conversationID),
+              let model = conversation.model ?? config.defaultModel,
+              let completed = try? await store.turns(of: conversationID).filter({ $0.status == .completed }),
+              completed.count == 1,
+              let items = try? await store.items(of: conversationID)
+        else { return }
+        let messages = items.compactMap { item -> Message? in if case .message(let m) = item.payload { m } else { nil } }
+        guard let question = messages.first(where: { $0.role == .user })?.text,
+              let answer = messages.first(where: { $0.role == .assistant })?.text,
+              conversation.title == Self.provisionalTitle(for: question)
+        else { return }
+
+        let target = config.utilityModel ?? model
+        guard let provider = try? provider(for: target) else { return }
+        let generator = TitleGenerator(provider: provider, model: target.model)
+        Task { [weak self] in
+            guard let title = try? await generator.title(question: question, answer: answer) else { return }
+            await self?.applyTitle(title, to: conversationID, ifStill: conversation.title)
+        }
+    }
+
+    private func applyTitle(_ title: String, to conversationID: UUID, ifStill provisional: String) async {
+        // The user may have renamed it meanwhile.
+        guard var conversation = try? await store.conversation(conversationID), conversation.title == provisional else { return }
+        conversation.title = title
+        try? await update(conversation)
     }
 
     // MARK: Compaction

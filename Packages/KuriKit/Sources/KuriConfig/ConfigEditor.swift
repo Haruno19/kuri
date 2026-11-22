@@ -55,6 +55,14 @@ public struct ConfigEditor: Sendable {
         }
     }
 
+    public func setGenerateTitles(_ enabled: Bool) throws {
+        try edit { tree in
+            guard case .object(var root) = tree else { return }
+            root["generateTitles"] = .bool(enabled)
+            tree = .object(root)
+        }
+    }
+
     public func setDefaultModel(_ ref: ModelRef?) throws {
         try edit { tree in
             guard case .object(var root) = tree else { return }

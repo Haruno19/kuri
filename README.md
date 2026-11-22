@@ -129,7 +129,7 @@ Done, the core: foundations (domain model, config, storage, Open Responses adapt
 
 1. **Message queue** — type while a turn runs: the message joins the running turn at its next step, after the current tool round, or starts the next turn if it ends first. *(done)*
 2. **Apple's on-device model** as a provider (`apple-foundation-models`), offline and free, a natural utility model. *(done)*
-3. **Generated titles**, switchable in Settings.
+3. **Generated titles**, switchable in Settings. *(done)*
 4. **Read-only tool calls in parallel.**
 
 **Later, engine:** more providers (Anthropic Messages, Gemini, Chat Completions), fallback models, memory review, attachments in messages, sub-agents, `KuriServer` for the iOS client.

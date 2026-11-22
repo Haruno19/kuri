@@ -53,7 +53,8 @@ Anywhere a secret is accepted (`apiKey`, `headers`, an MCP server's `env`), the 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `defaultModel` | `"<provider>/<model>"` | none | The model new conversations start with. Everything after the first slash is the model id. |
-| `utilityModel` | `"<provider>/<model>"` | none | A small, fast model for background jobs. Today: compaction summaries. Without it, the conversation's own model writes them. |
+| `utilityModel` | `"<provider>/<model>"` | none | A small, fast model for background jobs: compaction summaries and titles. Without it, the conversation's own model does them. |
+| `generateTitles` | bool | `true` | Name a conversation after its first exchange. Settings › General toggles it (rewriting this file). |
 | `providers` | object | `{}` | Providers by name; the name is the part before the slash in model references. |
 | `tools` | object | `{}` | Tool policies, see below. |
 | `sandbox` | object | defaults below | The Linux sandbox. |

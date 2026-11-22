@@ -26,6 +26,8 @@ Kuri is **stateless towards providers**: every request carries the history it ne
 
 Guards against runaway turns: a round limit per turn, detection of identical repeated calls, and a cap on tool output size. Fallback models are planned.
 
+**Titles.** A conversation starts with a provisional title, the first line of its first message. After its first completed turn, if `generateTitles` is on and the title is still the provisional one, the utility model (or the conversation's model) writes a 2-to-6-word title from the first exchange, in the background; labels, quotes and trailing punctuation are cleaned off. A title the user changed meanwhile is left alone, and a failure keeps the provisional one.
+
 **Messages sent during a turn are queued.** While a conversation is busy (a turn or a compaction), `Engine.send` queues the message instead of failing. The running turn takes the queue at each step boundary: after a tool round, and when its answer would otherwise end the turn, so the message joins the same turn and the next request includes it. A message that arrives after the turn has ended, or was queued before Stop, starts the next turn as soon as the conversation is free. Queued messages can be removed before delivery; they live in memory only.
 
 **Clarify and approvals suspend the turn.** The `clarify` tool asks the user and *waits*: the answer is the tool's return value, so the model continues the same turn. A tool whose policy is `ask` waits the same way for Allow or Deny. While waiting, the turn's status is `awaiting_input`.
