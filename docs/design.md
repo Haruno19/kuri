@@ -48,7 +48,7 @@ A long conversation is summarized so it keeps fitting in the model's context.
 
 `open-responses` covers every OpenAI-style server. `apple-foundation-models` runs Apple's on-device model through the FoundationModels framework: each request becomes a fresh `LanguageModelSession` over a transcript rebuilt from the items (user-side and assistant-side text; tool calls and results from earlier turns with other models are described in words), and the reply streams back as text deltas. That model gets no tools: its 4,096-token context would be mostly spent on Kuri's tool definitions, and FoundationModels runs tools inside its own session, outside Kuri's policies and persistence (see [decision 0013](decisions/0013-apple-model-text-only.md)). A provider says whether it supports tools; when it doesn't, requests carry none and the instructions don't mention any.
 
-Every adapter implements one method — `stream(InferenceRequest) -> AsyncThrowingStream<InferenceEvent>` — and maps its wire format to the shared item model in both directions. No official Swift SDK exists for these providers, so the adapters are hand-written over `URLSession` and a small SSE parser.
+Every adapter implements one method — `stream(InferenceRequest) -> AsyncThrowingStream<InferenceEvent>` — and maps its wire format to the shared item model in both directions. No official Swift SDK exists for these providers, so the adapters are hand-written over `URLSession` and a small SSE parser. A stream may stay silent for up to ten minutes before it fails: local servers queue requests and can take minutes over a long prompt before the first byte. Error responses show the server's own message when it sends one in the usual `{"error": {"message"}}` shape.
 
 ## Tools
 

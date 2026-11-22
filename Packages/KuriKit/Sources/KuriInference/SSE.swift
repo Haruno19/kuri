@@ -77,10 +77,18 @@ enum HTTP {
                 do {
                     var request = URLRequest(url: url)
                     request.httpMethod = "POST"
+                    // How long the stream may stay silent. Local servers queue
+                    // requests and can take minutes over a long prompt before
+                    // the first byte; a stalled turn can always be cancelled.
+                    request.timeoutInterval = 600
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
-                    request.httpBody = try JSONEncoder().encode(body)
+                    // Sorted keys: the same history always encodes to the same
+                    // bytes, which keeps providers' prompt caches warm.
+                    let encoder = JSONEncoder()
+                    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+                    request.httpBody = try encoder.encode(body)
 
                     let (bytes, response) = try await session.bytes(for: request)
                     try await check(response, bytes: bytes)
@@ -104,9 +112,20 @@ enum HTTP {
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
         let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            throw KuriError.http(status: http.statusCode, body: String(decoding: data.prefix(2000), as: UTF8.self))
+            throw KuriError.http(status: http.statusCode, body: describe(Array(data.prefix(4000))))
         }
         return data
+    }
+
+    /// The message inside a JSON error body (`{"error": {"message": …}}`,
+    /// the shape OpenAI- and Anthropic-style servers share), or the raw text.
+    static func describe(_ body: [UInt8]) -> String {
+        struct Envelope: Decodable {
+            struct Inner: Decodable { let message: String? }
+            let error: Inner?
+        }
+        if let message = (try? JSONDecoder().decode(Envelope.self, from: Data(body)))?.error?.message { return message }
+        return String(decoding: body.prefix(2000), as: UTF8.self)
     }
 
     private static func check(_ response: URLResponse, bytes: URLSession.AsyncBytes) async throws {
@@ -116,6 +135,6 @@ enum HTTP {
             body.append(byte)
             if body.count >= 4000 { break }
         }
-        throw KuriError.http(status: http.statusCode, body: String(decoding: body, as: UTF8.self))
+        throw KuriError.http(status: http.statusCode, body: describe(body))
     }
 }
