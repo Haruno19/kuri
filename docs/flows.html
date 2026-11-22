@@ -114,6 +114,8 @@
         <tr><td><code>.toolsChanged</code></td><td>ToolRegistry (via Engine)</td><td>Tools were added or removed, or policies changed</td><td>Refreshes the tool catalog</td></tr>
         <tr><td><code>.memoriesChanged</code></td><td>Engine</td><td>The memory tool or the user changed memories</td><td>Refreshes Settings › Memory</td></tr>
         <tr><td><code>.mcpServersChanged</code></td><td>MCPManager (via Engine)</td><td>A server's state, tools or log changed</td><td>Refreshes Settings › Tools</td></tr>
+        <tr><td><code>.sandboxChanged</code></td><td>Sandbox (via Engine)</td><td>Setup progresses, finishes or fails</td><td>Settings › Sandbox, folder hints</td></tr>
+        <tr><td><code>.foldersChanged</code></td><td>Engine</td><td>A conversation's folders change</td><td>Updates the folder chips</td></tr>
       </tbody>
     </table>
   </div>
@@ -144,13 +146,16 @@
         <tr><td>Inference server</td><td><code>GET &lt;baseURL&gt;/models</code> → <code>{ data: [{ id }] }</code>, for model discovery.</td></tr>
         <tr><td>MCP server</td><td>JSON-RPC via the MCP Swift SDK. Client → server: <code>initialize</code>, <code>notifications/initialized</code>, <code>tools/list</code>, <code>tools/call</code>, <code>notifications/cancelled</code>. Server → client: <code>notifications/tools/list_changed</code>.</td></tr>
         <tr><td>MCP transport</td><td>stdio: newline-delimited JSON over the child's stdin/stdout, stderr kept as a log. Streamable HTTP: <code>POST</code> per message, <code>Mcp-Session-Id</code>, optional <code>GET</code> event stream, configured headers on every request.</td></tr>
+        <tr><td>Kata Containers</td><td><code>GET</code> of the arm64 release tarball, once, for its kernel.</td></tr>
+        <tr><td>Image registries</td><td>OCI pulls, once each: Apple's <code>vminit</code> from ghcr.io and the sandbox image (Docker Hub by default).</td></tr>
+        <tr><td>Virtualization.framework</td><td>Through Containerization: one VM per conversation, no network device, folders shared with virtiofs, processes driven over vsock by <code>vminitd</code>.</td></tr>
         <tr><td>Login shell</td><td><code>$SHELL -ilc 'printf $PATH'</code>, once, so stdio servers find <code>npx</code>, <code>uvx</code> and friends when Kuri starts from Finder.</td></tr>
         <tr><td>File system</td><td><code>~/.config/kuri</code>: <code>config.json</code> and <code>mcp.json</code> (watched), <code>kuri.sqlite</code> (WAL), <code>blobs/</code>, <code>scratch/</code>.</td></tr>
       </tbody>
     </table>
   </div>
 
-  <p class="meta">Not drawn yet, because it doesn't exist yet: the sandbox and its <code>shell</code> tool. It'll be added here when it lands.</p>
+  <p class="meta">Every flow in the app today is drawn here. New ones get added when they land.</p>
 </main>
 
 <script>
@@ -182,6 +187,12 @@ const P = {
   transport: ["ProcessTransport", "KuriMCP", "module"],
   mcptool:   ["MCPTool", "KuriMCP", "module"],
   sdk:       ["Client", "MCP Swift SDK", "module"],
+  sandbox:   ["Sandbox", "KuriSandbox", "module"],
+  shelltool: ["ShellTool", "KuriSandbox", "module"],
+  ctrmanager:["ContainerManager", "Containerization", "module"],
+  vm:        ["Linux VM", "Virtualization.framework", "external"],
+  kata:      ["Kata release", "github.com", "external"],
+  oci:       ["Image registries", "ghcr.io, Docker Hub", "external"],
   llm:       ["Inference server", "Ollama, OpenAI…", "external"],
   server:    ["MCP server", "stdio or HTTP", "external"],
   shell:     ["Login shell", "$SHELL", "external"],
@@ -432,6 +443,63 @@ const FLOWS = [
     ],
     notes: ["While it works the conversation counts as running: the composer waits and Stop cancels it.",
             "A conversation that's a single exchange has nothing to summarize yet."] },
+
+  { group: "Sandbox", id: "sandbox-setup", title: "Setting up the sandbox",
+    summary: "A one-time setup fetches what the VMs need: a Linux kernel, Apple's init filesystem and the container image. Only then does the model get a shell.",
+    participants: ["user", "settings", "appmodel", "engine", "sandbox", "kata", "oci", "registry"],
+    steps: [
+      ["user", "settings", "Set Up Sandbox"],
+      ["settings", "engine", "`setUpSandbox()` via AppModel"],
+      ["engine", "sandbox", "`install()`"],
+      ["sandbox", "kata", "`GET kata-static-…-arm64.tar.zst` (≈ 680 MB)"],
+      ["sandbox", "appmodel", "`.sandboxChanged(.installing(step, fraction))`", "e"],
+      ["sandbox", "sandbox", "two passes over the archive:\nfind what `vmlinux.container` points at, extract it"],
+      ["sandbox", "oci", "pull `ghcr.io/apple/containerization/vminit`"],
+      ["sandbox", "oci", "pull `python:3-slim`"],
+      ["sandbox", "sandbox", "unpack the image into a snapshot"],
+      ["sandbox", "appmodel", "`.sandboxChanged(.ready)`", "e"],
+      ["engine", "registry", "`register(ShellTool)`"],
+      ["registry", "appmodel", "`.toolsChanged`", "e"],
+    ],
+    notes: ["On launch the engine only checks what's on disk (<code>refreshStatus()</code>), without the network, and offers the shell if everything is there.",
+            "Only the kernel is kept from the tarball, which is then deleted. After setup the sandbox works offline; files live in <code>~/.config/kuri/sandbox</code>."] },
+
+  { group: "Sandbox", id: "shell", title: "A shell command",
+    summary: "The shell tool runs a command in the conversation's container, starting it first if needed. The VM boots from a clone of the image's snapshot in about half a second; later commands take tens of milliseconds.",
+    participants: ["runner", "shelltool", "sandbox", "ctrmanager", "vm"],
+    steps: [
+      ["runner", "shelltool", "`run({ command, timeout_seconds })`"],
+      ["shelltool", "shelltool", "`SandboxMounts.plan(folders, scratch)`"],
+      ["shelltool", "sandbox", "`run(command, conversationID, mounts, timeout)`"],
+      { opt: "no container yet, or its folders changed", steps: [
+        ["sandbox", "ctrmanager", "`create(id, image, networking: false)`\nfolders shared at /work"],
+        ["ctrmanager", "ctrmanager", "clone the image snapshot (APFS)"],
+        ["sandbox", "vm", "`create()`, `start()`"],
+      ]},
+      ["sandbox", "vm", "exec `/bin/sh -lc command` in /work"],
+      ["vm", "sandbox", "stdout and stderr", "r"],
+      ["vm", "sandbox", "exit code — or, past the timeout, SIGKILL", "r"],
+      ["sandbox", "sandbox", "reset the idle timer"],
+      ["sandbox", "shelltool", "`CommandResult`", "r"],
+      ["shelltool", "runner", "“Exit code N.” + output (start and end kept)", "r"],
+    ],
+    notes: ["Stopping the turn kills the running command.",
+            "After <code>idleMinutes</code> without a command the container is stopped and deleted; the folders it mounted are untouched.",
+            "The VM talks to Kuri through Apple's init process (<code>vminitd</code>) over vsock; folders are shared with virtiofs."] },
+
+  { group: "Sandbox", id: "folders", title: "Attaching a folder",
+    summary: "Attaching a folder decides what /work is for the conversation. The container picks it up on its next command.",
+    participants: ["user", "chat", "appmodel", "engine", "store", "sandbox"],
+    steps: [
+      ["user", "chat", "Attach Folder, picks folders"],
+      ["chat", "appmodel", "`attach(urls)`"],
+      ["appmodel", "engine", "`setFolders(folders, for: id)`"],
+      ["engine", "store", "`setFolders(…)`"],
+      ["engine", "sandbox", "`stop(id)` — remounted on the next command"],
+      ["engine", "appmodel", "`.foldersChanged`", "e"],
+    ],
+    notes: ["One folder is /work; several are /work/&lt;name&gt;; none means a scratch folder for the conversation.",
+            "The next request's instructions say which of the user's folders is mounted where, and which are read-only (from the chip's menu)."] },
 
   { group: "MCP", id: "mcp-connect", title: "Connecting a server",
     summary: "MCPManager keeps connections in line with mcp.json. For each new or changed server it builds the environment, launches the transport, lets the SDK do the handshake, then lists the tools and registers them.",

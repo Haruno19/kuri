@@ -4,7 +4,7 @@ A native macOS app for working with language models — local or hosted — that
 
 Kuri is a single app that is both the engine and the interface: no server to deploy, no database service, no Docker. It runs offline with local models, talks to any hosted provider when you want it to, discovers MCP servers at runtime, and runs the model's commands inside a lightweight Linux VM.
 
-> Status: early. Working: the Open Responses adapter, the agent loop, the built-in tools, MCP servers with runtime discovery, durable turns, compaction, and a basic app. Sections marked *(planned)* describe what comes next.
+> Status: early. Working: the Open Responses adapter, the agent loop, the built-in tools, MCP servers with runtime discovery, durable turns, compaction, the Linux sandbox with its `shell` tool, and a basic app. Sections marked *(planned)* describe what comes next.
 
 ---
 
@@ -36,6 +36,7 @@ Kuri/
 │  │  ├─ KuriInference/   Provider protocol, SSE, wire-format adapters
 │  │  ├─ KuriTools/       Tool protocol, registry, permissions, built-in tools
 │  │  ├─ KuriMCP/         MCP servers: connections, discovery, hot-reload
+│  │  ├─ KuriSandbox/     Linux VMs per conversation, the shell tool
 │  │  └─ KuriAgent/       The engine: turn loop, interaction broker, events
 │  └─ Tests/
 ├─ docs/flows.html        Sequence diagrams of every flow, and the event reference
@@ -61,27 +62,27 @@ cd Packages/KuriKit && KURI_LIVE_MODEL=ollama/qwen3.5:2b swift test --filter Liv
 ### Overview
 
 ```
-┌───────────────────────────────── Kuri.app ─────────────────────────────────┐
-│                                                                            │
-│  App (SwiftUI)   main window · mini panel · menu bar · settings            │
-│        │  observes EngineEvents, calls Engine methods                      │
-│        ▼                                                                   │
-│  KuriAgent       Engine (actor) ── TurnRunner ── InteractionBroker         │
-│        │                                                                   │
-│        ├──────────────┬──────────────┬─────────────┬─────────────┐         │
-│        ▼              ▼              ▼             ▼             ▼         │
-│  KuriInference    KuriMCP        KuriTools     KuriStore     KuriConfig    │
-│  adapters         MCP servers    registry,     SQLite file   JSON5 files,  │
-│  (HTTP + SSE)     → tools        built-ins                   Keychain      │
-│        └──────────────┴── KuriCore (domain types) ─┴─────────────┘         │
-│                                                                            │
-│  SandboxService.xpc  (planned) Containerization, isolated from the app     │
-└────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────── Kuri.app ──────────────────────────────────┐
+│                                                                              │
+│  App (SwiftUI)   main window · mini panel · menu bar · settings              │
+│        │  observes EngineEvents, calls Engine methods                        │
+│        ▼                                                                     │
+│  KuriAgent       Engine (actor) ── TurnRunner ── InteractionBroker           │
+│        │                                                                     │
+│        ├────────────┬────────────┬────────────┬────────────┬────────────┐    │
+│        ▼            ▼            ▼            ▼            ▼            ▼    │
+│  KuriInference  KuriMCP      KuriSandbox  KuriTools    KuriStore    KuriConfig│
+│  adapters       MCP servers  VMs, shell   registry,    SQLite file  JSON5 files,│
+│  (HTTP + SSE)   → tools      tool         built-ins                 Keychain │
+│        └────────────┴──── KuriCore (domain types) ──────┴────────────┘       │
+│                                                                              │
+│  Each sandbox VM runs in its own system process (Virtualization.framework).  │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **The engine is in-process.** The SwiftUI layer talks to `Engine` directly and subscribes to its event stream. A future network server (for an iOS client) is just another subscriber to the same stream — the local UI never goes through HTTP.
 
-**Flows.** [`docs/flows.html`](docs/flows.html) documents every flow as a sequence diagram: startup and quit, a turn, tool rounds, approval, clarify, cancellation, resuming after a relaunch, Continue, compaction, MCP connection, calls, runtime tool changes and crashes, config hot-reload, model registration and memory edits, plus a reference of every engine event and external protocol. It's a single self-contained page (open it in a browser); each diagram is data in the page, rendered to SVG by a small script, so updating a flow means editing a few lines. Keep it in step with the code when a flow changes.
+**Flows.** [`docs/flows.html`](docs/flows.html) documents every flow as a sequence diagram: startup and quit, a turn, tool rounds, approval, clarify, cancellation, resuming after a relaunch, Continue, compaction, sandbox setup, shell commands, attaching folders, MCP connection, calls, runtime tool changes and crashes, config hot-reload, model registration and memory edits, plus a reference of every engine event and external protocol. It's a single self-contained page (open it in a browser); each diagram is data in the page, rendered to SVG by a small script, so updating a flow means editing a few lines. Keep it in step with the code when a flow changes.
 
 ### Modules
 
@@ -94,7 +95,7 @@ cd Packages/KuriKit && KURI_LIVE_MODEL=ollama/qwen3.5:2b swift test --filter Liv
 | `KuriTools` | `Tool` protocol, `ToolRegistry`, permission policy, built-in tools | Core, Store |
 | `KuriAgent` | `Engine` facade, `TurnRunner` (the agent loop), `InteractionBroker` (clarify/approval), event broadcasting | all of the above |
 | `KuriMCP` | MCP connections on the official Swift SDK: config diffing, discovery, process transport, MCP tools as `Tool`s | Core, Config, Tools |
-| `KuriSandbox` *(planned)* | Container lifecycle on Apple Containerization; the `shell` tool | Core, Config, Tools |
+| `KuriSandbox` | Linux containers on Apple's Containerization: setup, one VM per conversation, mounts; the `shell` tool | Core, Config, Tools |
 | `KuriMarkdown` *(planned)* | Streaming Markdown → SwiftUI renderer on `swift-markdown` | — |
 
 Dependencies point one way: down towards `KuriCore`. Nothing in the package imports SwiftUI.
@@ -159,7 +160,7 @@ Every tool implements `Tool`: a spec (name, description, JSON Schema), a default
 | `tasklist` | Write the current plan (the whole list each call) | allow |
 | `memory` | Add, update or remove long-term memories, in one batched call | allow |
 | `conversation_search` | Full-text search over past conversations, or this one | allow |
-| `shell` *(planned)* | Run a command in the conversation's container | allow (it's sandboxed) |
+| `shell` | Run a command in the conversation's Linux container, from `/work` | allow (it's sandboxed) |
 | MCP tools | Discovered at runtime, named `<server>__<tool>` | allow if the server marks them read-only, else ask |
 
 **Policies.** `allow` runs the call, `ask` shows an approval panel first, `deny` hides the tool from the model entirely. Rules come from `config.json` (`tools`, by the name the model sees, for any tool) and `mcp.json` (`tools` inside a server, by the server's own names). An exact name beats a `*` glob, a longer glob beats a shorter one, and `config.json` wins over `mcp.json` on the same name.
@@ -190,17 +191,23 @@ Every tool implements `Tool`: a spec (name, description, JSON Schema), a default
 
 Settings › Tools lists every server with its state, the server's own name and version, its tools and their policies, the log, and a Reconnect button.
 
-### Sandbox (planned)
+### Sandbox
 
-One container type, one container per conversation, built on Apple's [Containerization](https://github.com/apple/containerization) package (each container is its own lightweight VM).
+`KuriSandbox` gives each conversation a Linux container on Apple's [Containerization](https://github.com/apple/containerization) package. Each container is its own lightweight VM, run by Virtualization.framework in a separate system process, so a misbehaving VM can't take the app down; there's no extra XPC service to maintain.
 
-- Started lazily on the first `shell` call, stopped after a period of inactivity.
-- **The container is disposable; the folders are not.** Attached folders are mounted at `/work/<name>` (or `/work` if there's only one); with no folder attached, a per-conversation scratch folder in `~/.config/kuri/scratch/` is mounted instead. Edits land directly on disk.
-- Network is off by default; it can be turned on per conversation.
-- The shell is the only way the model touches files: listing, reading, searching and editing all happen in the container, on the mounted folders.
-- The image is configurable in `config.json`; once pulled it is cached, so the sandbox works offline.
-- Runs in an XPC service inside the app bundle, so a misbehaving VM can't take the app down.
-- Not covered by design: macOS-native commands (`xcodebuild`, `open`…). A host-side shell with approval may come later.
+- **One container per conversation, one kind of container.** Started on the first `shell` call (about half a second, VM boot included), reused for later commands (tens of milliseconds each), stopped after `idleMinutes` without one (10 by default), and recreated when the conversation's folders change.
+- **The container is disposable; the folders are not.** One attached folder is mounted at `/work`, several at `/work/<name>`; with none, a per-conversation scratch folder (`~/.config/kuri/scratch/<id>`) is. Read-only folders are mounted read-only. Edits land directly on disk; anything else (installed packages, files outside `/work`) disappears with the container.
+- **No network.** Containers get no network interface at all.
+- **The shell is the only way the model touches files.** Commands run with `/bin/sh -lc` from `/work`, with a timeout (120 s by default, 900 at most). Output keeps its start and end when it's long; stopping the turn kills the command.
+- **The image** is `python:3-slim` by default (Debian with bash, coreutils and Python), configurable as `sandbox.image`. Since there's no network, what the image ships with is what the model can use.
+- **Setup, once** (Settings › Sandbox). It downloads:
+  - a Linux kernel: Kata Containers publishes its container-tuned kernel only inside its release tarball (about 680 MB), so Kuri downloads it once and keeps just the kernel;
+  - Apple's init filesystem (`ghcr.io/apple/containerization/vminit`, matching the package version);
+  - the container image, unpacked once into a snapshot that each container clones (APFS copy-on-write).
+  After that the sandbox works offline. Everything lives in `~/.config/kuri/sandbox`. The `shell` tool only appears once setup is done.
+- **The model is told where things are:** its instructions say which folder of the user's is mounted where (or that `/work` is a scratch folder).
+- **Testing.** Starting a VM needs the `com.apple.security.virtualization` entitlement on the running executable, which `swift test` can't have; the package tests cover the logic, and real VMs are exercised by a signed executable and by the app.
+- **Not covered by design:** macOS-native commands (`xcodebuild`, `open`…). A host-side shell with approval may come later.
 
 ### Configuration
 
@@ -212,7 +219,8 @@ Everything lives in `~/.config/kuri`. The location resolves in this order: the `
 ├─ mcp.json        MCP servers
 ├─ kuri.sqlite     conversations, turns, items, memories
 ├─ blobs/          attachments, content-addressed by SHA-256
-└─ scratch/        per-conversation working folders
+├─ scratch/        per-conversation working folders (mounted when no folder is attached)
+└─ sandbox/        Linux kernel, images and snapshots for the sandbox
 ```
 
 Both config files are **JSON5**: comments, unquoted keys and trailing commas are fine (decoded with Foundation's `JSONDecoder.allowsJSON5`, no extra dependency). Kuri writes a commented template on first launch. The files are the only source of truth for providers, models and MCP servers; nothing about them is copied into the database.
@@ -240,6 +248,10 @@ Both config files are **JSON5**: comments, unquoted keys and trailing commas are
 
   // Tool policies by the name the model sees; "*" globs work.
   tools: { memory: "deny", "github__*": "ask" },
+
+  // The Linux sandbox. All optional; these are the defaults.
+  // kernel: "/path/to/vmlinux" uses a kernel you already have instead of downloading one.
+  sandbox: { image: "docker.io/library/python:3-slim", cpus: 4, memoryMiB: 2048, idleMinutes: 10 },
 }
 ```
 
@@ -299,7 +311,7 @@ memories             (id, content, source, status, supersedes_id, origin_convers
 
 - Distributed outside the Mac App Store: Developer ID signing, Hardened Runtime, notarization.
 - **No App Sandbox.** Child processes inherit it, which breaks stdio MCP servers (`npx`, `uvx`) and real shell work. Safety comes from Kuri's own layers instead: the container VM (which only sees the attached folders) and the permission policy.
-- Entitlements: `com.apple.security.virtualization` once the sandbox lands.
+- Entitlements: `com.apple.security.virtualization` (`App/Kuri.entitlements`), for the sandbox's VMs.
 - Secrets in the Keychain; logs through `os.Logger`.
 
 ### Dependencies
@@ -309,10 +321,12 @@ memories             (id, content, source, status, supersedes_id, origin_convers
 | Apple frameworks (SwiftUI, AppKit, Foundation, Security, SQLite3, Virtualization) | Everything | Now |
 | [modelcontextprotocol/swift-sdk](https://github.com/modelcontextprotocol/swift-sdk) | MCP client | Now |
 | [apple/swift-log](https://github.com/apple/swift-log) | The SDK's logging API, which a custom transport has to implement | Now |
-| [apple/containerization](https://github.com/apple/containerization) | Sandbox | With `KuriSandbox` |
+| [apple/containerization](https://github.com/apple/containerization) | Sandbox (pinned to an exact version: its API moves between minor versions) | Now |
 | [swiftlang/swift-markdown](https://github.com/swiftlang/swift-markdown) | Markdown parsing | With `KuriMarkdown` |
 
 The MCP SDK brings in, transitively, `apple/swift-system`, `apple/swift-log` and `mattt/eventsource` (SSE parsing for its HTTP transport); those are what end up linked into Kuri. SwiftPM also fetches `apple/swift-nio` and friends, used only by the SDK's own sample executables.
+
+Containerization is the heavy one: it brings gRPC (`grpc/grpc-swift-2` and friends, to talk to the VM's init process), SwiftNIO, swift-crypto, swift-protobuf, `swift-server/async-http-client` and `facebook/zstd`. All come from Apple, the Swift server workgroup, gRPC or Meta; no personal libraries.
 
 ### Later: iOS client
 
@@ -329,6 +343,6 @@ The core, in order:
 1. **Built-in tools** — `clarify`, `tasklist`, `memory`, `conversation_search`, complete end to end, UI included. *(done)*
 2. **MCP** — configurable servers with runtime discovery, hot-reload, per-tool policies, approval UI. *(done)*
 3. **Durable turns and compaction** — resume pending questions and approvals after a relaunch; automatic and on-demand compaction. *(done)*
-4. **Sandbox** — folder attachment, Containerization, the `shell` tool.
+4. **Sandbox** — folder attachment, Containerization, the `shell` tool. *(done)*
 
 Then embellishments, in no particular order: **message queue** (type while a turn runs: the message joins the running turn at its next step, after the current tool round, or waits for the next turn if it ends first), generated titles, streaming Markdown renderer, UI polish and theming, mini panel and hotkey, more providers (Anthropic Messages, Gemini, Chat Completions, Apple Foundation Models), fallback models, memory review, sub-agents, iOS client.
