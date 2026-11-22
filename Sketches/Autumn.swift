@@ -23,6 +23,8 @@ enum Tune {
     static let status = Animation.spring(response: 0.35, dampingFraction: 0.9)
     /// Hover washes and highlights.
     static let hover = Animation.easeOut(duration: 0.14)
+    /// A control becoming enabled or disabled.
+    static let enable = Animation.easeInOut(duration: 0.28)
     /// Pressed buttons.
     static let press = Animation.spring(response: 0.22, dampingFraction: 0.65)
     /// Seconds for the shine to cross the logo.
@@ -280,10 +282,11 @@ struct NewChat: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // The greeting's baseline sits on the logo's bottom.
+            // The greeting's baseline sits a little above the logo's bottom:
+            // lower than centred, higher than resting on it.
             HStack(alignment: .lastTextBaseline, spacing: 16) {
                 GlassChestnut(size: 46)
-                    .alignmentGuide(.lastTextBaseline) { $0[.bottom] - 2 }
+                    .alignmentGuide(.lastTextBaseline) { $0[.bottom] - 7 }
                 Text(greeting)
                     .font(Typeface.serif(30))
                     .foregroundStyle(palette.ink)
@@ -324,7 +327,8 @@ struct GlassChestnut: View {
     @State private var shakes = 0
     @State private var clicks = 0
 
-    struct Pose { var sx = 1.0, sy = 1.0, y = 0.0, r = 0.0 }
+    /// `r` turns around the centre; `tilt` around the bottom centre, like an upside-down pendulum.
+    struct Pose { var sx = 1.0, sy = 1.0, y = 0.0, r = 0.0, tilt = 0.0 }
 
     var body: some View {
         let shape = ChestnutShape()
@@ -361,46 +365,54 @@ struct GlassChestnut: View {
         content
             .scaleEffect(x: v.sx, y: v.sy, anchor: .bottom)
             .rotationEffect(.degrees(v.r))
+            .rotationEffect(.degrees(v.tilt), anchor: .bottom)
             .offset(y: v.y)
     }
 
-    /// Squish, jump, land. Heights are in points for the 46-point logo.
+    /// Squish, jump, a quick fall, a small squash on landing. Heights are in
+    /// points for the 46-point logo.
     @KeyframesBuilder<Pose> static var hop: some Keyframes<Pose> {
         KeyframeTrack(\Pose.sy) {
             SpringKeyframe(0.84, duration: 0.1)
             SpringKeyframe(1.08, duration: 0.16)
-            SpringKeyframe(1, duration: 0.5, spring: .bouncy)
+            CubicKeyframe(1.02, duration: 0.13)
+            SpringKeyframe(0.93, duration: 0.06)
+            SpringKeyframe(1, duration: 0.35, spring: .bouncy)
         }
         KeyframeTrack(\Pose.sx) {
             SpringKeyframe(1.12, duration: 0.1)
             SpringKeyframe(0.95, duration: 0.16)
-            SpringKeyframe(1, duration: 0.5, spring: .bouncy)
+            CubicKeyframe(0.99, duration: 0.13)
+            SpringKeyframe(1.05, duration: 0.06)
+            SpringKeyframe(1, duration: 0.35, spring: .bouncy)
         }
         KeyframeTrack(\Pose.y) {
             LinearKeyframe(0, duration: 0.1)
             SpringKeyframe(-12, duration: 0.18)
-            SpringKeyframe(0, duration: 0.5, spring: .bouncy)
+            // The fall: accelerating, quicker than the rise.
+            CubicKeyframe(0, duration: 0.13)
+            LinearKeyframe(0, duration: 0.3)
         }
         KeyframeTrack(\Pose.r) {
             LinearKeyframe(0, duration: 0.12)
             SpringKeyframe(-6, duration: 0.14)
-            SpringKeyframe(4, duration: 0.18)
-            SpringKeyframe(0, duration: 0.4, spring: .bouncy)
+            SpringKeyframe(3, duration: 0.14)
+            SpringKeyframe(0, duration: 0.3, spring: .bouncy)
         }
     }
 }
 
 extension GlassChestnut {
-    /// A small no: left, right, settle. Rotation only, around the centre.
+    /// A slow swing left, then right, then home, pivoting on the bottom
+    /// centre like an upside-down pendulum.
     @KeyframesBuilder<Pose> static var shake: some Keyframes<Pose> {
-        KeyframeTrack(\Pose.r) {
-            SpringKeyframe(-7, duration: 0.08)
-            SpringKeyframe(6, duration: 0.11)
-            SpringKeyframe(-4, duration: 0.11)
-            SpringKeyframe(2, duration: 0.1)
-            SpringKeyframe(0, duration: 0.35, spring: .smooth)
+        KeyframeTrack(\Pose.tilt) {
+            CubicKeyframe(-12, duration: 0.32)
+            CubicKeyframe(10, duration: 0.5)
+            SpringKeyframe(0, duration: 0.55, spring: .smooth(duration: 0.5, extraBounce: 0.15))
         }
     }
+
 }
 
 /// A band of light crossing the logo diagonally, once per trigger.
@@ -471,6 +483,8 @@ struct Conversation: View {
     @Environment(\.palette) private var palette
     /// The height left for content between the top margin and the composer.
     @State private var visible: CGFloat = 0
+    /// From the window's top edge to where a pinned message starts.
+    static let topMargin: CGFloat = 56
 
     var body: some View {
         // The latest exchange (the last user message and what follows) is at
@@ -502,8 +516,7 @@ struct Conversation: View {
             .frame(maxWidth: .infinity)
         }
         .defaultScrollAnchor(.bottom)
-        .safeAreaPadding(.top, 56)
-        .scrollEdgeEffectStyle(.soft, for: .top)
+        .safeAreaPadding(.top, Self.topMargin)
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             // Already without the top margin and the composer.
             geometry.containerSize.height
@@ -523,6 +536,9 @@ struct Conversation: View {
                 .frame(maxWidth: 740)
                 .padding(.horizontal, 48)
                 .padding(.bottom, 18)
+        }
+        .overlay(alignment: .top) {
+            TopFade().frame(height: Self.topMargin)
         }
         }
     }
@@ -544,6 +560,23 @@ struct Conversation: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .transition(.opacity)
         }
+    }
+}
+
+/// Text scrolling up past the pinned message blurs and fades into the
+/// background instead of being cut at the window's edge.
+struct TopFade: View {
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        let fade = LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.35), .init(color: .clear, location: 1)],
+                                  startPoint: .top, endPoint: .bottom)
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial)
+            palette.background.opacity(0.75)
+        }
+        .mask(fade)
+        .allowsHitTesting(false)
     }
 }
 
@@ -739,8 +772,15 @@ struct SendButton: View {
             chat.busy ? chat.stop() : chat.send()
         } label: {
             ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(ready ? AnyShapeStyle(palette.accentFill) : AnyShapeStyle(palette.faint.opacity(0.45)))
-                RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
+                // Disabled: flat, no light, no shadow. Enabled fades in over it.
+                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(palette.faint.opacity(0.28))
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(palette.accentFill)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
+                }
+                .shadow(color: palette.shadow.opacity(palette.dark ? 0.4 : 0.12), radius: 2, y: 1)
+                .opacity(ready ? 1 : 0)
                 ZStack {
                     if chat.busy {
                         RoundedRectangle(cornerRadius: 2.5, style: .continuous)
@@ -748,16 +788,14 @@ struct SendButton: View {
                             .frame(width: 10, height: 10)
                             .transition(.scale(scale: 0.5).combined(with: .opacity))
                     } else {
-                        PencilIcon(glyph: .arrowUp, size: 16, color: .white, weight: 1.7)
+                        PencilIcon(glyph: .arrowUp, size: 16, color: ready ? .white : palette.background.opacity(0.9), weight: 1.7)
                             .transition(.scale(scale: 0.5).combined(with: .opacity))
                     }
                 }
             }
             .frame(width: 30, height: 30)
-            .compositingGroup()
-            .shadow(color: palette.shadow.opacity(ready ? (palette.dark ? 0.4 : 0.12) : 0), radius: 2, y: 1)
             .animation(Tune.move, value: chat.busy)
-            .animation(Tune.hover, value: ready)
+            .animation(Tune.enable, value: ready)
         }
         .buttonStyle(Squish())
         .keyboardShortcut(chat.busy ? "." : .return, modifiers: chat.busy ? .command : [])
