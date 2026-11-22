@@ -402,18 +402,33 @@ public actor Engine {
     private func startRunner(for turn: Turn, in conversation: Conversation, provider: any InferenceProvider,
                              resuming: Bool) async throws {
         let folders = try await store.folders(of: conversation.id)
-        let modelConfig = config.modelConfig(for: turn.model)
-        let toolNames = provider.supportsTools ? Set(await registry.specs().map(\.name)) : []
         let mounts = SandboxMounts.plan(folders: folders, scratch: home.scratchFolder(for: conversation.id))
+        let memories = try await store.memories()
+        func choice(_ model: ModelRef, _ provider: any InferenceProvider) async -> ModelChoice {
+            let modelConfig = config.modelConfig(for: model)
+            let toolNames = provider.supportsTools ? Set(await registry.specs().map(\.name)) : []
+            return ModelChoice(
+                model: model, provider: provider,
+                modelConfig: ModelConfigSnapshot(maxOutputTokens: modelConfig?.maxOutputTokens,
+                                                 reasoningEffort: modelConfig?.reasoningEffort,
+                                                 contextWindow: config.contextWindow(for: model)),
+                instructions: Instructions.build(conversation: conversation, folders: folders, mounts: mounts,
+                                                 memories: memories, tools: toolNames),
+                useTools: provider.supportsTools)
+        }
+        let primary = await choice(turn.model, provider)
+        var fallbacks: [ModelChoice] = []
+        for ref in config.modelConfig(for: turn.model)?.fallbacks ?? [] where ref != turn.model {
+            // A fallback whose provider isn't configured can't help; skip it.
+            guard let fallbackProvider = try? self.provider(for: ref) else { continue }
+            fallbacks.append(await choice(ref, fallbackProvider))
+        }
         let runner = TurnRunner(
             conversationID: conversation.id,
             turn: turn,
             provider: provider,
-            modelConfig: ModelConfigSnapshot(maxOutputTokens: modelConfig?.maxOutputTokens,
-                                             reasoningEffort: modelConfig?.reasoningEffort,
-                                             contextWindow: config.contextWindow(for: turn.model)),
-            instructions: Instructions.build(conversation: conversation, folders: folders, mounts: mounts,
-                                             memories: try await store.memories(), tools: toolNames),
+            modelConfig: primary.modelConfig,
+            instructions: primary.instructions,
             folders: folders,
             registry: registry,
             store: store,
@@ -421,7 +436,8 @@ public actor Engine {
             limits: limits,
             compactor: compactor(for: turn.model, fallback: provider),
             takeQueued: { [weak self] in await self?.takeQueued(conversation.id) ?? [] },
-            useTools: provider.supportsTools,
+            useTools: primary.useTools,
+            fallbacks: fallbacks,
             emit: { [broadcaster] event in
                 broadcaster.emit(event)
                 if case .toolFinished(_, let call, let output) = event, call.name == MemoryTool().spec.name,

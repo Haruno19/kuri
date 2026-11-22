@@ -37,6 +37,8 @@ final class AppModel {
     private(set) var queues: [UUID: [QueuedMessage]] = [:]
     /// Conversations whose start is being summarized right now.
     private(set) var compacting: Set<UUID> = []
+    /// Which fallback model took over a conversation's running turn, and why.
+    private(set) var fallbackNotices: [UUID: String] = [:]
     /// The selected conversation's latest turn, for the Continue bar.
     private(set) var lastTurn: Turn?
     /// Estimated tokens the selected conversation fills, and the model's window if known.
@@ -331,6 +333,7 @@ final class AppModel {
 
         case .turnStarted(let turn):
             running.insert(turn.conversationID)
+            fallbackNotices[turn.conversationID] = nil
             if turn.conversationID == selection { lastTurn = turn }
 
         case .turnFinished(let id, _, _):
@@ -339,6 +342,13 @@ final class AppModel {
                 streamingText = ""
                 streamingReasoning = ""
                 Task { await refreshTurnState() }
+            }
+
+        case .modelFallback(let id, let from, let to, let reason):
+            fallbackNotices[id] = "\(from) failed (\(reason)); \(to) took over."
+            if id == selection {
+                streamingText = ""
+                streamingReasoning = ""
             }
 
         case .compacting(let id, let active):

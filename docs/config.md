@@ -103,7 +103,7 @@ anthropic: { format: "anthropic-messages", apiKey: "keychain:anthropic", discove
 | `maxOutputTokens` | int | Sent as `max_output_tokens` (`open-responses`) or `max_tokens` (`anthropic-messages`, default 32,000). |
 | `reasoningEffort` | string | Sent as `reasoning.effort` (`open-responses`) or `output_config.effort` (`anthropic-messages`), e.g. `low`, `medium`, `high`, for models that support it. |
 | `name` | string | A display name. Stored, not shown yet. |
-| `fallbacks` | array of model references | Models to try when this one fails. Accepted, not used yet. |
+| `fallbacks` | array of model references | Models to try, in order, when a request to this one fails before producing anything (the server is down, an HTTP error, an overloaded API). The one that answers keeps the rest of the turn, with its own settings; the next turn tries this model again. Fallbacks whose provider isn't configured are skipped. E.g. `["apple/default"]`. |
 
 ### `tools`
 

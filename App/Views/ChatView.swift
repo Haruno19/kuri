@@ -29,6 +29,10 @@ struct ChatView: View {
                         Text(model.streamingText)
                             .textSelection(.enabled)
                     }
+                    if let id = model.selection, let notice = model.fallbackNotices[id] {
+                        Label(notice, systemImage: "arrow.triangle.branch")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
                     if let id = model.selection, model.compacting.contains(id) {
                         Label {
                             Text("Summarizing earlier messages…")

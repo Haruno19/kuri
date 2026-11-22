@@ -17,6 +17,9 @@ public enum EngineEvent: Sendable {
     case inference(conversationID: UUID, InferenceEvent)
     case turnStarted(Turn)
     case turnFinished(conversationID: UUID, turnID: UUID, TurnOutcome)
+    /// A request to the turn's model failed before it produced anything, so
+    /// the turn goes on with the next of its fallbacks.
+    case modelFallback(conversationID: UUID, from: ModelRef, to: ModelRef, reason: String)
     /// A summary of the conversation is being written (true) or done (false).
     case compacting(conversationID: UUID, Bool)
     /// A tool call finished; its result also arrives as `itemAdded`.

@@ -40,6 +40,9 @@ struct TurnRunner {
     var takeQueued: @Sendable () async -> [String] = { [] }
     /// False for models that can't be offered tools.
     var useTools = true
+    /// Models to try, in order, when a request fails before producing
+    /// anything. Once one takes over, it keeps the rest of the turn.
+    var fallbacks: [ModelChoice] = []
     let emit: @Sendable (EngineEvent) -> Void
 
     /// - Parameter resuming: The turn was waiting for the user when Kuri
@@ -73,14 +76,17 @@ struct TurnRunner {
             try await runCalls(pending, counts: &callCounts, interaction: interaction)
         }
 
+        let choices = [ModelChoice(model: turn.model, provider: provider, modelConfig: modelConfig,
+                                   instructions: instructions, useTools: useTools)] + fallbacks
+        var active = 0
         var compactionFailed = false
         for _ in 0..<limits.maxRounds {
             try Task.checkCancellation()
             try await deliverQueued()
             var items = try await store.items(of: conversationID)
-            var request = makeRequest(items: items, tools: useTools ? await registry.specs() : [])
+            var request = await makeRequest(items: items, for: choices[active])
 
-            if let window = modelConfig.contextWindow, let compactor, !compactionFailed,
+            if let window = choices[active].modelConfig.contextWindow, let compactor, !compactionFailed,
                ContextEstimate.tokens(request) > Int(Double(window) * limits.compactionThreshold),
                let cut = Compactor.cut(in: items, budget: Int(Double(window) * limits.compactionKeepShare)) {
                 emit(.compacting(conversationID: conversationID, true))
@@ -89,7 +95,7 @@ struct TurnRunner {
                                                            turnID: turn.id)
                     emit(.itemAdded(item))
                     items = try await store.items(of: conversationID)
-                    request = makeRequest(items: items, tools: request.tools)
+                    request = await makeRequest(items: items, for: choices[active])
                 } catch is CancellationError {
                     emit(.compacting(conversationID: conversationID, false))
                     throw CancellationError()
@@ -102,18 +108,21 @@ struct TurnRunner {
 
             var calls: [ToolCall] = []
             var stop: StopReason = .endTurn
-            for try await event in provider.stream(request) {
-                emit(.inference(conversationID: conversationID, event))
-                switch event {
-                case .itemCompleted(let payload):
-                    try await append(payload)
-                    if case .toolCall(let call) = payload { calls.append(call) }
-                case .usage(let delta):
-                    usage = usage + delta
-                case .finished(let reason):
-                    stop = reason
-                default:
+            while true {
+                var produced = false
+                do {
+                    (calls, stop) = try await stream(request, to: choices[active].provider, usage: &usage,
+                                                     produced: &produced)
                     break
+                } catch {
+                    // Only a request that stored nothing can be sent again
+                    // elsewhere; a cancelled turn stays cancelled.
+                    guard !(error is CancellationError), !Task.isCancelled, !produced, active + 1 < choices.count
+                    else { throw error }
+                    active += 1
+                    emit(.modelFallback(conversationID: conversationID, from: choices[active - 1].model,
+                                        to: choices[active].model, reason: error.localizedDescription))
+                    request = await makeRequest(items: items, for: choices[active])
                 }
             }
 
@@ -137,14 +146,38 @@ struct TurnRunner {
         return !messages.isEmpty
     }
 
-    private func makeRequest(items: [Item], tools: [ToolSpec]) -> InferenceRequest {
+    /// Streams one request, storing what it completes. `produced` says
+    /// whether anything was stored, even when the stream then fails.
+    private func stream(_ request: InferenceRequest, to provider: any InferenceProvider, usage: inout Usage,
+                        produced: inout Bool) async throws -> ([ToolCall], StopReason) {
+        var calls: [ToolCall] = []
+        var stop: StopReason = .endTurn
+        for try await event in provider.stream(request) {
+            emit(.inference(conversationID: conversationID, event))
+            switch event {
+            case .itemCompleted(let payload):
+                try await append(payload)
+                produced = true
+                if case .toolCall(let call) = payload { calls.append(call) }
+            case .usage(let delta):
+                usage = usage + delta
+            case .finished(let reason):
+                stop = reason
+            default:
+                break
+            }
+        }
+        return (calls, stop)
+    }
+
+    private func makeRequest(items: [Item], for choice: ModelChoice) async -> InferenceRequest {
         InferenceRequest(
-            model: turn.model.model,
-            instructions: instructions,
+            model: choice.model.model,
+            instructions: choice.instructions,
             items: Self.history(from: items),
-            tools: tools,
-            maxOutputTokens: modelConfig.maxOutputTokens,
-            reasoningEffort: modelConfig.reasoningEffort)
+            tools: choice.useTools ? await registry.specs() : [],
+            maxOutputTokens: choice.modelConfig.maxOutputTokens,
+            reasoningEffort: choice.modelConfig.reasoningEffort)
     }
 
     /// Runs a round's calls. Consecutive calls to read-only tools that run
@@ -293,6 +326,16 @@ struct ModelConfigSnapshot: Sendable {
     var maxOutputTokens: Int?
     var reasoningEffort: String?
     var contextWindow: Int?
+}
+
+/// A model a turn can run on, with what depends on it: its provider, its
+/// settings, and instructions that mention tools only if it can use them.
+struct ModelChoice: Sendable {
+    let model: ModelRef
+    let provider: any InferenceProvider
+    let modelConfig: ModelConfigSnapshot
+    let instructions: String
+    let useTools: Bool
 }
 
 /// Marks the turn as awaiting input while a tool waits for the user, so a

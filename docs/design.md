@@ -24,7 +24,9 @@ Kuri is **stateless towards providers**: every request carries the history it ne
 4. If the model called tools: each call is checked against its permission policy (`allow` / `ask` / `deny`), run, its output capped, and stored as a `toolResult`. Consecutive calls to read-only tools that run without asking go concurrently; anything that may change something, or needs the user, runs alone. Results are stored in call order either way. Back to step 2.
 5. Otherwise the turn closes with its stop reason and token usage.
 
-Guards against runaway turns: a round limit per turn, detection of identical repeated calls, and a cap on tool output size. Fallback models are planned.
+Guards against runaway turns: a round limit per turn, detection of identical repeated calls, and a cap on tool output size.
+
+**Fallback models.** A model can list `fallbacks` in `config.json`. When a request fails before the model produced anything, the round is sent again to the next fallback, with that model's provider, settings and instructions (no tools mentioned if it can't use them), and `.modelFallback` tells the app which model took over and why. The fallback keeps the rest of the turn; the next turn starts with the conversation's model again. A request that fails after storing output isn't retried, since that would store it twice, and Stop never falls back. Only the conversation's model has fallbacks: titles and summaries don't.
 
 **Titles.** A conversation starts with a provisional title, the first line of its first message. After its first completed turn, if `generateTitles` is on and the title is still the provisional one, the utility model (or the conversation's model) writes a 2-to-6-word title from the first exchange, in the background; labels, quotes and trailing punctuation are cleaned off. A title the user changed meanwhile is left alone, a failure keeps the provisional one, and quitting cancels any title still being written.
 
