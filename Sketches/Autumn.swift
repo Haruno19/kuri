@@ -347,17 +347,18 @@ struct GlassChestnut: View {
         .compositingGroup()
         .shadow(color: palette.shadow.opacity(palette.dark ? 0.35 : 0.1), radius: 4, y: 2)
         .contentShape(shape)
-        .keyframeAnimator(initialValue: Pose(), trigger: plays[.hop, default: 0], content: pose) { _ in Self.hop }
-        .keyframeAnimator(initialValue: Pose(), trigger: plays[.skip, default: 0], content: pose) { _ in Self.skip }
-        .keyframeAnimator(initialValue: Pose(), trigger: plays[.wiggle, default: 0], content: pose) { _ in Self.wiggle }
-        .keyframeAnimator(initialValue: Pose(), trigger: plays[.flip, default: 0], content: pose) { _ in Self.flip }
+        .keyframeAnimator(initialValue: Pose(), trigger: plays[.hop, default: 0], content: { Self.pose($0, $1) }) { _ in Self.hop }
+        .keyframeAnimator(initialValue: Pose(), trigger: plays[.skip, default: 0], content: { Self.pose($0, $1) }) { _ in Self.skip }
+        .keyframeAnimator(initialValue: Pose(), trigger: plays[.wiggle, default: 0], content: { Self.pose($0, $1) }) { _ in Self.wiggle }
+        .keyframeAnimator(initialValue: Pose(), trigger: plays[.flip, default: 0], content: { Self.pose($0, $1) }) { _ in Self.flip }
         .onTapGesture {
             last = Reaction.allCases.filter { $0 != last }.randomElement()!
             plays[last, default: 0] += 1
         }
     }
 
-    private func pose(_ content: PlaceholderContentView<some View>, _ v: Pose) -> some View {
+    /// Static and nonisolated: the animator calls it from a @Sendable closure.
+    nonisolated private static func pose(_ content: PlaceholderContentView<some View>, _ v: Pose) -> some View {
         content
             .scaleEffect(x: v.sx, y: v.sy, anchor: .bottom)
             .rotationEffect(.degrees(v.r))
