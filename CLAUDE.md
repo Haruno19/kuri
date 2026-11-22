@@ -8,10 +8,11 @@ Kuri is a native macOS app for working with language models, local or hosted: an
 - [docs/flows.html](docs/flows.html): every flow as a sequence diagram with the code behind each step, plus the engine-event and protocol reference.
 - [docs/decisions/](docs/decisions/): why things are the way they are. Don't reverse a decision without a new record that supersedes it.
 - [docs/config.md](docs/config.md): every configuration key.
+- [docs/ui.md](docs/ui.md): the UI and UX brief (principles, style, layout, UI roadmap).
 
 ## Current priorities
 
-The backend comes first. The UI will be redesigned from scratch once the engine is complete, so keep app changes functional and minimal: enough to use and test a feature, no polish, no styling work.
+The engine is done; the work now is the UI redesign, following [docs/ui.md](docs/ui.md). Try directions as standalone sketches in `Sketches/` first, agree on one with the author, then apply it to `App/`. Motion and feedback get the most care and will be tuned back and forth: keep timings as named constants.
 
 ## Principles that shape every change
 

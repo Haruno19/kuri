@@ -2,7 +2,7 @@
 
 Done, the core: foundations (domain model, config, storage, Open Responses adapter, agent loop), the built-in tools, MCP with runtime discovery, durable turns and compaction, the sandbox with folder attachment and the `shell` tool.
 
-**Next: finish the engine.** The UI stays functional and minimal until then.
+Then the engine: everything below is done.
 
 1. **Message queue** — type while a turn runs: the message joins the running turn at its next step, after the current tool round, or starts the next turn if it ends first. *(done)*
 2. **Apple's on-device model** as a provider (`apple-foundation-models`), offline and free, a natural utility model. *(done)*
@@ -13,7 +13,13 @@ Done, the core: foundations (domain model, config, storage, Open Responses adapt
 
 **Later, engine:** more providers (Gemini, Chat Completions), attachments in messages, sub-agents, `KuriServer` for the iOS client.
 
-**Then: the UI redesign.** Streaming Markdown renderer, theming and the style layer, mini panel and global hotkey, conversation management, editing providers and MCP servers from Settings.
+**Now: the UI redesign**, briefed in [ui.md](ui.md):
+
+1. Full Markdown, including LaTeX.
+2. Layout and styling of the main window, with conversation management (rename, archive, delete; maybe projects or grouping by root folder).
+3. Menu bar extra.
+4. Settings window, including editing providers and MCP servers.
+5. Floating window with a global hotkey.
 
 ## iOS client
 

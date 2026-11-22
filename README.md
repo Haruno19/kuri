@@ -67,7 +67,7 @@ Kuri/
 ├─ Kuri.xcodeproj         The app target (sources are a folder-synchronized group)
 ├─ App/                   SwiftUI app
 ├─ Packages/KuriKit/      Everything that isn't UI: the modules above, and their tests
-├─ docs/                  Design, flows, configuration, decisions
+├─ docs/                  Design, flows, configuration, UI brief, decisions
 ├─ CLAUDE.md              Working agreements and commands
 └─ Sketches/              UI experiments (not part of the build)
 ```
@@ -119,6 +119,7 @@ None of this includes a model's weights. A local model runs in its own process (
 | [docs/design.md](docs/design.md) | How each part works, in detail |
 | [docs/flows.html](docs/flows.html) | Every flow as a sequence diagram with the code behind each step, and the event and protocol reference (open it in a browser) |
 | [docs/config.md](docs/config.md) | Every configuration key |
+| [docs/ui.md](docs/ui.md) | The UI and UX brief: principles, style, layout |
 | [docs/decisions/](docs/decisions/) | Why things are the way they are |
 | [docs/roadmap.md](docs/roadmap.md) | What's done and what comes next |
 | [CLAUDE.md](CLAUDE.md) | Working agreements, build and test commands |
