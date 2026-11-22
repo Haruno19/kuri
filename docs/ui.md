@@ -16,11 +16,10 @@ The brief for the redesign. Every app change is checked against it. Directions a
 - **Classy and warm**, built from **layers and depth**: surfaces sit on surfaces, with real shadows and light from above.
 - **Light and dark** themes, following the system.
 - **Autumn palette**: chestnut, amber, toasted cream, warm brown-blacks. The accent is the app icon's chestnut gradient (top `p3(0.60, 0.35, 0.16)` → bottom `sRGB(0.73, 0.58, 0.34)`; the dark icon starts at `p3(0.50, 0.31, 0.14)`). No cold greys: neutrals are warm.
-- **Type** (being chosen in the sketch, which switches fonts live):
-  - **Serif** (model replies, headings, accents): a humanist text serif. Candidates *Iowan Old Style*, *Publico Text*, *Charter*.
-  - **Sans** (user messages and the rest of the UI: titles, model selector, buttons): narrow enough for an interface, with some character, never Inter or the system font. Candidates *Instrument Sans*, *PT Sans*.
-  - **Mono** (code): a little quirky or serif-feeling, set smaller than the surrounding text (×0.86). Candidates *iA Writer Mono*, *Victor Mono*.
-  - Fonts either ship with macOS (Iowan, Charter, PT Sans), are Apple downloads macOS fetches on request (Publico Text), or are open-licensed (OFL) files bundled in the app (Instrument Sans, iA Writer Mono, Victor Mono).
+- **Type**:
+  - **Serif** (model replies, headings, accents): *Publico Text*, an Apple-provided download macOS fetches on request. Fallback: *Iowan Old Style*, which ships with macOS.
+  - **Mono** (code): *iA Writer Mono*, open-licensed (OFL) and bundled in the app, set smaller than the surrounding text (×0.86).
+  - **Sans** (user messages and the rest of the UI: titles, model selector, buttons): still open, chosen in the sketch, which switches it live. It should feel Apple-native while having some character. Candidates: *SF Pro Rounded*, *Galvji*, *SF Pro*, *Avenir Next*, *Lucida Grande*, *Instrument Sans*.
 - **Glass**: Liquid Glass (`glassEffect`) and materials where something floats above the content (composer, floating buttons, popovers), so the app feels first-party and modern.
 - **Icons**: look hand-drawn with a pencil: slightly irregular strokes, round caps, a graphite feel. Custom shapes, not SF Symbols, wherever the user sees them in the main window.
 

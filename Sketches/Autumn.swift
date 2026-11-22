@@ -6,7 +6,7 @@
 // Try: click the logo, send a message (Return), stop it (⌘.), toggle the
 // sidebar, switch the theme (top right, or ⇧⌘T). Environment overrides for
 // screenshots: AUTUMN_SCHEME=light|dark, AUTUMN_STATE=new|chat, AUTUMN_SIDEBAR=1,
-// AUTUMN_SEND="text" (sends it a second after launch).
+// AUTUMN_SEND="text" (sends it a second after launch), AUTUMN_SANS=<family>.
 
 import AppKit
 import SwiftUI
@@ -84,13 +84,15 @@ extension EnvironmentValues {
 
 /// The type, switchable in the sketch (top right) until the author picks:
 /// a serif for the model and accents, a sans for everything else, a mono for
-/// code. Each list holds font families; "SF Mono" means the system's.
+/// code. Each list holds font families; "SF Pro", "SF Pro Rounded" and
+/// "SF Mono" mean the system's own faces.
 @MainActor @Observable final class Fonts {
     static let shared = Fonts()
 
-    static let serifs = ["Iowan Old Style", "Publico Text", "Charter"]
-    static let sanses = ["Instrument Sans", "PT Sans", "Seravek"]
-    static let monos = ["iA Writer Mono S", "Victor Mono", "SF Mono"]
+    // Chosen: Publico Text and iA Writer Mono. The sans is still open.
+    static let serifs = ["Publico Text", "Iowan Old Style"]
+    static let sanses = ["SF Pro Rounded", "Galvji", "SF Pro", "Avenir Next", "Lucida Grande", "Instrument Sans"]
+    static let monos = ["iA Writer Mono S"]
 
     var serif = serifs[0]
     var sans = sanses[0]
@@ -98,11 +100,10 @@ extension EnvironmentValues {
 
     init() {
         Self.registerBundled()
-        if !Self.installed(sans) { sans = Self.sanses[1] }
     }
 
     static func installed(_ family: String) -> Bool {
-        family == "SF Mono" || NSFontManager.shared.availableMembers(ofFontFamily: family) != nil
+        ["SF Pro", "SF Pro Rounded", "SF Mono"].contains(family) || NSFontManager.shared.availableMembers(ofFontFamily: family) != nil
     }
 
     /// Fonts dropped in Sketches/Fonts are loaded for this process only, the
@@ -118,7 +119,13 @@ extension EnvironmentValues {
 
 enum Typeface {
     @MainActor static func serif(_ size: CGFloat) -> Font { .custom(Fonts.shared.serif, size: size) }
-    @MainActor static func sans(_ size: CGFloat) -> Font { .custom(Fonts.shared.sans, size: size) }
+    @MainActor static func sans(_ size: CGFloat) -> Font {
+        switch Fonts.shared.sans {
+        case "SF Pro": .system(size: size)
+        case "SF Pro Rounded": .system(size: size, design: .rounded)
+        case let family: .custom(family, size: size)
+        }
+    }
     /// Code is set smaller than the text around it: monospaced faces look
     /// bigger at the same point size.
     @MainActor static func mono(_ size: CGFloat) -> Font {
@@ -278,6 +285,7 @@ struct Root: View {
             theme = Theme(rawValue: (env["AUTUMN_SCHEME"] ?? "").capitalized) ?? .system
             NSApp.appearance = theme.appearance
             if env["AUTUMN_STATE"] == "chat" { chat.seed() }
+            if let sans = env["AUTUMN_SANS"] { Fonts.shared.sans = sans }
             if env["AUTUMN_SIDEBAR"] == "1" { columns = .all }
             if let text = env["AUTUMN_SEND"] {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
