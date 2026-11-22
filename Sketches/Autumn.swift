@@ -3,9 +3,10 @@
 //
 //   swiftc -parse-as-library -O Sketches/Autumn.swift -o /tmp/autumn && /tmp/autumn
 //
-// Try: hover around the logo (it looks at the pointer), click it, send a
-// message (Return), stop it, toggle the sidebar. Environment overrides for
-// screenshots: AUTUMN_SCHEME=light|dark, AUTUMN_STATE=new|chat.
+// Try: click the logo, send a message (Return), stop it (⌘.), toggle the
+// sidebar, switch the theme (top right, or ⇧⌘T). Environment overrides for
+// screenshots: AUTUMN_SCHEME=light|dark, AUTUMN_STATE=new|chat, AUTUMN_SIDEBAR=1,
+// AUTUMN_SEND="text" (sends it a second after launch).
 
 import AppKit
 import SwiftUI
@@ -15,49 +16,56 @@ import SwiftUI
 /// Every timing in one place: these are what we'll adjust back and forth.
 enum Tune {
     /// Things entering, leaving or moving across the window.
-    static let move = Animation.spring(response: 0.42, dampingFraction: 0.86)
-    /// The sidebar panel.
-    static let panel = Animation.spring(response: 0.38, dampingFraction: 0.88)
+    static let move = Animation.spring(response: 0.42, dampingFraction: 0.88)
+    /// Scrolling a sent message to the top.
+    static let scroll = Animation.spring(response: 0.5, dampingFraction: 0.9)
     /// Status text swapping while the model works.
     static let status = Animation.spring(response: 0.35, dampingFraction: 0.9)
     /// Hover washes and highlights.
     static let hover = Animation.easeOut(duration: 0.14)
     /// Pressed buttons.
-    static let press = Animation.spring(response: 0.22, dampingFraction: 0.6)
-    /// The logo turning toward the pointer.
-    static let look = Animation.spring(response: 0.55, dampingFraction: 0.68)
+    static let press = Animation.spring(response: 0.22, dampingFraction: 0.65)
     /// Seconds per word while a fake reply streams.
     static let wordDelay = 0.028
 }
 
 // MARK: - Palette and type
 
+/// Quiet, warm neutrals (the flows page's palette) with a muted chestnut accent.
 struct Palette {
     let scheme: ColorScheme
     var dark: Bool { scheme == .dark }
 
-    // Surfaces, warm in both themes: toasted cream by day, roasted brown by night.
-    var backdropTop: Color { dark ? Color(red: 0.13, green: 0.105, blue: 0.085) : Color(red: 0.975, green: 0.952, blue: 0.912) }
-    var backdropBottom: Color { dark ? Color(red: 0.095, green: 0.075, blue: 0.06) : Color(red: 0.94, green: 0.905, blue: 0.85) }
-    var glow: Color { dark ? Color(red: 0.55, green: 0.3, blue: 0.12).opacity(0.16) : Color(red: 0.95, green: 0.7, blue: 0.4).opacity(0.18) }
+    var background: Color { dark ? hex(0x1C1B1A) : hex(0xFAF9F5) }
+    /// The composer sits a step darker than the background in both themes.
+    var composer: Color { dark ? hex(0x141312) : hex(0xEFEDE6) }
 
-    var ink: Color { dark ? Color(red: 0.95, green: 0.91, blue: 0.85) : Color(red: 0.18, green: 0.13, blue: 0.10) }
-    var secondary: Color { dark ? Color(red: 0.70, green: 0.63, blue: 0.56) : Color(red: 0.47, green: 0.40, blue: 0.34) }
-    var faint: Color { secondary.opacity(0.7) }
+    var ink: Color { dark ? hex(0xECEBE5) : hex(0x1F1E1D) }
+    var secondary: Color { dark ? hex(0xA8A59C) : hex(0x6B6A64) }
+    var faint: Color { dark ? hex(0x78766F) : hex(0x9C9A92) }
 
-    // The icon's chestnut gradient.
-    var chestnutTop: Color { dark ? Color(.displayP3, red: 0.50, green: 0.31, blue: 0.14) : Color(.displayP3, red: 0.60, green: 0.345, blue: 0.165) }
-    var chestnutBottom: Color { Color(red: 0.733, green: 0.58, blue: 0.341) }
-    var chestnut: LinearGradient { LinearGradient(colors: [chestnutTop, chestnutBottom], startPoint: .top, endPoint: .bottom) }
+    /// Accent for the send button and the working dots: chestnut, toned down.
+    var accent: Color { dark ? hex(0xB89474) : hex(0x9C7556) }
+    var accentLight: Color { dark ? hex(0xCDB091) : hex(0xB8987A) }
+    var accentFill: LinearGradient { LinearGradient(colors: [accentLight, accent], startPoint: .top, endPoint: .bottom) }
 
-    // User cards: a thick slab of warm paper.
-    var cardTop: Color { dark ? Color(red: 0.25, green: 0.20, blue: 0.165) : Color(red: 1.0, green: 0.985, blue: 0.96) }
-    var cardBottom: Color { dark ? Color(red: 0.205, green: 0.163, blue: 0.135) : Color(red: 0.965, green: 0.935, blue: 0.885) }
-    var cardEdge: Color { dark ? Color(red: 0.11, green: 0.085, blue: 0.07) : Color(red: 0.86, green: 0.80, blue: 0.72) }
-    var highlight: Color { .white.opacity(dark ? 0.10 : 0.95) }
-    var shadow: Color { dark ? .black : Color(red: 0.35, green: 0.2, blue: 0.08) }
+    /// The icon's own gradient, for the logo only.
+    var iconTop: Color { dark ? Color(.displayP3, red: 0.50, green: 0.31, blue: 0.14) : Color(.displayP3, red: 0.60, green: 0.345, blue: 0.165) }
+    var iconBottom: Color { Color(red: 0.733, green: 0.58, blue: 0.341) }
+    var iconGradient: LinearGradient { LinearGradient(colors: [iconTop, iconBottom], startPoint: .top, endPoint: .bottom) }
+
+    // User cards: a slab of paper, lighter than the background.
+    var cardTop: Color { dark ? hex(0x2B2A28) : hex(0xFFFFFF) }
+    var cardBottom: Color { dark ? hex(0x262523) : hex(0xFCFBF8) }
+    var cardEdge: Color { dark ? hex(0x121110) : hex(0xE4E1D7) }
+    var highlight: Color { .white.opacity(dark ? 0.07 : 0.9) }
+    var shadow: Color { dark ? .black : hex(0x3A3226) }
 
     var wash: Color { ink.opacity(dark ? 0.08 : 0.06) }
+
+    private func hex(_ v: UInt32) -> Color {
+        Color(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
+    }
 }
 
 struct PaletteKey: EnvironmentKey { static let defaultValue = Palette(scheme: .light) }
@@ -68,8 +76,8 @@ extension EnvironmentValues {
     }
 }
 
-/// Fonts that ship with macOS: a humanist serif for the model and accents,
-/// a humanist sans with some character for everything else.
+/// Placeholders until the author picks the final pair: a humanist serif for
+/// the model and accents, a humanist sans for everything else.
 enum Typeface {
     static func serif(_ size: CGFloat) -> Font { .custom("Iowan Old Style", size: size) }
     static func sans(_ size: CGFloat) -> Font { .custom("Seravek", size: size) }
@@ -88,7 +96,6 @@ enum Typeface {
     var messages: [Message] = []
     var phase: Phase = .idle
     var draft = ""
-    var sidebar = false
     private var task: Task<Void, Never>?
 
     var busy: Bool { phase != .idle }
@@ -151,56 +158,90 @@ enum Sample {
 @main struct AutumnSketch: App {
     init() {
         NSApplication.shared.setActivationPolicy(.regular)
+        setvbuf(stdout, nil, _IOLBF, 0)
     }
 
     var body: some Scene {
         WindowGroup("Kuri") {
             Root()
                 .frame(minWidth: 720, minHeight: 560)
-                .preferredColorScheme(Self.forcedScheme)
         }
-        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified)
         .defaultSize(width: 1040, height: 780)
     }
+}
 
-    static var forcedScheme: ColorScheme? {
-        switch ProcessInfo.processInfo.environment["AUTUMN_SCHEME"] {
-        case "dark": .dark
-        case "light": .light
-        default: nil
+/// Only for the sketch: System, Light, Dark.
+enum Theme: String, CaseIterable {
+    case system = "System", light = "Light", dark = "Dark"
+
+    var appearance: NSAppearance? {
+        switch self {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
         }
     }
+
+    var next: Theme { Self.allCases[(Self.allCases.firstIndex(of: self)! + 1) % Self.allCases.count] }
 }
 
 struct Root: View {
     @Environment(\.colorScheme) private var scheme
     @State private var chat = Chat()
+    @State private var columns: NavigationSplitViewVisibility = .detailOnly
+    @State private var theme: Theme = .system
     @Namespace private var space
 
     var body: some View {
         let palette = Palette(scheme: scheme)
-        ZStack(alignment: .topLeading) {
-            Backdrop()
-            HStack(spacing: 0) {
-                if chat.sidebar {
-                    Sidebar()
-                        .padding(8)
-                        .frame(width: 260)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
+        NavigationSplitView(columnVisibility: $columns) {
+            Sidebar()
+                .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 320)
+                .toolbar(removing: .sidebarToggle)
+        } detail: {
+            ZStack {
+                palette.background.ignoresSafeArea()
+                if chat.messages.isEmpty {
+                    NewChat(space: space).transition(.opacity)
+                } else {
+                    Conversation(space: space).transition(.opacity)
                 }
-                main
             }
-            FloatingButton(glyph: .sidebar) {
-                withAnimation(Tune.panel) { chat.sidebar.toggle() }
+            .overlay(alignment: .topTrailing) {
+                ThemeButton(theme: $theme).padding(.top, 10).padding(.trailing, 14)
             }
-            .padding(.leading, 80)
-            .padding(.top, 1)
+            .ignoresSafeArea()
         }
+        .overlay(alignment: .topLeading) {
+            // Below the traffic lights, in line with the first one.
+            FloatingButton(glyph: .sidebar) {
+                withAnimation { columns = columns == .detailOnly ? .all : .detailOnly }
+            }
+            .padding(.leading, 12)
+            .padding(.top, 36)
+            .ignoresSafeArea()
+        }
+        // A toolbar that's there but invisible: macOS draws its standard
+        // sidebar, and nothing shows above the content.
+        .toolbar(removing: .title)
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .environment(\.palette, palette)
         .environment(chat)
-        .ignoresSafeArea()
+        .onChange(of: theme) { _, theme in NSApp.appearance = theme.appearance }
         .onAppear {
-            if ProcessInfo.processInfo.environment["AUTUMN_STATE"] == "chat" { chat.seed() }
+            let env = ProcessInfo.processInfo.environment
+            theme = Theme(rawValue: (env["AUTUMN_SCHEME"] ?? "").capitalized) ?? .system
+            NSApp.appearance = theme.appearance
+            if env["AUTUMN_STATE"] == "chat" { chat.seed() }
+            if env["AUTUMN_SIDEBAR"] == "1" { columns = .all }
+            if let text = env["AUTUMN_SEND"] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    chat.stop()
+                    chat.draft = text
+                    chat.send()
+                }
+            }
             NSApp.activate()
             // For screenshots: `screencapture -l <number>`.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -211,26 +252,26 @@ struct Root: View {
             }
         }
     }
-
-    @ViewBuilder private var main: some View {
-        if chat.messages.isEmpty {
-            NewChat(space: space)
-                .transition(.opacity)
-        } else {
-            Conversation(space: space)
-                .transition(.opacity)
-        }
-    }
 }
 
-struct Backdrop: View {
+struct ThemeButton: View {
+    @Binding var theme: Theme
     @Environment(\.palette) private var palette
+
     var body: some View {
-        ZStack {
-            LinearGradient(colors: [palette.backdropTop, palette.backdropBottom], startPoint: .top, endPoint: .bottom)
-            RadialGradient(colors: [palette.glow, .clear], center: .topLeading, startRadius: 0, endRadius: 700)
-            RadialGradient(colors: [palette.glow.opacity(0.6), .clear], center: .bottomTrailing, startRadius: 0, endRadius: 600)
+        Button {
+            theme = theme.next
+        } label: {
+            Text(theme.rawValue)
+                .font(Typeface.sans(12.5))
+                .foregroundStyle(palette.faint)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .modifier(HoverWash())
         }
+        .buttonStyle(Squish())
+        .keyboardShortcut("t", modifiers: [.command, .shift])
+        .help("Sketch only: switch between system, light and dark (⇧⌘T)")
     }
 }
 
@@ -239,38 +280,25 @@ struct Backdrop: View {
 struct NewChat: View {
     let space: Namespace.ID
     @Environment(\.palette) private var palette
-    /// Where the pointer is, relative to the logo's centre.
-    @State private var pointer: CGSize = .zero
-    @State private var logoFrame: CGRect = .zero
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 30) {
-            HStack(spacing: 20) {
-                GlassChestnut(size: 62, look: pointer)
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("stage")) } action: { logoFrame = $0 }
+        VStack(alignment: .leading, spacing: 26) {
+            HStack(spacing: 18) {
+                GlassChestnut(size: 56)
                 Text(greeting)
-                    .font(Typeface.serif(34))
+                    .font(Typeface.serif(32))
                     .foregroundStyle(palette.ink)
             }
-            .padding(.leading, 6)
-            .transition(.asymmetric(insertion: .opacity, removal: .opacity.combined(with: .scale(scale: 0.94, anchor: .leading)).combined(with: .offset(y: -16))))
+            .padding(.leading, 4)
+            .transition(.asymmetric(insertion: .opacity,
+                                    removal: .opacity.combined(with: .scale(scale: 0.96, anchor: .leading)).combined(with: .offset(y: -12))))
             Composer()
                 .matchedGeometryEffect(id: "composer", in: space)
         }
-        .frame(maxWidth: 760)
+        .frame(maxWidth: 740)
         .padding(.horizontal, 48)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .offset(y: -20)
-        .contentShape(Rectangle())
-        .coordinateSpace(.named("stage"))
-        .onContinuousHover(coordinateSpace: .named("stage")) { phase in
-            switch phase {
-            case .active(let p):
-                pointer = CGSize(width: p.x - logoFrame.midX, height: p.y - logoFrame.midY)
-            case .ended:
-                pointer = .zero
-            }
-        }
     }
 
     private var greeting: String {
@@ -283,98 +311,55 @@ struct NewChat: View {
 
 // MARK: - Logo
 
-/// The chestnut from the app icon, in glass, tinted with the icon's gradient.
-/// Always a little alive: it breathes and sways, turns toward the pointer,
-/// and squishes and hops when clicked.
+/// The chestnut from the app icon, in Liquid Glass tinted with the icon's
+/// gradient. Still at rest; a click squishes it and it hops.
 struct GlassChestnut: View {
     let size: CGFloat
-    var look: CGSize = .zero
     @Environment(\.palette) private var palette
     @State private var pokes = 0
-    @State private var hovering = false
 
-    struct Poke { var sx = 1.0, sy = 1.0, y = 0.0, r = 0.0 }
+    struct Poke { var sx = 1.0, sy = 1.0, y = 0.0 }
 
     var body: some View {
-        TimelineView(.animation) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
-            body(t: t)
-        }
-        .frame(width: size, height: size)
-    }
-
-    private func body(t: Double) -> some View {
-        // Three slow, unrelated cycles, so the motion never visibly repeats.
-        let bob = sin(t * 1.15) * 2.2
-        let sway = sin(t * 0.73) * 2.5 + sin(t * 1.9) * 0.6
-        let breathe = 1 + sin(t * 1.6) * 0.012
-        // Turn toward the pointer, a lot when it's near, a little from afar.
-        let reach: CGFloat = 260
-        let dx = max(-1, min(1, look.width / reach))
-        let dy = max(-1, min(1, look.height / reach))
-
-        return chestnut
-            .scaleEffect(hovering ? 1.05 : 1)
-            .rotation3DEffect(.degrees(dx * 18), axis: (0, 1, 0), perspective: 0.6)
-            .rotation3DEffect(.degrees(-dy * 14), axis: (1, 0, 0), perspective: 0.6)
-            .animation(Tune.look, value: look)
-            .animation(Tune.press, value: hovering)
-            .keyframeAnimator(initialValue: Poke(), trigger: pokes) { content, v in
-                content
-                    .scaleEffect(x: v.sx, y: v.sy, anchor: .bottom)
-                    .rotationEffect(.degrees(v.r))
-                    .offset(y: v.y)
-            } keyframes: { _ in
-                KeyframeTrack(\.sy) {
-                    SpringKeyframe(0.8, duration: 0.1)
-                    SpringKeyframe(1.1, duration: 0.16)
-                    SpringKeyframe(1, duration: 0.5, spring: .bouncy)
-                }
-                KeyframeTrack(\.sx) {
-                    SpringKeyframe(1.16, duration: 0.1)
-                    SpringKeyframe(0.94, duration: 0.16)
-                    SpringKeyframe(1, duration: 0.5, spring: .bouncy)
-                }
-                KeyframeTrack(\.y) {
-                    LinearKeyframe(0, duration: 0.1)
-                    SpringKeyframe(-16, duration: 0.18)
-                    SpringKeyframe(0, duration: 0.5, spring: .bouncy)
-                }
-                KeyframeTrack(\.r) {
-                    LinearKeyframe(0, duration: 0.12)
-                    SpringKeyframe(-8, duration: 0.14)
-                    SpringKeyframe(5, duration: 0.18)
-                    SpringKeyframe(0, duration: 0.4, spring: .bouncy)
-                }
-            }
-            .rotationEffect(.degrees(sway))
-            .scaleEffect(breathe)
-            .offset(y: bob)
-            .onHover { hovering = $0 }
-            .onTapGesture { pokes += 1 }
-    }
-
-    private var chestnut: some View {
         let shape = ChestnutShape()
-        return ZStack {
-            // Contact shadow, tinted like the nut.
-            Ellipse()
-                .fill(palette.chestnutTop.opacity(palette.dark ? 0.0 : 0.35))
-                .frame(width: size * 0.6, height: size * 0.09)
-                .blur(radius: 4)
-                .offset(y: size * 0.47)
+        ZStack {
             Color.clear
-                .glassEffect(.regular.tint(palette.chestnutBottom.opacity(0.5)).interactive(), in: shape)
-            // The icon's gradient, inside the glass; the hilum (the inner path) lighter.
-            shape.fill(palette.chestnut).opacity(0.5)
-            shape.fill(palette.chestnut, style: FillStyle(eoFill: true)).opacity(0.45)
-            // Light from above: a broad sheen and a crisp rim.
-            shape.fill(LinearGradient(colors: [.white.opacity(palette.dark ? 0.25 : 0.45), .clear], startPoint: .top, endPoint: .center))
-            shape.stroke(LinearGradient(colors: [.white.opacity(0.9), .white.opacity(0.1), palette.chestnutTop.opacity(0.4)],
+                .glassEffect(.regular.tint(palette.iconBottom.opacity(0.3)), in: shape)
+            // The icon's gradient, thin enough that the glass shows through.
+            shape.fill(palette.iconGradient).opacity(palette.dark ? 0.6 : 0.5)
+            // Depth: the glass thickens toward the bottom...
+            shape.fill(LinearGradient(colors: [.clear, palette.iconTop.opacity(0.35)], startPoint: .center, endPoint: .bottom))
+            // ...and catches the light at the top.
+            shape.fill(LinearGradient(colors: [.white.opacity(palette.dark ? 0.18 : 0.35), .clear], startPoint: .top, endPoint: .center))
+            shape.stroke(LinearGradient(colors: [.white.opacity(palette.dark ? 0.45 : 0.85), .white.opacity(0.12)],
                                         startPoint: .top, endPoint: .bottom), lineWidth: 1)
         }
+        .frame(width: size, height: size)
         .compositingGroup()
-        .shadow(color: palette.shadow.opacity(palette.dark ? 0.5 : 0.22), radius: 8, y: 5)
+        .shadow(color: palette.shadow.opacity(palette.dark ? 0.35 : 0.1), radius: 5, y: 3)
+        .contentShape(shape)
+        .keyframeAnimator(initialValue: Poke(), trigger: pokes) { content, v in
+            content
+                .scaleEffect(x: v.sx, y: v.sy, anchor: .bottom)
+                .offset(y: v.y)
+        } keyframes: { _ in
+            KeyframeTrack(\.sy) {
+                SpringKeyframe(0.9, duration: 0.09)
+                SpringKeyframe(1.04, duration: 0.15)
+                SpringKeyframe(1, duration: 0.45, spring: .bouncy)
+            }
+            KeyframeTrack(\.sx) {
+                SpringKeyframe(1.07, duration: 0.09)
+                SpringKeyframe(0.98, duration: 0.15)
+                SpringKeyframe(1, duration: 0.45, spring: .bouncy)
+            }
+            KeyframeTrack(\.y) {
+                LinearKeyframe(0, duration: 0.09)
+                SpringKeyframe(-8, duration: 0.16)
+                SpringKeyframe(0, duration: 0.45, spring: .bouncy)
+            }
+        }
+        .onTapGesture { pokes += 1 }
     }
 }
 
@@ -424,79 +409,110 @@ struct Conversation: View {
     let space: Namespace.ID
     @Environment(Chat.self) private var chat
     @Environment(\.palette) private var palette
+    /// The height left for content between the top margin and the composer.
+    @State private var visible: CGFloat = 0
 
     var body: some View {
+        // The latest exchange (the last user message and what follows) is at
+        // least a screen tall, so a sent message can scroll to the top and the
+        // reply grows below it.
+        let split = chat.messages.lastIndex(where: \.fromUser) ?? 0
+        let current = Array(chat.messages[split...])
+        ScrollViewReader { proxy in
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 30) {
-                ForEach(chat.messages) { message in
-                    if message.fromUser {
-                        UserCard(text: message.text)
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.97, anchor: .bottom).combined(with: .opacity).combined(with: .offset(y: 24)),
-                                removal: .opacity))
-                    } else {
-                        // Inline Markdown only; full Markdown is the first item of the UI roadmap.
-                        Text(LocalizedStringKey(message.text))
-                            .font(Typeface.serif(17.5))
-                            .lineSpacing(6)
-                            .foregroundStyle(palette.ink)
-                            .textSelection(.enabled)
+            VStack(alignment: .leading, spacing: 26) {
+                ForEach(chat.messages[..<split]) { message in
+                    row(message)
+                }
+                VStack(alignment: .leading, spacing: 26) {
+                    ForEach(current) { message in
+                        row(message)
+                    }
+                    if case .working(let status) = chat.phase {
+                        Working(status: status)
                             .padding(.horizontal, 6)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .transition(.opacity)
+                            .transition(.opacity.combined(with: .offset(y: 6)))
                     }
                 }
-                if case .working(let status) = chat.phase {
-                    Working(status: status)
-                        .padding(.horizontal, 6)
-                        .transition(.opacity.combined(with: .offset(y: 8)))
-                }
+                .frame(minHeight: visible, alignment: .top)
+                .id(current.first?.id)
             }
-            .frame(maxWidth: 760)
+            .frame(maxWidth: 740)
             .padding(.horizontal, 48)
-            .padding(.top, 64)
-            .padding(.bottom, 24)
             .frame(maxWidth: .infinity)
         }
         .defaultScrollAnchor(.bottom)
-        .scrollIndicators(.automatic)
+        .safeAreaPadding(.top, 56)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.containerSize.height - geometry.contentInsets.top - geometry.contentInsets.bottom
+        } action: { _, height in
+            visible = max(0, height)
+            if ProcessInfo.processInfo.environment["AUTUMN_DEBUG"] != nil { print("visible", height) }
+        }
+        .onChange(of: chat.messages.last?.id) {
+            guard let last = chat.messages.last, last.fromUser else { return }
+            // Next pass, once the new exchange (and its height) is laid out.
+            DispatchQueue.main.async {
+                if ProcessInfo.processInfo.environment["AUTUMN_DEBUG"] != nil { print("scroll to", last.id) }
+                withAnimation(Tune.scroll) { proxy.scrollTo(last.id, anchor: .top) }
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             Composer()
                 .matchedGeometryEffect(id: "composer", in: space)
-                .frame(maxWidth: 760)
+                .frame(maxWidth: 740)
                 .padding(.horizontal, 48)
-                .padding(.bottom, 22)
+                .padding(.bottom, 18)
+        }
+        }
+    }
+
+    @ViewBuilder private func row(_ message: Chat.Message) -> some View {
+        if message.fromUser {
+            UserCard(text: message.text)
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity).combined(with: .offset(y: 16)),
+                    removal: .opacity))
+        } else {
+            // Inline Markdown only; full Markdown is the first item of the UI roadmap.
+            Text(LocalizedStringKey(message.text))
+                .font(Typeface.serif(17.5))
+                .lineSpacing(6)
+                .foregroundStyle(palette.ink)
+                .textSelection(.enabled)
+                .padding(.horizontal, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.opacity)
         }
     }
 }
 
-/// A user message: a thick, lit slab of paper resting on the surface.
+/// A user message: a slab of paper resting on the surface.
 struct UserCard: View {
     let text: String
     @Environment(\.palette) private var palette
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
         Text(text)
             .font(Typeface.sans(16))
             .lineSpacing(3)
             .foregroundStyle(palette.ink)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
             .background {
                 ZStack {
                     // The slab's thickness, showing below its face.
-                    shape.fill(palette.cardEdge).offset(y: 3)
+                    shape.fill(palette.cardEdge).offset(y: 2)
                     shape.fill(LinearGradient(colors: [palette.cardTop, palette.cardBottom], startPoint: .top, endPoint: .bottom))
-                    // Bevel: light on the top edge, a touch of shade at the bottom.
-                    shape.strokeBorder(LinearGradient(colors: [palette.highlight, .clear, palette.shadow.opacity(0.06)],
-                                                      startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                    shape.strokeBorder(LinearGradient(colors: [palette.highlight, .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
                 }
                 .compositingGroup()
-                .shadow(color: palette.shadow.opacity(palette.dark ? 0.45 : 0.12), radius: 1.5, y: 2)
-                .shadow(color: palette.shadow.opacity(palette.dark ? 0.4 : 0.10), radius: 18, y: 12)
+                .shadow(color: palette.shadow.opacity(palette.dark ? 0.3 : 0.05), radius: 1, y: 1)
+                .shadow(color: palette.shadow.opacity(palette.dark ? 0.25 : 0.05), radius: 10, y: 5)
             }
     }
 }
@@ -508,7 +524,7 @@ struct Working: View {
     @Environment(\.palette) private var palette
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             OrbitingDots()
             TimelineView(.animation) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
@@ -516,11 +532,11 @@ struct Working: View {
                 Text(status)
                     .font(Typeface.serif(16.5).italic())
                     .foregroundStyle(LinearGradient(stops: [
-                        .init(color: palette.secondary, location: 0),
-                        .init(color: palette.secondary, location: clamp(p - 0.18)),
+                        .init(color: palette.faint, location: 0),
+                        .init(color: palette.faint, location: clamp(p - 0.18)),
                         .init(color: palette.ink, location: clamp(p)),
-                        .init(color: palette.secondary, location: clamp(p + 0.18)),
-                        .init(color: palette.secondary, location: 1),
+                        .init(color: palette.faint, location: clamp(p + 0.18)),
+                        .init(color: palette.faint, location: 1),
                     ], startPoint: .leading, endPoint: .trailing))
             }
             .id(status)
@@ -543,17 +559,16 @@ struct OrbitingDots: View {
                     let a = t * 2.4 + Double(i) * 2 * .pi / 3
                     let depth = (sin(a) + 1) / 2  // 0 far, 1 near
                     Circle()
-                        .fill(RadialGradient(colors: [palette.chestnutBottom.mix(with: .white, by: 0.35), palette.chestnutTop],
+                        .fill(RadialGradient(colors: [palette.accentLight, palette.accent],
                                              center: UnitPoint(x: 0.35, y: 0.3), startRadius: 0, endRadius: 6))
-                        .frame(width: 8, height: 8)
+                        .frame(width: 7, height: 7)
                         .scaleEffect(0.65 + 0.45 * depth)
-                        .opacity(0.45 + 0.55 * depth)
-                        .offset(x: cos(a) * 10, y: sin(a) * 3.5 - 1)
+                        .opacity(0.4 + 0.6 * depth)
+                        .offset(x: cos(a) * 9, y: sin(a) * 3)
                         .zIndex(depth)
-                        .shadow(color: palette.chestnutTop.opacity(0.35 * depth), radius: 2, y: 1.5)
                 }
             }
-            .frame(width: 30, height: 22)
+            .frame(width: 28, height: 20)
             .rotationEffect(.degrees(-10))
         }
     }
@@ -561,8 +576,8 @@ struct OrbitingDots: View {
 
 // MARK: - Composer
 
-/// Glass floating over the surface. Controls blend into it; only send/stop
-/// stands out.
+/// Frosted, a step darker than the background, floating just above it.
+/// Controls blend into it; only send/stop stands out.
 struct Composer: View {
     @Environment(Chat.self) private var chat
     @Environment(\.palette) private var palette
@@ -570,31 +585,39 @@ struct Composer: View {
 
     var body: some View {
         @Bindable var chat = chat
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
-        VStack(alignment: .leading, spacing: 12) {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        VStack(alignment: .leading, spacing: 8) {
             TextField("Ask anything", text: $chat.draft, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(Typeface.sans(16.5))
+                .font(Typeface.sans(16))
                 .foregroundStyle(palette.ink)
                 .lineLimit(1...8)
                 .focused($focused)
                 .onSubmit { chat.send() }
-                .padding(.horizontal, 4)
-            HStack(spacing: 2) {
+                .padding(.horizontal, 5)
+            HStack(spacing: 0) {
                 QuietButton(glyph: .paperclip) {}
                 QuietButton(glyph: .folder, label: "Kuri") {}
                 Spacer()
                 ModelPicker()
                 SendButton()
-                    .padding(.leading, 6)
+                    .padding(.leading, 4)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
-        .glassEffect(.regular.tint(palette.chestnutBottom.opacity(palette.dark ? 0.06 : 0.10)), in: shape)
-        .background { OuterShadow(shape: shape, color: palette.shadow.opacity(palette.dark ? 0.55 : 0.16), radius: 26, y: 14) }
-        .background { OuterShadow(shape: shape, color: palette.shadow.opacity(palette.dark ? 0.5 : 0.10), radius: 2, y: 1) }
+        .padding(.horizontal, 12)
+        .padding(.top, 13)
+        .padding(.bottom, 9)
+        .background {
+            // Liquid Glass brightens what's under it (lighter than the surface in
+            // dark mode); a tinted fill over a blur keeps it a step darker.
+            ZStack {
+                shape.fill(.ultraThinMaterial)
+                shape.fill(palette.composer.opacity(0.88))
+                shape.strokeBorder(palette.ink.opacity(palette.dark ? 0.06 : 0.05), lineWidth: 1)
+            }
+        }
+        .background { OuterShadow(shape: shape, color: palette.shadow.opacity(palette.dark ? 0.35 : 0.07), radius: 14, y: 6) }
+        .background { OuterShadow(shape: shape, color: palette.shadow.opacity(palette.dark ? 0.3 : 0.05), radius: 1, y: 1) }
         .onAppear { focused = true }
     }
 }
@@ -634,14 +657,14 @@ struct ModelPicker: View {
                 ForEach(["Low", "Medium", "High"], id: \.self) { Text($0) }
             }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 Text(model).foregroundStyle(palette.ink.opacity(0.85))
                 Text(effort).foregroundStyle(palette.faint)
-                PencilIcon(glyph: .chevron, size: 13, color: palette.secondary)
+                PencilIcon(glyph: .chevron, size: 12, color: palette.secondary)
             }
             .font(Typeface.sans(14))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
             .modifier(HoverWash())
         }
         .menuStyle(.button)
@@ -661,25 +684,21 @@ struct SendButton: View {
             chat.busy ? chat.stop() : chat.send()
         } label: {
             ZStack {
-                Circle().fill(palette.chestnut)
-                Circle().fill(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center))
-                Circle().strokeBorder(LinearGradient(colors: [.white.opacity(0.55), .black.opacity(0.12)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                Circle().fill(ready ? AnyShapeStyle(palette.accentFill) : AnyShapeStyle(palette.faint.opacity(0.45)))
+                Circle().strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
                 ZStack {
                     if chat.busy {
-                        PencilIcon(glyph: .stop, size: 17, color: .white, weight: 1.8)
-                            .transition(.scale(0.5).combined(with: .opacity))
+                        PencilIcon(glyph: .stop, size: 16, color: .white, weight: 1.7)
+                            .transition(.scale(scale: 0.5).combined(with: .opacity))
                     } else {
-                        PencilIcon(glyph: .arrowUp, size: 17, color: .white, weight: 1.8)
-                            .transition(.scale(0.5).combined(with: .opacity))
+                        PencilIcon(glyph: .arrowUp, size: 16, color: .white, weight: 1.7)
+                            .transition(.scale(scale: 0.5).combined(with: .opacity))
                     }
                 }
-                .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
             }
-            .frame(width: 34, height: 34)
+            .frame(width: 30, height: 30)
             .compositingGroup()
-            .shadow(color: palette.chestnutTop.opacity(ready ? 0.45 : 0), radius: 6, y: 3)
-            .saturation(ready ? 1 : 0.35)
-            .opacity(ready ? 1 : 0.55)
+            .shadow(color: palette.shadow.opacity(ready ? (palette.dark ? 0.4 : 0.12) : 0), radius: 2, y: 1)
             .animation(Tune.move, value: chat.busy)
             .animation(Tune.hover, value: ready)
         }
@@ -690,46 +709,31 @@ struct SendButton: View {
 
 // MARK: - Sidebar
 
+/// The standard macOS sidebar, with the sketch's type.
 struct Sidebar: View {
     @Environment(\.palette) private var palette
+    @State private var selection: String? = "Moving the sandbox module"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Color.clear.frame(height: 40)
-            row(glyph: .plus, "New chat", strong: true)
-            Text("Today")
-                .font(Typeface.sans(12).weight(.medium))
-                .foregroundStyle(palette.faint)
-                .padding(.horizontal, 12)
-                .padding(.top, 16)
-                .padding(.bottom, 4)
-            ForEach(["Moving the sandbox module", "Fallback models", "Flows with code references"], id: \.self) { row($0) }
-            Text("Earlier")
-                .font(Typeface.sans(12).weight(.medium))
-                .foregroundStyle(palette.faint)
-                .padding(.horizontal, 12)
-                .padding(.top, 16)
-                .padding(.bottom, 4)
-            ForEach(["Anthropic adapter", "Parallel read-only tools", "Titles on the Apple model", "Queueing messages"], id: \.self) { row($0) }
-            Spacer()
+        List(selection: $selection) {
+            Label { Text("New chat").font(Typeface.sans(14).weight(.medium)) } icon: {
+                PencilIcon(glyph: .plus, size: 15, color: palette.ink)
+            }
+            .tag("new")
+            Section("Today") {
+                ForEach(["Moving the sandbox module", "Fallback models", "Flows with code references"], id: \.self) { title in
+                    Text(title).font(Typeface.sans(14)).lineLimit(1).tag(title)
+                }
+            }
+            Section("Earlier") {
+                ForEach(["Anthropic adapter", "Parallel read-only tools", "Titles on the Apple model", "Queueing messages"], id: \.self) { title in
+                    Text(title).font(Typeface.sans(14)).lineLimit(1).tag(title)
+                }
+            }
         }
-        .padding(8)
-        .frame(maxHeight: .infinity)
-        .glassEffect(.regular.tint(palette.chestnutBottom.opacity(0.06)), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    private func row(glyph: Glyph? = nil, _ title: String, strong: Bool = false) -> some View {
-        HStack(spacing: 8) {
-            if let glyph { PencilIcon(glyph: glyph, size: 15, color: palette.ink) }
-            Text(title)
-                .font(Typeface.sans(14).weight(strong ? .medium : .regular))
-                .foregroundStyle(palette.ink.opacity(strong ? 1 : 0.85))
-                .lineLimit(1)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .modifier(HoverWash(shape: RoundedRectangle(cornerRadius: 9, style: .continuous)))
+        .listStyle(.sidebar)
+        // Room for the sidebar toggle under the traffic lights.
+        .safeAreaPadding(.top, 30)
     }
 }
 
@@ -756,7 +760,7 @@ struct HoverWash<S: Shape>: ViewModifier {
 struct Squish: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.9 : 1)
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
             .animation(Tune.press, value: configuration.isPressed)
     }
 }
@@ -771,11 +775,11 @@ struct QuietButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                PencilIcon(glyph: glyph, size: 17, color: palette.secondary)
+                PencilIcon(glyph: glyph, size: 16, color: palette.secondary)
                 if let label { Text(label).font(Typeface.sans(14)).foregroundStyle(palette.secondary) }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 5)
             .modifier(HoverWash())
         }
         .buttonStyle(Squish())
@@ -790,8 +794,8 @@ struct FloatingButton: View {
 
     var body: some View {
         Button(action: action) {
-            PencilIcon(glyph: glyph, size: 16, color: palette.ink.opacity(0.8))
-                .frame(width: 30, height: 30)
+            PencilIcon(glyph: glyph, size: 16, color: palette.ink.opacity(0.75))
+                .frame(width: 28, height: 28)
                 .glassEffect(.regular.interactive(), in: Circle())
         }
         .buttonStyle(Squish())
