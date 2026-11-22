@@ -20,3 +20,4 @@ To change one, write a new record that supersedes it, and mark the old one *Supe
 | [0012](0012-sandbox-on-containerization.md) | The sandbox: Containerization, one VM per conversation, no network |
 | [0013](0013-apple-model-text-only.md) | Apple's on-device model is text only |
 | [0014](0014-anthropic-thinking-replay.md) | Anthropic thinking is replayed only within the current exchange |
+| [0015](0015-typography.md) | Typography: Publico Text, DM Sans, iA Writer Mono |

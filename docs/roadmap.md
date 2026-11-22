@@ -13,13 +13,14 @@ Then the engine: everything below is done.
 
 **Later, engine:** more providers (Gemini, Chat Completions), attachments in messages, sub-agents, `KuriServer` for the iOS client.
 
-**Now: the UI redesign**, briefed in [ui.md](ui.md):
+**Now: the UI redesign**, briefed in [ui.md](ui.md) and tried in `Sketches/Autumn.swift`:
 
-1. Full Markdown, including LaTeX.
-2. Layout and styling of the main window, with conversation management (rename, archive, delete; maybe projects or grouping by root folder).
+1. Full Markdown, including LaTeX; code blocks in the Everforest colours (Higure dark, Yoake light).
+2. Layout and styling of the main window, with conversation management (rename, archive, delete; maybe projects or grouping by root folder). Running chats get a single-orb status indicator in the sidebar; the sidebar snaps shut when dragged past a threshold.
 3. Menu bar extra.
 4. Settings window, including editing providers and MCP servers.
 5. Floating window with a global hotkey.
+6. A right-hand sidebar previewing the sandbox while the model uses it.
 
 ## iOS client
 

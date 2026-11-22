@@ -89,7 +89,7 @@ extension EnvironmentValues {
 @MainActor @Observable final class Fonts {
     static let shared = Fonts()
 
-    // Chosen: Publico Text and iA Writer Mono. The sans is still open.
+    // Chosen: Publico Text, DM Sans and iA Writer Mono (decision 0015).
     static let serifs = ["Publico Text", "Iowan Old Style"]
     static let sanses = ["DM Sans", "Satoshi", "Figtree", "SF Pro Rounded", "Galvji", "SF Pro", "Avenir Next", "Lucida Grande", "Instrument Sans"]
     static let monos = ["iA Writer Mono S"]

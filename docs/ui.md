@@ -16,10 +16,11 @@ The brief for the redesign. Every app change is checked against it. Directions a
 - **Classy and warm**, built from **layers and depth**: surfaces sit on surfaces, with real shadows and light from above.
 - **Light and dark** themes, following the system.
 - **Autumn palette**: chestnut, amber, toasted cream, warm brown-blacks. The accent is the app icon's chestnut gradient (top `p3(0.60, 0.35, 0.16)` → bottom `sRGB(0.73, 0.58, 0.34)`; the dark icon starts at `p3(0.50, 0.31, 0.14)`). No cold greys: neutrals are warm.
-- **Type**:
-  - **Serif** (model replies, headings, accents): *Publico Text*, an Apple-provided download macOS fetches on request. Fallback: *Iowan Old Style*, which ships with macOS.
-  - **Mono** (code): *iA Writer Mono*, open-licensed (OFL) and bundled in the app, set smaller than the surrounding text (×0.86).
-  - **Sans** (user messages and the rest of the UI: titles, model selector, buttons): still open, chosen in the sketch, which switches it live. It should feel Apple-native while having some character. Candidates: *DM Sans*, *Figtree* (both OFL), *Satoshi* (ITF Free Font License: may be embedded in an app, but the files may not sit in a public repository), *SF Pro Rounded*, *Galvji*, *SF Pro*, *Avenir Next*, *Lucida Grande*, *Instrument Sans*.
+- **Type** (see [decision 0015](decisions/0015-typography.md) for where each font comes from):
+  - **Serif** (model replies, headings, accents): *Publico Text*, an Apple font macOS downloads on request; *Iowan Old Style* until it's there.
+  - **Sans** (user messages and the rest of the UI: titles, model selector, buttons): *DM Sans*, bundled.
+  - **Mono** (code): *iA Writer Mono*, bundled, set smaller than the text around it (×0.86).
+- **Code blocks**: syntax colours from the author's Everforest themes ([everforest-vscode](https://github.com/Haruno19/everforest-vscode)): *Higure* in dark mode, *Yoake* (its light counterpart) in light mode.
 - **Glass**: Liquid Glass (`glassEffect`) and materials where something floats above the content (composer, floating buttons, popovers), so the app feels first-party and modern.
 - **Icons**: look hand-drawn with a pencil: slightly irregular strokes, round caps, a graphite feel. Custom shapes, not SF Symbols, wherever the user sees them in the main window.
 
@@ -36,8 +37,11 @@ The brief for the redesign. Every app change is checked against it. Directions a
 
 ## UI roadmap
 
-1. Full Markdown, including LaTeX (deferred earlier).
-2. Layout and styling of the main window, with conversation management: rename, archive, delete; maybe projects / groups, or grouping by root folder.
+1. Full Markdown, including LaTeX (deferred earlier), with code blocks highlighted in the Everforest colours.
+2. Layout and styling of the main window, from the Autumn sketch, with conversation management: rename, archive, delete; maybe projects / groups, or grouping by root folder.
+   - **Running chats** show a status indicator in the sidebar: a single orb in the accent colour, with the same 3D feel as the working dots.
+   - **Sidebar snaps shut**: dragging its edge past a threshold collapses it, if SwiftUI allows it.
 3. Menu bar extra (dropdown).
 4. Settings window (compact, retro, dense).
 5. Floating window (mini panel with a global hotkey).
+6. **Sandbox preview**: a sidebar on the right, shown while the model uses the sandbox, previewing what happens in it.
