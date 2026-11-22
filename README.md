@@ -38,6 +38,7 @@ Kuri/
 │  │  ├─ KuriMCP/         MCP servers: connections, discovery, hot-reload
 │  │  └─ KuriAgent/       The engine: turn loop, interaction broker, events
 │  └─ Tests/
+├─ docs/flows.html        Sequence diagrams of every flow, and the event reference
 └─ Sketches/              UI experiments (not part of the build)
 ```
 
@@ -79,6 +80,8 @@ cd Packages/KuriKit && KURI_LIVE_MODEL=ollama/qwen3.5:2b swift test --filter Liv
 ```
 
 **The engine is in-process.** The SwiftUI layer talks to `Engine` directly and subscribes to its event stream. A future network server (for an iOS client) is just another subscriber to the same stream — the local UI never goes through HTTP.
+
+**Flows.** [`docs/flows.html`](docs/flows.html) documents every flow as a sequence diagram: startup and quit, a turn, tool rounds, approval, clarify, cancellation, MCP connection, calls, runtime tool changes and crashes, config hot-reload, model registration and memory edits, plus a reference of every engine event and external protocol. It's a single self-contained page (open it in a browser); each diagram is data in the page, rendered to SVG by a small script, so updating a flow means editing a few lines. Keep it in step with the code when a flow changes.
 
 ### Modules
 

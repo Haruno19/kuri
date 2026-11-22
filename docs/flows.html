@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kuri — Flows</title>
+<style>
+  :root {
+    --bg: #faf9f5; --card: #ffffff; --ink: #1f1e1d; --muted: #6b6a64; --faint: #9c9a92;
+    --line: #d4d1c6; --border: #e8e5da; --accent: #c2603d; --accent-soft: #f6e6dd;
+    --code-bg: #f1efe8;
+    --ui-fill: #e6edf6; --ui-stroke: #7c98c2;
+    --agent-fill: #f6e4da; --agent-stroke: #d07a55;
+    --mod-fill: #efede6; --mod-stroke: #ada99d;
+    --ext-fill: #e9f0e1; --ext-stroke: #7f9c63;
+    --actor-fill: #ffffff; --actor-stroke: #8c8a82;
+    --note-fill: #fbf6e9; --note-stroke: #e3d7b3;
+    --group-stroke: #cfcbbf; --group-tab: #f1efe8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1b1a; --card: #242322; --ink: #ecebe5; --muted: #a8a59c; --faint: #78766f;
+      --line: #4a4843; --border: #34332f; --accent: #e5906c; --accent-soft: #3a2a22;
+      --code-bg: #2e2d2a;
+      --ui-fill: #243041; --ui-stroke: #6f8db8;
+      --agent-fill: #3b2a22; --agent-stroke: #c97a57;
+      --mod-fill: #2e2d2a; --mod-stroke: #6e6b63;
+      --ext-fill: #26301f; --ext-stroke: #7e9a62;
+      --actor-fill: #242322; --actor-stroke: #8c8a82;
+      --note-fill: #2f2b21; --note-stroke: #5c5340;
+      --group-stroke: #4a4843; --group-tab: #2c2b28;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.6 ui-sans-serif, -apple-system, "SF Pro Text", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 1200px; margin: 0 auto; padding: 56px 28px 96px; }
+  h1, h2, h3 { font-family: ui-serif, "Iowan Old Style", "New York", Charter, Georgia, serif; font-weight: 500; letter-spacing: -0.01em; }
+  h1 { font-size: 40px; line-height: 1.15; margin: 0 0 12px; }
+  h2 { font-size: 26px; margin: 64px 0 6px; }
+  h3 { font-size: 21px; margin: 0 0 6px; }
+  p { margin: 0 0 12px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font: 0.86em ui-monospace, "SF Mono", Menlo, monospace; background: var(--code-bg); padding: 1px 5px; border-radius: 5px; }
+  .lede { font-size: 17px; color: var(--muted); max-width: 760px; }
+  .section-lede { color: var(--muted); margin-bottom: 20px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 26px 28px 22px; margin: 18px 0;
+  }
+  .card .summary { color: var(--muted); max-width: 760px; }
+  .diagram { overflow-x: auto; margin: 18px -8px 6px; padding: 0 8px 6px; }
+  .diagram svg { display: block; }
+  .notes { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+  .notes li { margin: 3px 0; }
+  nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 28px; margin: 28px 0 8px; }
+  nav.toc .group { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); margin: 10px 0 2px; }
+  nav.toc a { display: block; color: var(--ink); font-size: 14.5px; padding: 1px 0; }
+  nav.toc a:hover { color: var(--accent); text-decoration: none; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; font-size: 13.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .swatch { width: 26px; height: 16px; border-radius: 5px; border: 1.5px solid; display: inline-block; }
+  .arrow-sample { display: inline-block; width: 40px; height: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  th, td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  td:first-child { white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .meta { font-size: 13px; color: var(--faint); margin-top: 18px; }
+  svg text { font-family: ui-sans-serif, -apple-system, "SF Pro Text", system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<main>
+  <h1>How Kuri works</h1>
+  <p class="lede">The flows inside the app: what each module asks of the others, which events the engine publishes, and what goes over the wire to inference providers and MCP servers. One sequence diagram per flow, drawn from the code as it is today.</p>
+
+  <nav class="toc" id="toc"></nav>
+
+  <div class="card">
+    <h3>Reading the diagrams</h3>
+    <p class="summary">Columns are participants, top to bottom is time. The second line of each box is the module it lives in.</p>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div id="flows"></div>
+
+  <h2 id="reference">Reference</h2>
+  <p class="section-lede">The vocabulary the diagrams use.</p>
+
+  <div class="card">
+    <h3>Engine events</h3>
+    <p class="summary"><code>Engine.events()</code> returns an <code>AsyncStream&lt;EngineEvent&gt;</code>; any number of subscribers can listen (today: the app's <code>AppModel</code>; later, a network server for the iOS client).</p>
+    <table>
+      <thead><tr><th>Event</th><th>Published by</th><th>When</th><th>The app</th></tr></thead>
+      <tbody>
+        <tr><td><code>.conversationUpdated</code></td><td>Engine</td><td>A conversation is created or changed (title, model, timestamps)</td><td>Upserts it in the sidebar</td></tr>
+        <tr><td><code>.conversationDeleted</code></td><td>Engine</td><td>A conversation is deleted</td><td>Removes it, clears the selection</td></tr>
+        <tr><td><code>.itemAdded</code></td><td>Engine, TurnRunner</td><td>An item is stored: the user's message, a finished model output, a tool result</td><td>Appends to the transcript, ends streaming text</td></tr>
+        <tr><td><code>.inference</code></td><td>TurnRunner</td><td>Every event streamed by the provider (deltas included)</td><td>Grows the streaming text and reasoning</td></tr>
+        <tr><td><code>.turnStarted</code></td><td>Engine</td><td>A turn begins</td><td>Marks the conversation as running</td></tr>
+        <tr><td><code>.turnFinished</code></td><td>TurnRunner</td><td>A turn completes, fails or is cancelled</td><td>Clears running state; shows failures</td></tr>
+        <tr><td><code>.toolFinished</code></td><td>TurnRunner</td><td>A tool call has its result</td><td>— (the engine derives <code>.memoriesChanged</code> from it)</td></tr>
+        <tr><td><code>.inputRequested</code></td><td>InteractionBroker</td><td>A tool waits for the user: <code>clarify</code> or an approval</td><td>Shows the panel and a sidebar badge</td></tr>
+        <tr><td><code>.inputResolved</code></td><td>InteractionBroker</td><td>The request was answered or its turn cancelled</td><td>Removes the panel</td></tr>
+        <tr><td><code>.configReloaded</code></td><td>Engine</td><td>Config files reloaded, or discovered models changed</td><td>Refreshes models and config</td></tr>
+        <tr><td><code>.configFailed</code></td><td>Engine</td><td>A config file doesn't parse; the previous config stays</td><td>Shows the error</td></tr>
+        <tr><td><code>.toolsChanged</code></td><td>ToolRegistry (via Engine)</td><td>Tools were added or removed, or policies changed</td><td>Refreshes the tool catalog</td></tr>
+        <tr><td><code>.memoriesChanged</code></td><td>Engine</td><td>The memory tool or the user changed memories</td><td>Refreshes Settings › Memory</td></tr>
+        <tr><td><code>.mcpServersChanged</code></td><td>MCPManager (via Engine)</td><td>A server's state, tools or log changed</td><td>Refreshes Settings › Tools</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Inference events</h3>
+    <p class="summary">What every provider adapter streams to <code>TurnRunner</code>, whatever its wire format. Deltas are for display only; <code>itemCompleted</code> is what gets stored.</p>
+    <table>
+      <thead><tr><th>Event</th><th>Meaning</th><th>Open Responses source</th></tr></thead>
+      <tbody>
+        <tr><td><code>.textDelta</code></td><td>A piece of the answer</td><td><code>response.output_text.delta</code></td></tr>
+        <tr><td><code>.reasoningDelta</code></td><td>A piece of the reasoning</td><td><code>response.reasoning_text.delta</code>, <code>response.reasoning_summary_text.delta</code></td></tr>
+        <tr><td><code>.toolCallStarted</code></td><td>The model began a tool call</td><td><code>response.output_item.added</code> (function_call)</td></tr>
+        <tr><td><code>.toolCallArgumentsDelta</code></td><td>A piece of its arguments</td><td><code>response.function_call_arguments.delta</code></td></tr>
+        <tr><td><code>.itemCompleted</code></td><td>A finished message, reasoning or tool call</td><td><code>response.output_item.done</code></td></tr>
+        <tr><td><code>.usage</code></td><td>Token counts</td><td><code>response.completed</code> / <code>response.incomplete</code></td></tr>
+        <tr><td><code>.finished</code></td><td>Stop reason: end of turn, tool use, max tokens</td><td><code>response.completed</code> / <code>response.incomplete</code>; <code>response.failed</code> and <code>error</code> throw</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>External protocols</h3>
+    <table>
+      <thead><tr><th>With</th><th>What Kuri uses</th></tr></thead>
+      <tbody>
+        <tr><td>Inference server</td><td><code>POST &lt;baseURL&gt;/responses</code> with <code>stream: true</code> and <code>store: false</code> (stateless: the whole history every time), <code>Authorization: Bearer</code> from the provider's <code>apiKey</code>; the answer is a server-sent event stream.</td></tr>
+        <tr><td>Inference server</td><td><code>GET &lt;baseURL&gt;/models</code> → <code>{ data: [{ id }] }</code>, for model discovery.</td></tr>
+        <tr><td>MCP server</td><td>JSON-RPC via the MCP Swift SDK. Client → server: <code>initialize</code>, <code>notifications/initialized</code>, <code>tools/list</code>, <code>tools/call</code>, <code>notifications/cancelled</code>. Server → client: <code>notifications/tools/list_changed</code>.</td></tr>
+        <tr><td>MCP transport</td><td>stdio: newline-delimited JSON over the child's stdin/stdout, stderr kept as a log. Streamable HTTP: <code>POST</code> per message, <code>Mcp-Session-Id</code>, optional <code>GET</code> event stream, configured headers on every request.</td></tr>
+        <tr><td>Login shell</td><td><code>$SHELL -ilc 'printf $PATH'</code>, once, so stdio servers find <code>npx</code>, <code>uvx</code> and friends when Kuri starts from Finder.</td></tr>
+        <tr><td>File system</td><td><code>~/.config/kuri</code>: <code>config.json</code> and <code>mcp.json</code> (watched), <code>kuri.sqlite</code> (WAL), <code>blobs/</code>, <code>scratch/</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="meta">Not drawn yet, because they don't exist yet: resuming a pending question after a relaunch, compaction, and the sandbox with its <code>shell</code> tool. They'll be added here when they land.</p>
+</main>
+
+<script>
+// ─── Participants ────────────────────────────────────────────────────────────
+// id: [label, module or subtitle, kind]. Kinds pick the colours in the legend.
+const P = {
+  user:      ["You", "", "actor"],
+  macos:     ["macOS", "AppKit", "external"],
+  kuriapp:   ["KuriApp", "App", "ui"],
+  chat:      ["ChatView", "App", "ui"],
+  panel:     ["Input panel", "App", "ui"],
+  settings:  ["Settings", "App", "ui"],
+  appmodel:  ["AppModel", "App", "ui"],
+  engine:    ["Engine", "KuriAgent", "agent"],
+  runner:    ["TurnRunner", "KuriAgent", "agent"],
+  broker:    ["InteractionBroker", "KuriAgent", "agent"],
+  watcher:   ["ConfigWatcher", "KuriConfig", "module"],
+  loader:    ["ConfigLoader", "KuriConfig", "module"],
+  editor:    ["ConfigEditor", "KuriConfig", "module"],
+  store:     ["Store", "KuriStore", "module"],
+  registry:  ["ToolRegistry", "KuriTools", "module"],
+  tool:      ["Built-in tool", "KuriTools", "module"],
+  clarify:   ["ClarifyTool", "KuriTools", "module"],
+  provider:  ["OpenResponsesProvider", "KuriInference", "module"],
+  factory:   ["ProviderFactory", "KuriInference", "module"],
+  mcp:       ["MCPManager", "KuriMCP", "module"],
+  conn:      ["MCPServerConnection", "KuriMCP", "module"],
+  transport: ["ProcessTransport", "KuriMCP", "module"],
+  mcptool:   ["MCPTool", "KuriMCP", "module"],
+  sdk:       ["Client", "MCP Swift SDK", "module"],
+  llm:       ["Inference server", "Ollama, OpenAI…", "external"],
+  server:    ["MCP server", "stdio or HTTP", "external"],
+  shell:     ["Login shell", "$SHELL", "external"],
+  disk:      ["config.json", "~/.config/kuri", "external"],
+  texteditor:["Your editor", "", "external"],
+};
+
+// ─── Flows ───────────────────────────────────────────────────────────────────
+// Steps: [from, to, label, type] where type is omitted (call), "r" (return),
+// "e" (engine event, published to subscribers) or "a" (async: a task or
+// callback). Objects: {note, over}, {loop, steps}, {opt, steps},
+// {alt: [[label, steps], …]}. `backticks` render as code.
+const FLOWS = [
+  { group: "Lifecycle", id: "startup", title: "Startup",
+    summary: "The engine starts with the app, not with a window, so Kuri keeps running from the menu bar with every window closed. MCP servers and model discovery connect in the background: the UI is ready before they are.",
+    participants: ["kuriapp", "appmodel", "engine", "loader", "store", "registry", "mcp"],
+    steps: [
+      ["kuriapp", "appmodel", "`start()`", "a"],
+      ["appmodel", "engine", "`Engine.open(home:)`"],
+      { note: "home: KURI_HOME → $XDG_CONFIG_HOME/kuri → ~/.config/kuri", over: "engine" },
+      ["engine", "loader", "`loadConfig()`, `loadMCP()`"],
+      { note: "writes commented templates on first launch,\ndecodes JSON5", over: "loader" },
+      ["loader", "engine", "`Config`, `MCPConfig`", "r"],
+      ["engine", "store", "`Store(url: kuri.sqlite)`"],
+      { note: "WAL, foreign keys,\nmigrations by user_version", over: "store" },
+      ["engine", "store", "`recoverInterruptedTurns()`"],
+      ["engine", "registry", "`onChange { … }`, `setPolicies(…)`"],
+      ["engine", "mcp", "`apply(mcpConfig)`", "a"],
+      ["engine", "engine", "discover models, start `ConfigWatcher`", "a"],
+      ["engine", "appmodel", "engine", "r"],
+      ["appmodel", "engine", "conversations, models, tools,\nmemories, MCP servers"],
+      ["appmodel", "engine", "`for await event in events()`", "a"],
+    ],
+    notes: ["Turns left <code>running</code> by a crash or a force quit are marked failed; turns waiting for an answer are kept."] },
+
+  { group: "Lifecycle", id: "quit", title: "Quit",
+    summary: "On quit the engine stops what it started. The main thread waits up to two seconds; the engine is its own actor, so it can finish meanwhile.",
+    participants: ["macos", "kuriapp", "engine", "mcp", "registry", "conn", "server"],
+    steps: [
+      ["macos", "kuriapp", "`willTerminateNotification`"],
+      ["kuriapp", "engine", "`shutdown()`", "a"],
+      ["engine", "engine", "cancel watcher, discovery, running turns"],
+      ["engine", "mcp", "`shutdown()`"],
+      { loop: "each server", steps: [
+        ["mcp", "registry", "`removeAll(from: .mcp(server))`"],
+        ["mcp", "conn", "`stop()`"],
+        ["conn", "server", "disconnect, close stdin,\nSIGTERM"],
+      ]},
+    ],
+    notes: ["A stdio server that misses the signal still sees end-of-file on stdin once Kuri has exited."] },
+
+  { group: "Turns", id: "turn", title: "A turn",
+    summary: "The user sends a message; the engine stores it, opens a turn and returns. A TurnRunner task then asks the model and streams its answer back as events. Kuri is stateless towards the provider: each request carries the whole history, rebuilt from the database.",
+    participants: ["user", "chat", "appmodel", "engine", "store", "runner", "provider", "llm"],
+    steps: [
+      ["user", "chat", "types, ⌘↩"],
+      ["chat", "appmodel", "`send(text)`"],
+      ["appmodel", "engine", "`send(text, to: id)`"],
+      ["engine", "store", "`append(user message)`"],
+      ["engine", "appmodel", "`.itemAdded`", "e"],
+      ["engine", "store", "provisional title,\n`beginTurn`"],
+      ["engine", "appmodel", "`.conversationUpdated`\n`.turnStarted`", "e"],
+      ["engine", "runner", "`Task { run() }`", "a"],
+      ["runner", "store", "`items(of:)`"],
+      { note: "history since the last compaction,\ninstructions with memories, tool specs", over: "runner" },
+      ["runner", "provider", "`stream(request)`"],
+      ["provider", "llm", "`POST /responses`\n`stream: true, store: false`"],
+      { loop: "server-sent events", steps: [
+        ["llm", "provider", "`response.output_text.delta`", "r"],
+        ["provider", "runner", "`.textDelta`", "r"],
+        ["runner", "appmodel", "`.inference(.textDelta)`", "e"],
+      ]},
+      ["llm", "provider", "`response.output_item.done`", "r"],
+      ["provider", "runner", "`.itemCompleted(.message)`", "r"],
+      ["runner", "store", "`append(…)`"],
+      ["runner", "appmodel", "`.itemAdded`", "e"],
+      ["llm", "provider", "`response.completed`\nwith usage", "r"],
+      ["provider", "runner", "`.usage`,\n`.finished(.endTurn)`", "r"],
+      ["runner", "store", "`finishTurn(.completed)`"],
+      ["runner", "appmodel", "`.turnFinished(.completed)`", "e"],
+    ],
+    notes: ["Reasoning streams the same way (<code>.reasoningDelta</code>, then an item of kind <code>reasoning</code>).",
+            "A provider error throws out of the stream: the turn is stored as failed and <code>.turnFinished(.failed)</code> carries the message."] },
+
+  { group: "Turns", id: "tools", title: "A tool round",
+    summary: "When the model calls tools, the runner checks each call's policy, runs it, stores the result and asks the model again with the call and its result in the history. Shown here with a built-in tool that's allowed.",
+    participants: ["appmodel", "runner", "registry", "tool", "store", "provider", "llm"],
+    steps: [
+      ["llm", "provider", "`response.output_item.done`\n(function_call)", "r"],
+      ["provider", "runner", "`.itemCompleted(.toolCall)`", "r"],
+      ["runner", "store", "`append(…)`"],
+      ["runner", "appmodel", "`.itemAdded`", "e"],
+      ["provider", "runner", "`.finished(.toolUse)`", "r"],
+      { loop: "each call", steps: [
+        ["runner", "registry", "`tool(named:)`, `policy(for:)`\n→ allow"],
+        ["runner", "tool", "`run(arguments, context)`"],
+        ["tool", "store", "e.g. `applyMemoryChanges`,\n`search`"],
+        ["tool", "runner", "`ToolOutput`", "r"],
+        ["runner", "store", "`append(.toolResult)`"],
+        ["runner", "appmodel", "`.itemAdded`, `.toolFinished`", "e"],
+      ]},
+      ["runner", "store", "`items(of:)`"],
+      ["runner", "provider", "`stream(request)`"],
+      ["provider", "llm", "`POST /responses` with\n`function_call`, `function_call_output`"],
+    ],
+    notes: ["Repeats until a round has no tool calls, at most 40 rounds per turn.",
+            "The same call with the same arguments more than 3 times in a turn gets an error result instead. Output is capped at 30,000 characters.",
+            "<code>tasklist</code> touches nothing: the app reads the current plan from the latest call's arguments. <code>memory</code> also triggers <code>.memoriesChanged</code>."] },
+
+  { group: "Turns", id: "approval", title: "Approval",
+    summary: "A tool whose policy is ask waits for the user. The broker parks the call on a continuation and publishes a request; the answer resumes it.",
+    participants: ["user", "panel", "appmodel", "engine", "broker", "runner", "registry", "tool"],
+    steps: [
+      ["runner", "registry", "`policy(for:)` → ask"],
+      ["runner", "broker", "`approve(request)`"],
+      ["broker", "appmodel", "`.inputRequested(.approval)`", "e"],
+      ["appmodel", "panel", "shows tool and arguments"],
+      ["user", "panel", "Allow / Deny"],
+      ["panel", "appmodel", "`respond(.approved(…))`"],
+      ["appmodel", "engine", "`respond(to: id, with:)`"],
+      ["engine", "broker", "`respond(…)`"],
+      ["broker", "appmodel", "`.inputResolved`", "e"],
+      ["broker", "runner", "true / false", "r"],
+      { alt: [
+        ["allowed", [["runner", "tool", "`run(…)`"]]],
+        ["denied", [["runner", "runner", "error result: “The user declined this call.”"]]],
+      ]},
+    ],
+    notes: ["A tool whose policy is deny is never offered to the model: <code>specs()</code> leaves it out."] },
+
+  { group: "Turns", id: "clarify", title: "Clarify",
+    summary: "The model asks the user and waits. The answers are the tool's return value, not a new user message, so the model carries on in the same turn.",
+    participants: ["user", "panel", "appmodel", "broker", "runner", "clarify", "store"],
+    steps: [
+      ["runner", "clarify", "`run({ questions })`"],
+      ["clarify", "store", "`setTurnStatus(.awaitingInput)`"],
+      ["clarify", "broker", "`clarify(request)`"],
+      ["broker", "appmodel", "`.inputRequested(.clarify)`", "e"],
+      ["appmodel", "panel", "questions, suggested answers"],
+      ["user", "panel", "answers"],
+      ["panel", "appmodel", "`respond(.answers(…))`"],
+      ["appmodel", "broker", "via `Engine.respond`"],
+      ["broker", "appmodel", "`.inputResolved`", "e"],
+      ["broker", "clarify", "answers by question id", "r"],
+      ["clarify", "store", "`setTurnStatus(.running)`"],
+      ["clarify", "runner", "“question → answer” lines", "r"],
+    ],
+    notes: ["The sidebar badges a conversation while its question is open."] },
+
+  { group: "Turns", id: "cancel", title: "Cancel",
+    summary: "Stop cancels the turn's task. Whatever it's waiting on gives way: the HTTP stream, a pending question, or an MCP call, which is cancelled on the server too.",
+    participants: ["user", "appmodel", "engine", "runner", "broker", "store", "provider", "llm", "server"],
+    steps: [
+      ["user", "appmodel", "Stop"],
+      ["appmodel", "engine", "`cancel(id)`"],
+      ["engine", "runner", "`task.cancel()`"],
+      { alt: [
+        ["streaming", [["provider", "llm", "request cancelled"]]],
+        ["waiting for the user", [["broker", "appmodel", "`.inputResolved`", "e"]]],
+        ["MCP call running", [["runner", "server", "`notifications/cancelled` via MCPServerConnection"]]],
+      ]},
+      ["runner", "store", "`finishTurn(.cancelled)`"],
+      ["runner", "appmodel", "`.turnFinished(.cancelled)`", "e"],
+    ],
+    notes: ["A call left without a result gets a placeholder result (“Interrupted before completing.”) in the next request; providers reject dangling calls."] },
+
+  { group: "MCP", id: "mcp-connect", title: "Connecting a server",
+    summary: "MCPManager keeps connections in line with mcp.json. For each new or changed server it builds the environment, launches the transport, lets the SDK do the handshake, then lists the tools and registers them.",
+    participants: ["appmodel", "engine", "mcp", "shell", "conn", "sdk", "server", "registry"],
+    steps: [
+      ["engine", "mcp", "`apply(mcpConfig)`"],
+      { note: "diff against what runs: unchanged servers are skipped,\nremoved or disabled ones stopped", over: "mcp" },
+      ["mcp", "appmodel", "`.mcpServersChanged` (connecting)", "e"],
+      { opt: "first stdio server", steps: [
+        ["mcp", "shell", "`$SHELL -ilc 'printf $PATH'`"],
+        ["shell", "mcp", "PATH", "r"],
+      ]},
+      ["mcp", "conn", "`start(config, environment, headers)`"],
+      ["conn", "sdk", "`connect(transport)`\n60 s timeout"],
+      ["sdk", "server", "launch `ProcessTransport`\nor open `HTTPClientTransport`"],
+      ["sdk", "server", "`initialize`"],
+      ["server", "sdk", "capabilities, serverInfo", "r"],
+      ["sdk", "server", "`notifications/initialized`"],
+      ["mcp", "conn", "`listTools()`"],
+      ["conn", "server", "`tools/list` (while `nextCursor`)"],
+      ["server", "conn", "tools", "r"],
+      ["mcp", "registry", "`replace(source: .mcp(server), with: tools)`"],
+      ["registry", "appmodel", "`.toolsChanged`", "e"],
+      ["mcp", "appmodel", "`.mcpServersChanged` (connected)", "e"],
+    ],
+    notes: ["Tools are named <code>&lt;server&gt;__&lt;tool&gt;</code>. Read-only tools (<code>readOnlyHint</code>) default to allow, others to ask; config files override.",
+            "<code>env</code> and <code>headers</code> values are secret references, resolved from the Keychain or the environment.",
+            "stdio servers are launched through <code>/usr/bin/env</code>; their stderr becomes the log shown in Settings › Tools."] },
+
+  { group: "MCP", id: "mcp-call", title: "Calling an MCP tool",
+    summary: "An MCP tool is a Tool like any other to the runner. MCPTool forwards the call through the SDK and flattens the result into text.",
+    participants: ["runner", "registry", "broker", "mcptool", "conn", "server"],
+    steps: [
+      ["runner", "registry", "`policy(for:)`"],
+      { opt: "policy is ask", steps: [
+        ["runner", "broker", "`approve(…)` — see Approval"],
+      ]},
+      ["runner", "mcptool", "`run(arguments)`"],
+      ["mcptool", "conn", "`call(name, [String: Value])`"],
+      ["conn", "server", "`tools/call { name, arguments }`"],
+      ["server", "conn", "`{ content, isError }`", "r"],
+      ["conn", "mcptool", "content", "r"],
+      ["mcptool", "mcptool", "flatten to text"],
+      ["mcptool", "runner", "`ToolOutput`", "r"],
+    ],
+    notes: ["Text passes through; images and audio are described (Kuri doesn't send media to models yet); resource links become Markdown links."] },
+
+  { group: "MCP", id: "mcp-changed", title: "Tools changing at runtime",
+    summary: "A server may add or remove tools while connected. It says so with a notification; Kuri lists them again and swaps them in the registry.",
+    participants: ["appmodel", "engine", "mcp", "registry", "conn", "server"],
+    steps: [
+      ["server", "conn", "`notifications/tools/list_changed`"],
+      ["conn", "mcp", "`toolsChanged()`", "a"],
+      ["mcp", "conn", "`listTools()`"],
+      ["conn", "server", "`tools/list`"],
+      ["server", "conn", "tools", "r"],
+      ["mcp", "registry", "`replace(source: .mcp(server), with: tools)`"],
+      ["registry", "engine", "`onChange`", "a"],
+      ["engine", "appmodel", "`.toolsChanged`", "e"],
+      ["mcp", "appmodel", "`.mcpServersChanged`", "e"],
+    ],
+    notes: ["The next request to the model already lists the new tools."] },
+
+  { group: "MCP", id: "mcp-exit", title: "A server exits",
+    summary: "When a stdio server dies, its transport ends the message stream (so the SDK stops reading) and reports the exit. The server is marked failed and its tools disappear until it's reconnected.",
+    participants: ["user", "appmodel", "mcp", "registry", "conn", "transport", "server"],
+    steps: [
+      ["server", "transport", "exits, stdout closes"],
+      ["transport", "conn", "message stream\nends with an error", "a"],
+      ["transport", "mcp", "`onExit(status)`\n→ `lost(name, generation)`", "a"],
+      ["mcp", "registry", "`removeAll(from: .mcp(server))`"],
+      ["mcp", "appmodel", "`.mcpServersChanged`\nfailed: “exited with status 3”", "e"],
+      ["mcp", "conn", "`stop()`"],
+      { note: "pending calls fail", over: "conn" },
+      ["user", "appmodel", "Reconnect"],
+      ["appmodel", "mcp", "`reconnect(name)` via Engine"],
+      ["mcp", "mcp", "stop, then connect again"],
+    ],
+    notes: ["Every (re)start bumps a generation number; callbacks from an older connection are ignored."] },
+
+  { group: "Configuration", id: "reload", title: "Config hot-reload",
+    summary: "Kuri watches its folder, not single files: editors save by writing a new file and renaming it over the old one. A burst of events becomes one reload.",
+    participants: ["user", "texteditor", "watcher", "engine", "loader", "registry", "mcp", "appmodel"],
+    steps: [
+      ["user", "texteditor", "saves mcp.json"],
+      ["texteditor", "watcher", "write + rename\nin ~/.config/kuri"],
+      { note: "debounced 250 ms", over: "watcher" },
+      ["watcher", "engine", "change", "a"],
+      ["engine", "loader", "`loadConfig()`, `loadMCP()`"],
+      { alt: [
+        ["invalid", [
+          ["loader", "engine", "error", "r"],
+          ["engine", "appmodel", "`.configFailed(message)`", "e"],
+        ]],
+        ["valid", [
+          ["loader", "engine", "`Config`, `MCPConfig`", "r"],
+          ["engine", "registry", "`setPolicies(merged)`"],
+          ["engine", "mcp", "`apply(mcpConfig)` — diff"],
+          ["engine", "engine", "drop cached providers, rediscover models", "a"],
+          ["engine", "appmodel", "`.configReloaded`", "e"],
+        ]],
+      ]},
+    ],
+    notes: ["Policies merge <code>mcp.json</code> rules (per server) with <code>config.json</code> ones; <code>config.json</code> wins on the same name.",
+            "An invalid file changes nothing: the previous configuration stays in effect."] },
+
+  { group: "Configuration", id: "models", title: "Model discovery and registration",
+    summary: "Settings › Models asks each provider which models it serves and offers them in the model id field. Registering one edits config.json, which then reloads like any other change.",
+    participants: ["user", "settings", "appmodel", "engine", "factory", "llm", "editor", "disk"],
+    steps: [
+      ["user", "settings", "opens Settings › Models"],
+      ["settings", "appmodel", "`availableModels(provider:)`"],
+      ["appmodel", "engine", "`availableModels(provider:)`"],
+      ["engine", "factory", "`discoverModels(…)`"],
+      ["factory", "llm", "`GET /models`"],
+      ["llm", "factory", "`{ data: [{ id }] }`", "r"],
+      ["factory", "settings", "sorted ids → suggestions", "r"],
+      ["user", "settings", "picks or types an id, Add"],
+      ["settings", "engine", "`register(ModelConfig, provider:)`\nvia AppModel"],
+      ["engine", "editor", "`register(…)`"],
+      ["editor", "disk", "read, edit as a JSON tree,\nvalidate, write JSON5"],
+      ["engine", "engine", "`reloadConfig()` — see Config hot-reload"],
+      ["engine", "appmodel", "`.configReloaded`", "e"],
+    ],
+    notes: ["Keys Kuri doesn't know survive the edit; comments don't.",
+            "The watcher also sees the write and reloads again; the diff makes that a no-op.",
+            "Providers with <code>discoverModels: true</code> are listed at startup and on every reload, and their models join the picker without registering."] },
+
+  { group: "Configuration", id: "memory", title: "Editing memory",
+    summary: "Memories change in one transaction, from Settings or from the model's memory tool. Either way the app hears about it through the same event.",
+    participants: ["user", "settings", "appmodel", "engine", "store"],
+    steps: [
+      ["user", "settings", "Add / Edit / Forget"],
+      ["settings", "appmodel", "`changeMemories([.add | .update | .remove])`"],
+      ["appmodel", "engine", "`changeMemories(…)`"],
+      ["engine", "store", "`applyMemoryChanges(source: .user)`"],
+      ["engine", "appmodel", "`.memoriesChanged`", "e"],
+      ["appmodel", "engine", "`memories()`"],
+    ],
+    notes: ["The model's edits go through the memory tool (with a 4,000-character budget) and arrive as <code>.toolFinished</code> → <code>.memoriesChanged</code>.",
+            "Active memories are part of every request's instructions, in <code>&lt;user_memory&gt;</code>, with their ids."] },
+];
+
+// ─── Renderer ────────────────────────────────────────────────────────────────
+const FONT = "12.5px ui-sans-serif, -apple-system, system-ui, sans-serif";
+const MONO = "11.5px ui-monospace, SFMono-Regular, Menlo, monospace";
+const BOLD = "600 12.5px ui-sans-serif, -apple-system, system-ui, sans-serif";
+const SMALL = "10.5px ui-sans-serif, -apple-system, system-ui, sans-serif";
+const ctx = document.createElement("canvas").getContext("2d");
+
+const KIND = {
+  actor:    ["--actor-fill", "--actor-stroke", false],
+  ui:       ["--ui-fill", "--ui-stroke", false],
+  agent:    ["--agent-fill", "--agent-stroke", false],
+  module:   ["--mod-fill", "--mod-stroke", false],
+  external: ["--ext-fill", "--ext-stroke", true],
+};
+
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const segments = text => text.split("`").map((t, i) => ({ t, mono: i % 2 === 1 })).filter(s => s.t);
+function width(text, font = FONT) {
+  return segments(text).reduce((sum, s) => { ctx.font = s.mono ? MONO : font; return sum + ctx.measureText(s.t).width; }, 0);
+}
+function textSVG(text, x, y, anchor, cls) {
+  const spans = segments(text).map(s => s.mono
+    ? `<tspan style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px">${esc(s.t)}</tspan>`
+    : `<tspan>${esc(s.t)}</tspan>`).join("");
+  return `<text x="${x}" y="${y}" text-anchor="${anchor}" class="${cls}">${spans}</text>`;
+}
+
+function walk(steps, visit) {
+  for (const step of steps) {
+    if (Array.isArray(step)) visit({ msg: step });
+    else if (step.note) visit(step);
+    else if (step.loop || step.opt) walk(step.steps, visit);
+    else if (step.alt) step.alt.forEach(([, s]) => walk(s, visit));
+  }
+}
+
+function render(flow) {
+  const parts = flow.participants.map(id => {
+    const [label, sub, kind] = P[id];
+    return { id, label, sub, kind, w: Math.max(width(label, BOLD), sub ? width(sub, SMALL) : 0) + 22 };
+  });
+  const idx = Object.fromEntries(parts.map((p, i) => [p.id, i]));
+  const n = parts.length;
+  const gaps = parts.slice(0, -1).map((p, i) => (p.w + parts[i + 1].w) / 2 + 14);
+  let rightExtra = parts[n - 1].w / 2 + 10;
+
+  // Widen gaps until every label fits between its arrow's ends.
+  walk(flow.steps, step => {
+    if (step.msg) {
+      const [from, to, label] = step.msg;
+      const a = idx[from], b = idx[to];
+      if (a === undefined || b === undefined) throw new Error(`${flow.id}: unknown participant in ${step.msg}`);
+      const w = Math.max(...label.split("\n").map(l => width(l))) + 24;
+      if (a === b) {
+        // Self-message labels may run over the next lifelines (they have a halo);
+        // only the last column needs room on its right.
+        if (a === n - 1) rightExtra = Math.max(rightExtra, w + 40);
+      } else {
+        const lo = Math.min(a, b), hi = Math.max(a, b);
+        const current = gaps.slice(lo, hi).reduce((x, y) => x + y, 0);
+        if (current < w) for (let k = lo; k < hi; k++) gaps[k] += (w - current) / (hi - lo);
+      }
+    } else if (step.note) {
+      const over = [].concat(step.over).map(id => idx[id]);
+      const w = Math.max(...step.note.split("\n").map(l => width(l))) + 24;
+      const lo = Math.min(...over), hi = Math.max(...over);
+      if (hi > lo) {
+        const current = gaps.slice(lo, hi).reduce((x, y) => x + y, 0) + 60;
+        if (current < w) for (let k = lo; k < hi; k++) gaps[k] += (w - current) / (hi - lo);
+      }
+    }
+  });
+
+  const margin = 16;
+  const x = [margin + parts[0].w / 2];
+  gaps.forEach((g, i) => x.push(x[i] + g));
+  const W = Math.ceil(x[n - 1] + rightExtra + margin);
+  const H0 = 42;
+
+  const back = [], front = [];
+  let y = H0 + 26;
+  const left = 6, right = W - 6;
+
+  function message([from, to, label, type = "c"], depth) {
+    const a = x[idx[from]], b = x[idx[to]];
+    const cls = { c: "m-call", r: "m-ret", e: "m-event", a: "m-async" }[type];
+    const marker = { c: "call", r: "open", e: "event", a: "open" }[type];
+    const lines = label ? label.split("\n") : [];
+    if (from === to) {
+      front.push(`<path d="M${a},${y} h28 v16 h-26" class="${cls}" marker-end="url(#${flow.id}-${marker})"/>`);
+      lines.forEach((line, i) => front.push(textSVG(line, a + 36, y + 12 + i * 15, "start", `t-${type} halo`)));
+      y += 38 + Math.max(0, lines.length - 1) * 15;
+    } else {
+      y += Math.max(0, lines.length - 1) * 15;
+      const dir = b > a ? 1 : -1;
+      front.push(`<line x1="${a}" y1="${y}" x2="${b - dir * 2}" y2="${y}" class="${cls}" marker-end="url(#${flow.id}-${marker})"/>`);
+      lines.forEach((line, i) =>
+        front.push(textSVG(line, (a + b) / 2, y - 7 - (lines.length - 1 - i) * 15, "middle", `t-${type} halo`)));
+      y += 30;
+    }
+  }
+
+  function note(step) {
+    const over = [].concat(step.over).map(id => idx[id]);
+    const lines = step.note.split("\n");
+    const w = Math.max(...lines.map(l => width(l))) + 24;
+    const lo = Math.min(...over), hi = Math.max(...over);
+    let l = x[lo] - 30, r = x[hi] + 30;
+    if (r - l < w) { const c = (l + r) / 2; l = c - w / 2; r = c + w / 2; }
+    l = Math.max(l, left + 4); r = Math.min(r, right - 4);
+    const h = lines.length * 16 + 10;
+    front.push(`<rect x="${l}" y="${y - 12}" width="${r - l}" height="${h}" rx="6" class="note"/>`);
+    lines.forEach((line, i) => front.push(textSVG(line, (l + r) / 2, y + 4 + i * 16, "middle", "t-note")));
+    y += h + 10;
+  }
+
+  function frame(kind, label, depth, body) {
+    const inset = depth * 7;
+    const top = y - 18;
+    y += 16;
+    const tabW = width(kind, BOLD) + (label ? width(label) + 22 : 16);
+    const sections = body();
+    const bottom = y - 12;
+    back.push(`<rect x="${left + inset}" y="${top}" width="${right - left - 2 * inset}" height="${bottom - top}" rx="8" class="frame"/>`);
+    back.push(`<path d="M${left + inset},${top + 20} h${tabW} l6,-6 v-14" class="frame-tab"/>`);
+    back.push(`<text x="${left + inset + 8}" y="${top + 14}" class="t-frame"><tspan class="t-frame-kind">${kind}</tspan>${label ? `<tspan dx="6">${esc(label)}</tspan>` : ""}</text>`);
+    (sections || []).forEach(([sy, sl]) => {
+      back.push(`<line x1="${left + inset}" y1="${sy}" x2="${right - inset}" y2="${sy}" class="frame-split"/>`);
+      back.push(`<text x="${left + inset + 8}" y="${sy + 14}" class="t-frame">[${esc(sl)}]</text>`);
+    });
+    y += 8;
+  }
+
+  function steps(list, depth) {
+    for (const step of list) {
+      if (Array.isArray(step)) message(step, depth);
+      else if (step.note) note(step);
+      else if (step.loop) frame("loop", step.loop, depth, () => steps(step.steps, depth + 1));
+      else if (step.opt) frame("opt", step.opt, depth, () => steps(step.steps, depth + 1));
+      else if (step.alt) frame("alt", step.alt[0][0], depth, () => {
+        const splits = [];
+        step.alt.forEach(([label, s], i) => {
+          if (i > 0) { splits.push([y - 14, label]); y += 14; }
+          steps(s, depth + 1);
+        });
+        return splits;
+      });
+    }
+  }
+  steps(flow.steps, 0);
+
+  const bottomY = y + 4;
+  const lifelines = parts.map((p, i) => `<line x1="${x[i]}" y1="${H0}" x2="${x[i]}" y2="${bottomY}" class="lifeline"/>`);
+  const boxes = (top) => parts.map((p, i) => {
+    const [fill, stroke, dashed] = KIND[p.kind];
+    const bx = x[i] - p.w / 2;
+    return `<rect x="${bx}" y="${top}" width="${p.w}" height="${H0}" rx="9" style="fill: var(${fill}); stroke: var(${stroke})" class="box${dashed ? " dashed" : ""}"/>` +
+      `<text x="${x[i]}" y="${top + (p.sub ? 18 : 25)}" text-anchor="middle" class="t-box">${esc(p.label)}</text>` +
+      (p.sub ? `<text x="${x[i]}" y="${top + 32}" text-anchor="middle" class="t-sub">${esc(p.sub)}</text>` : "");
+  }).join("");
+
+  const Htotal = bottomY + H0 + margin;
+  const m = (id, d, style) => `<marker id="${flow.id}-${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="${d}" style="${style}"/></marker>`;
+  // Shrink to fit the page down to 85%; past that, scroll sideways.
+  return `<svg width="${W}" height="${Htotal}" viewBox="0 0 ${W} ${Htotal}" style="width: clamp(${Math.round(W * 0.85)}px, 100%, ${W}px); height: auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${esc(flow.title)} sequence diagram">
+    <style>
+      .lifeline { stroke: var(--line); stroke-dasharray: 3 4; }
+      .box { stroke-width: 1.3; } .box.dashed { stroke-dasharray: 4 3; }
+      .t-box { font: 600 12.5px ui-sans-serif, -apple-system, system-ui, sans-serif; fill: var(--ink); }
+      .t-sub { font: 10.5px ui-sans-serif, -apple-system, system-ui, sans-serif; fill: var(--muted); }
+      .m-call { stroke: var(--ink); stroke-width: 1.2; fill: none; }
+      .m-ret { stroke: var(--muted); stroke-width: 1.1; stroke-dasharray: 5 4; fill: none; }
+      .m-async { stroke: var(--ink); stroke-width: 1.1; stroke-dasharray: 1.5 3; fill: none; }
+      .m-event { stroke: var(--accent); stroke-width: 1.3; fill: none; }
+      .t-c, .t-a { font: 12.5px ui-sans-serif, -apple-system, system-ui, sans-serif; fill: var(--ink); }
+      .t-r { font: 12.5px ui-sans-serif, -apple-system, system-ui, sans-serif; fill: var(--muted); }
+      .t-e { font: 12.5px ui-sans-serif, -apple-system, system-ui, sans-serif; fill: var(--accent); }
+      .halo { paint-order: stroke; stroke: var(--card); stroke-width: 5px; stroke-linejoin: round; }
+      .note { fill: var(--note-fill); stroke: var(--note-stroke); }
+      .t-note { font: 12px ui-sans-serif, -apple-system, system-ui, sans-serif; fill: var(--muted); }
+      .frame { fill: none; stroke: var(--group-stroke); }
+      .frame-tab { fill: var(--group-tab); stroke: var(--group-stroke); }
+      .frame-split { stroke: var(--group-stroke); stroke-dasharray: 5 4; }
+      .t-frame { font: 11.5px ui-sans-serif, -apple-system, system-ui, sans-serif; fill: var(--muted); }
+      .t-frame-kind { font-weight: 700; fill: var(--ink); }
+    </style>
+    <defs>
+      ${m("call", "M0,0 L10,5 L0,10 z", "fill: var(--ink)")}
+      ${m("open", "M0,0 L10,5 L0,10", "fill: none; stroke: var(--muted); stroke-width: 1.4")}
+      ${m("event", "M0,0 L10,5 L0,10", "fill: none; stroke: var(--accent); stroke-width: 1.6")}
+    </defs>
+    ${back.join("")}
+    ${lifelines.join("")}
+    ${front.join("")}
+    ${boxes(0)}
+    ${boxes(bottomY)}
+  </svg>`;
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+const flowsEl = document.getElementById("flows");
+const tocEl = document.getElementById("toc");
+let currentGroup = null, tocGroup = null;
+for (const flow of FLOWS) {
+  if (flow.group !== currentGroup) {
+    currentGroup = flow.group;
+    const h2 = document.createElement("h2");
+    h2.id = flow.group.toLowerCase();
+    h2.textContent = flow.group;
+    flowsEl.appendChild(h2);
+    tocGroup = document.createElement("div");
+    tocGroup.innerHTML = `<div class="group">${esc(flow.group)}</div>`;
+    tocEl.appendChild(tocGroup);
+  }
+  const card = document.createElement("section");
+  card.className = "card";
+  card.id = flow.id;
+  card.innerHTML = `<h3>${esc(flow.title)}</h3><p class="summary">${esc(flow.summary)}</p>` +
+    `<div class="diagram">${render(flow)}</div>` +
+    (flow.notes ? `<ul class="notes">${flow.notes.map(n => `<li>${n}</li>`).join("")}</ul>` : "");
+  flowsEl.appendChild(card);
+  tocGroup.insertAdjacentHTML("beforeend", `<a href="#${flow.id}">${esc(flow.title)}</a>`);
+}
+const refGroup = document.createElement("div");
+refGroup.innerHTML = `<div class="group">Reference</div><a href="#reference">Events and protocols</a>`;
+tocEl.appendChild(refGroup);
+
+const sample = (cls, marker, color, dash) => `<svg class="arrow-sample" viewBox="0 0 40 10"><line x1="1" y1="5" x2="36" y2="5" style="stroke: var(${color}); stroke-width: 1.3; ${dash ? `stroke-dasharray: ${dash}` : ""}"/>${marker === "fill"
+  ? `<path d="M31,1 L39,5 L31,9 z" style="fill: var(${color})"/>` : `<path d="M31,1 L39,5 L31,9" style="fill: none; stroke: var(${color}); stroke-width: 1.4"/>`}</svg>`;
+document.getElementById("legend").innerHTML = [
+  ["--actor-fill", "--actor-stroke", "You", false],
+  ["--ui-fill", "--ui-stroke", "App (SwiftUI)", false],
+  ["--agent-fill", "--agent-stroke", "Engine (KuriAgent)", false],
+  ["--mod-fill", "--mod-stroke", "Package modules", false],
+  ["--ext-fill", "--ext-stroke", "Outside Kuri", true],
+].map(([f, s, l, d]) => `<span><i class="swatch" style="background: var(${f}); border-color: var(${s}); ${d ? "border-style: dashed" : ""}"></i>${l}</span>`).join("") +
+  `<span>${sample("", "fill", "--ink")}call</span>` +
+  `<span>${sample("", "open", "--muted", "5 4")}return</span>` +
+  `<span>${sample("", "open", "--ink", "1.5 3")}async task or callback</span>` +
+  `<span>${sample("", "open", "--accent")}engine event</span>`;
+</script>
+</body>
+</html>
