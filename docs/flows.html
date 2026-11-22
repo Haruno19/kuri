@@ -73,6 +73,17 @@
   tr:last-child td { border-bottom: none; }
   .meta { font-size: 13px; color: var(--faint); margin-top: 18px; }
   svg text { font-family: ui-sans-serif, -apple-system, "SF Pro Text", system-ui, sans-serif; }
+  details.code { margin: 14px 0 0; border-top: 1px solid var(--border); padding-top: 10px; }
+  details.code summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  details.code summary:hover { color: var(--accent); }
+  details.code table { margin-top: 8px; font-size: 13px; }
+  details.code td { padding: 6px 12px 6px 0; }
+  details.code td.no { color: var(--accent); font-weight: 600; text-align: right; width: 1%; }
+  details.code td.who { color: var(--muted); white-space: nowrap; width: 1%; }
+  details.code td.at { white-space: normal; }
+  details.code a.path { font: 12px ui-monospace, "SF Mono", Menlo, monospace; color: var(--accent); }
+  details.code code.line { display: block; margin-top: 2px; white-space: pre-wrap; word-break: break-word; }
+  details.code .outside { color: var(--faint); }
 </style>
 </head>
 <body>
@@ -85,6 +96,7 @@
   <div class="card">
     <h3>Reading the diagrams</h3>
     <p class="summary">Columns are participants, top to bottom is time. The second line of each box is the module it lives in.</p>
+    <p class="summary">Arrows are numbered. Under each diagram, <em>Code</em> lists every step with the line that does it: for a call, where it's made; for a return or an event, where it's produced; for a step from outside Kuri, the code that receives it. Package paths start at <code>Packages/KuriKit/Sources</code>, app paths at the repository root; each comes with the code on that line.</p>
     <div class="legend" id="legend"></div>
   </div>
 
@@ -203,31 +215,36 @@ const P = {
 };
 
 // ─── Flows ───────────────────────────────────────────────────────────────────
-// Steps: [from, to, label, type] where type is omitted (call), "r" (return),
-// "e" (engine event, published to subscribers) or "a" (async: a task or
-// callback). Objects: {note, over}, {loop, steps}, {opt, steps},
+// Steps: [from, to, label, type, ref] where type is omitted (call), "r"
+// (return), "e" (engine event, published to subscribers) or "a" (async: a
+// task or callback). Objects: {note, over, ref}, {loop, steps}, {opt, steps},
 // {alt: [[label, steps], …]}. `backticks` render as code.
+//
+// ref is 'path:line: code', single-quoted: the line that does the step and
+// the code expected on it. Every step has one unless both ends are outside
+// Kuri. FlowReferenceTests checks them all; after moving code, run
+// `python3 docs/sync-flow-refs.py` to update the line numbers.
 const FLOWS = [
   { group: "Lifecycle", id: "startup", title: "Startup",
     summary: "The engine starts with the app, not with a window, so Kuri keeps running from the menu bar with every window closed. MCP servers and model discovery connect in the background: the UI is ready before they are.",
     participants: ["kuriapp", "appmodel", "engine", "loader", "store", "registry", "mcp"],
     steps: [
-      ["kuriapp", "appmodel", "`start()`", "a"],
-      ["appmodel", "engine", "`Engine.open(home:)`"],
-      { note: "home: KURI_HOME → $XDG_CONFIG_HOME/kuri → ~/.config/kuri", over: "engine" },
-      ["engine", "loader", "`loadConfig()`, `loadMCP()`"],
-      { note: "writes commented templates on first launch,\ndecodes JSON5", over: "loader" },
-      ["loader", "engine", "`Config`, `MCPConfig`", "r"],
-      ["engine", "store", "`Store(url: kuri.sqlite)`"],
-      { note: "WAL, foreign keys,\nmigrations by user_version", over: "store" },
-      ["engine", "store", "`recoverInterruptedTurns()`"],
-      ["engine", "registry", "`onChange { … }`, `setPolicies(…)`"],
-      ["engine", "mcp", "`apply(mcpConfig)`", "a"],
-      ["engine", "engine", "discover models, start `ConfigWatcher`", "a"],
-      ["engine", "appmodel", "engine", "r"],
-      ["appmodel", "engine", "conversations, models, tools,\nmemories, MCP servers"],
-      ["appmodel", "engine", "`for await event in events()`", "a"],
-      ["appmodel", "engine", "`resumePendingTurns()` — see Resuming after a relaunch"],
+      ["kuriapp", "appmodel", "`start()`", "a", 'App/KuriApp.swift:12: Task { await model.start() }'],
+      ["appmodel", "engine", "`Engine.open(home:)`", 'App/AppModel.swift:77: let engine = try await Engine.open()'],
+      { note: "home: KURI_HOME → $XDG_CONFIG_HOME/kuri → ~/.config/kuri", over: "engine", ref: 'KuriConfig/KuriHome.swift:13: public static func resolve(environment: [String: String] = ProcessInfo.processInfo.environment) -> KuriHome {' },
+      ["engine", "loader", "`loadConfig()`, `loadMCP()`", 'KuriAgent/Engine.swift:47: config: try loader.loadConfig(),'],
+      { note: "writes commented templates on first launch,\ndecodes JSON5", over: "loader", ref: 'KuriConfig/ConfigLoader.swift:31: try Data(template.utf8).write(to: url, options: .atomic)' },
+      ["loader", "engine", "`Config`, `MCPConfig`", "r", 'KuriConfig/ConfigLoader.swift:35: return try Self.decode(type, from: data)'],
+      ["engine", "store", "`Store(url: kuri.sqlite)`", 'KuriAgent/Engine.swift:46: store: try Store(url: home.database),'],
+      { note: "WAL, foreign keys,\nmigrations by user_version", over: "store", ref: 'KuriStore/SQLite.swift:19: try execute("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;")' },
+      ["engine", "store", "`recoverInterruptedTurns()`", 'KuriAgent/Engine.swift:49: try await engine.store.recoverInterruptedTurns()'],
+      ["engine", "registry", "`onChange { … }`, `setPolicies(…)`", 'KuriAgent/Engine.swift:76: await registry.onChange { [broadcaster] in broadcaster.emit(.toolsChanged) }'],
+      ["engine", "mcp", "`apply(mcpConfig)`", "a", 'KuriAgent/Engine.swift:78: await mcp.apply(mcpConfig)'],
+      ["engine", "engine", "discover models, start `ConfigWatcher`", "a", 'KuriAgent/Engine.swift:79: refreshDiscoveredModels()'],
+      ["engine", "appmodel", "engine", "r", 'KuriAgent/Engine.swift:51: return engine'],
+      ["appmodel", "engine", "conversations, models, tools,\nmemories, MCP servers", 'App/AppModel.swift:79: conversations = try await engine.store.conversations()'],
+      ["appmodel", "engine", "`for await event in events()`", "a", 'App/AppModel.swift:90: for await event in events { handle(event) }'],
+      ["appmodel", "engine", "`resumePendingTurns()` — see Resuming after a relaunch", 'App/AppModel.swift:92: await engine.resumePendingTurns()'],
     ],
     notes: ["Turns left <code>running</code> by a crash or a force quit are marked failed (“Interrupted”); turns waiting for an answer are kept and resumed.",
             "The app subscribes before asking to resume, so re-asked questions can't be missed."] },
@@ -236,14 +253,14 @@ const FLOWS = [
     summary: "On quit the engine stops what it started. The main thread waits up to two seconds; the engine is its own actor, so it can finish meanwhile.",
     participants: ["macos", "kuriapp", "engine", "mcp", "registry", "conn", "server"],
     steps: [
-      ["macos", "kuriapp", "`willTerminateNotification`"],
-      ["kuriapp", "engine", "`shutdown()`", "a"],
-      ["engine", "engine", "cancel watcher, discovery, running turns"],
-      ["engine", "mcp", "`shutdown()`"],
+      ["macos", "kuriapp", "`willTerminateNotification`", 'App/KuriApp.swift:15: forName: NSApplication.willTerminateNotification, object: nil, queue: .main'],
+      ["kuriapp", "engine", "`shutdown()`", "a", 'App/KuriApp.swift:23: await engine.shutdown()'],
+      ["engine", "engine", "cancel watcher, discovery, running turns", 'KuriAgent/Engine.swift:86: watcher?.cancel()'],
+      ["engine", "mcp", "`shutdown()`", 'KuriAgent/Engine.swift:90: await mcp.shutdown()'],
       { loop: "each server", steps: [
-        ["mcp", "registry", "`removeAll(from: .mcp(server))`"],
-        ["mcp", "conn", "`stop()`"],
-        ["conn", "server", "disconnect, close stdin,\nSIGTERM"],
+        ["mcp", "registry", "`removeAll(from: .mcp(server))`", 'KuriMCP/MCPManager.swift:183: await registry.removeAll(from: .mcp(server: name))'],
+        ["mcp", "conn", "`stop()`", 'KuriMCP/MCPManager.swift:184: await server.connection?.stop()'],
+        ["conn", "server", "disconnect, close stdin,\nSIGTERM", 'KuriMCP/ProcessTransport.swift:90: process.terminate()'],
       ]},
     ],
     notes: ["A stdio server that misses the signal still sees end-of-file on stdin once Kuri has exited."] },
@@ -252,31 +269,31 @@ const FLOWS = [
     summary: "The user sends a message; the engine stores it, opens a turn and returns. A TurnRunner task then asks the model and streams its answer back as events. Kuri is stateless towards the provider: each request carries the whole history, rebuilt from the database.",
     participants: ["user", "chat", "appmodel", "engine", "store", "runner", "provider", "llm"],
     steps: [
-      ["user", "chat", "types, ⌘↩"],
-      ["chat", "appmodel", "`send(text)`"],
-      ["appmodel", "engine", "`send(text, to: id)`"],
-      ["engine", "store", "`append(user message)`"],
-      ["engine", "appmodel", "`.itemAdded`", "e"],
-      ["engine", "store", "provisional title,\n`beginTurn`"],
-      ["engine", "appmodel", "`.conversationUpdated`\n`.turnStarted`", "e"],
-      ["engine", "runner", "`Task { run() }`", "a"],
-      ["runner", "store", "`items(of:)`"],
-      { note: "history since the last compaction,\ninstructions with memories, tool specs", over: "runner" },
-      ["runner", "provider", "`stream(request)`"],
-      ["provider", "llm", "`POST /responses`\n`stream: true, store: false`"],
+      ["user", "chat", "types, ⌘↩", 'App/Views/ChatView.swift:91: .keyboardShortcut(.return, modifiers: .command)'],
+      ["chat", "appmodel", "`send(text)`", 'App/Views/ChatView.swift:123: Task { await model.send(text) }'],
+      ["appmodel", "engine", "`send(text, to: id)`", 'App/AppModel.swift:119: try await engine.send(text, to: id)'],
+      ["engine", "store", "`append(user message)`", 'KuriAgent/Engine.swift:330: try await store.append(message)'],
+      ["engine", "appmodel", "`.itemAdded`", "e", 'KuriAgent/Engine.swift:331: broadcaster.emit(.itemAdded(message))'],
+      ["engine", "store", "provisional title,\n`beginTurn`", 'KuriAgent/Engine.swift:342: let turn = try await store.beginTurn(conversationID: conversationID, model: model)'],
+      ["engine", "appmodel", "`.conversationUpdated`\n`.turnStarted`", "e", 'KuriAgent/Engine.swift:343: broadcaster.emit(.turnStarted(turn))'],
+      ["engine", "runner", "`Task { run() }`", "a", 'KuriAgent/Engine.swift:435: let outcome = await runner.run(resuming: resuming)'],
+      ["runner", "store", "`items(of:)`", 'KuriAgent/TurnRunner.swift:80: var items = try await store.items(of: conversationID)'],
+      { note: "history since the last compaction,\ninstructions with memories, tool specs", over: "runner", ref: 'KuriAgent/TurnRunner.swift:144: items: Self.history(from: items),' },
+      ["runner", "provider", "`stream(request)`", 'KuriAgent/TurnRunner.swift:105: for try await event in provider.stream(request) {'],
+      ["provider", "llm", "`POST /responses`\n`stream: true, store: false`", 'KuriInference/OpenResponsesProvider.swift:25: session: session, url: baseURL.appending(path: "responses"), headers: headers,'],
       { loop: "server-sent events", steps: [
-        ["llm", "provider", "`response.output_text.delta`", "r"],
-        ["provider", "runner", "`.textDelta`", "r"],
-        ["runner", "appmodel", "`.inference(.textDelta)`", "e"],
+        ["llm", "provider", "`response.output_text.delta`", "r", 'KuriInference/OpenResponsesProvider.swift:107: case "response.output_text.delta":'],
+        ["provider", "runner", "`.textDelta`", "r", 'KuriInference/OpenResponsesProvider.swift:108: return event.delta.map { [.textDelta($0)] } ?? []'],
+        ["runner", "appmodel", "`.inference(.textDelta)`", "e", 'KuriAgent/TurnRunner.swift:106: emit(.inference(conversationID: conversationID, event))'],
       ]},
-      ["llm", "provider", "`response.output_item.done`", "r"],
-      ["provider", "runner", "`.itemCompleted(.message)`", "r"],
-      ["runner", "store", "`append(…)`"],
-      ["runner", "appmodel", "`.itemAdded`", "e"],
-      ["llm", "provider", "`response.completed`\nwith usage", "r"],
-      ["provider", "runner", "`.usage`,\n`.finished(.endTurn)`", "r"],
-      ["runner", "store", "`finishTurn(.completed)`"],
-      ["runner", "appmodel", "`.turnFinished(.completed)`", "e"],
+      ["llm", "provider", "`response.output_item.done`", "r", 'KuriInference/OpenResponsesProvider.swift:123: case "response.output_item.done":'],
+      ["provider", "runner", "`.itemCompleted(.message)`", "r", 'KuriInference/OpenResponsesProvider.swift:126: return [.itemCompleted(payload)]'],
+      ["runner", "store", "`append(…)`", 'KuriAgent/TurnRunner.swift:234: try await store.append(item)'],
+      ["runner", "appmodel", "`.itemAdded`", "e", 'KuriAgent/TurnRunner.swift:235: emit(.itemAdded(item))'],
+      ["llm", "provider", "`response.completed`\nwith usage", "r", 'KuriInference/OpenResponsesProvider.swift:128: case "response.completed":'],
+      ["provider", "runner", "`.usage`,\n`.finished(.endTurn)`", "r", 'KuriInference/OpenResponsesProvider.swift:129: return usage(event.response) + [.finished(sawToolCall ? .toolUse : .endTurn)]'],
+      ["runner", "store", "`finishTurn(.completed)`", 'KuriAgent/TurnRunner.swift:54: try? await store.finishTurn(turn.id, status: .completed, stopReason: stop, usage: usage)'],
+      ["runner", "appmodel", "`.turnFinished(.completed)`", "e", 'KuriAgent/TurnRunner.swift:63: emit(.turnFinished(conversationID: conversationID, turnID: turn.id, outcome))'],
     ],
     notes: ["Before each request the runner estimates its size and compacts first if it would overflow the model's context; see Automatic compaction.",
             "Reasoning streams the same way (<code>.reasoningDelta</code>, then an item of kind <code>reasoning</code>).",
@@ -287,22 +304,22 @@ const FLOWS = [
     summary: "When the model calls tools, the runner checks each call's policy, runs it, stores the result and asks the model again with the call and its result in the history. Shown here with a built-in tool that's allowed.",
     participants: ["appmodel", "runner", "registry", "tool", "store", "provider", "llm"],
     steps: [
-      ["llm", "provider", "`response.output_item.done`\n(function_call)", "r"],
-      ["provider", "runner", "`.itemCompleted(.toolCall)`", "r"],
-      ["runner", "store", "`append(…)`"],
-      ["runner", "appmodel", "`.itemAdded`", "e"],
-      ["provider", "runner", "`.finished(.toolUse)`", "r"],
+      ["llm", "provider", "`response.output_item.done`\n(function_call)", "r", 'KuriInference/OpenResponsesProvider.swift:123: case "response.output_item.done":'],
+      ["provider", "runner", "`.itemCompleted(.toolCall)`", "r", 'KuriInference/OpenResponsesProvider.swift:125: if case .toolCall = payload { sawToolCall = true }'],
+      ["runner", "store", "`append(…)`", 'KuriAgent/TurnRunner.swift:234: try await store.append(item)'],
+      ["runner", "appmodel", "`.itemAdded`", "e", 'KuriAgent/TurnRunner.swift:235: emit(.itemAdded(item))'],
+      ["provider", "runner", "`.finished(.toolUse)`", "r", 'KuriInference/OpenResponsesProvider.swift:129: return usage(event.response) + [.finished(sawToolCall ? .toolUse : .endTurn)]'],
       { loop: "each call", steps: [
-        ["runner", "registry", "`tool(named:)`, `policy(for:)`\n→ allow"],
-        ["runner", "tool", "`run(arguments, context)`"],
-        ["tool", "store", "e.g. `applyMemoryChanges`,\n`search`"],
-        ["tool", "runner", "`ToolOutput`", "r"],
-        ["runner", "store", "`append(.toolResult)`"],
-        ["runner", "appmodel", "`.itemAdded`, `.toolFinished`", "e"],
+        ["runner", "registry", "`tool(named:)`, `policy(for:)`\n→ allow", 'KuriAgent/TurnRunner.swift:211: switch await registry.policy(for: tool) {'],
+        ["runner", "tool", "`run(arguments, context)`", 'KuriAgent/TurnRunner.swift:223: let output = try await tool.run(arguments: Data(call.arguments.utf8), context: context)'],
+        ["tool", "store", "e.g. `applyMemoryChanges`,\n`search`", 'KuriTools/BuiltIn/MemoryTool.swift:90: let outcomes = try await context.store.applyMemoryChanges('],
+        ["tool", "runner", "`ToolOutput`", "r", 'KuriTools/BuiltIn/MemoryTool.swift:93: return ToolOutput(Self.describe(outcomes))'],
+        ["runner", "store", "`append(.toolResult)`", 'KuriAgent/TurnRunner.swift:186: try await append(.toolResult(ToolResult(callID: entry.call.id, output: output.text, isError: output.isError)))'],
+        ["runner", "appmodel", "`.itemAdded`, `.toolFinished`", "e", 'KuriAgent/TurnRunner.swift:187: emit(.toolFinished(conversationID: conversationID, call: entry.call, output: output))'],
       ]},
-      ["runner", "store", "`items(of:)`"],
-      ["runner", "provider", "`stream(request)`"],
-      ["provider", "llm", "`POST /responses` with\n`function_call`, `function_call_output`"],
+      ["runner", "store", "`items(of:)`", 'KuriAgent/TurnRunner.swift:80: var items = try await store.items(of: conversationID)'],
+      ["runner", "provider", "`stream(request)`", 'KuriAgent/TurnRunner.swift:105: for try await event in provider.stream(request) {'],
+      ["provider", "llm", "`POST /responses` with\n`function_call`, `function_call_output`", 'KuriInference/OpenResponsesProvider.swift:81: return ["type": "function_call", "call_id": .string(call.id), "name": .string(call.name),'],
     ],
     notes: ["Consecutive calls to read-only tools that need no approval run concurrently; their results are still stored in call order. Anything else runs alone.",
             "Repeats until a round has no tool calls, at most 40 rounds per turn.",
@@ -313,21 +330,21 @@ const FLOWS = [
     summary: "A tool whose policy is ask waits for the user. The broker parks the call on a continuation and publishes a request; the answer resumes it.",
     participants: ["user", "panel", "appmodel", "engine", "broker", "runner", "store", "registry", "tool"],
     steps: [
-      ["runner", "registry", "`policy(for:)` → ask"],
-      ["runner", "store", "`setTurnStatus(.awaitingInput)`"],
-      ["runner", "broker", "`approve(request)`"],
-      ["broker", "appmodel", "`.inputRequested(.approval)`", "e"],
-      ["appmodel", "panel", "shows tool and arguments"],
-      ["user", "panel", "Allow / Deny"],
-      ["panel", "appmodel", "`respond(.approved(…))`"],
-      ["appmodel", "engine", "`respond(to: id, with:)`"],
-      ["engine", "broker", "`respond(…)`"],
-      ["broker", "appmodel", "`.inputResolved`", "e"],
-      ["broker", "runner", "true / false", "r"],
-      ["runner", "store", "`setTurnStatus(.running)`"],
+      ["runner", "registry", "`policy(for:)` → ask", 'KuriAgent/TurnRunner.swift:211: switch await registry.policy(for: tool) {'],
+      ["runner", "store", "`setTurnStatus(.awaitingInput)`", 'KuriAgent/TurnRunner.swift:314: try await store.setTurnStatus(turnID, .awaitingInput)'],
+      ["runner", "broker", "`approve(request)`", 'KuriAgent/TurnRunner.swift:310: try await waiting { try await base.approve(request) }'],
+      ["broker", "appmodel", "`.inputRequested(.approval)`", "e", 'KuriAgent/InteractionBroker.swift:43: emit(.inputRequested(request))'],
+      ["appmodel", "panel", "shows tool and arguments", 'App/Views/ChatView.swift:401: Text("Allow **\\(approval.tool)** to run?")'],
+      ["user", "panel", "Allow / Deny", 'App/Views/ChatView.swift:404: Button("Deny") { Task { await model.respond(to: request, with: .approved(false)) } }'],
+      ["panel", "appmodel", "`respond(.approved(…))`", 'App/Views/ChatView.swift:405: Button("Allow") { Task { await model.respond(to: request, with: .approved(true)) } }'],
+      ["appmodel", "engine", "`respond(to: id, with:)`", 'App/AppModel.swift:173: await engine?.respond(to: request.id, with: response)'],
+      ["engine", "broker", "`respond(…)`", 'KuriAgent/Engine.swift:380: await broker.respond(to: requestID, with: response)'],
+      ["broker", "appmodel", "`.inputResolved`", "e", 'KuriAgent/InteractionBroker.swift:33: emit(.inputResolved(requestID: id))'],
+      ["broker", "runner", "true / false", "r", 'KuriAgent/InteractionBroker.swift:34: continuation.resume(returning: response)'],
+      ["runner", "store", "`setTurnStatus(.running)`", 'KuriAgent/TurnRunner.swift:316: try await store.setTurnStatus(turnID, .running)'],
       { alt: [
-        ["allowed", [["runner", "tool", "`run(…)`"]]],
-        ["denied", [["runner", "runner", "error result: “The user declined this call.”"]]],
+        ["allowed", [["runner", "tool", "`run(…)`", 'KuriAgent/TurnRunner.swift:223: let output = try await tool.run(arguments: Data(call.arguments.utf8), context: context)']]],
+        ["denied", [["runner", "runner", "error result: “The user declined this call.”", 'KuriAgent/TurnRunner.swift:217: if !approved { return .error("The user declined this call.") }']]],
       ]},
     ],
     notes: ["A tool whose policy is deny is never offered to the model: <code>specs()</code> leaves it out.",
@@ -337,20 +354,20 @@ const FLOWS = [
     summary: "The model asks the user and waits. The answers are the tool's return value, not a new user message, so the model carries on in the same turn.",
     participants: ["user", "panel", "appmodel", "broker", "runner", "clarify", "store"],
     steps: [
-      ["runner", "clarify", "`run({ questions })`"],
-      ["clarify", "runner", "`context.interaction.clarify(…)`"],
-      ["runner", "store", "`setTurnStatus(.awaitingInput)`"],
-      ["runner", "broker", "`clarify(request)`"],
-      ["broker", "appmodel", "`.inputRequested(.clarify)`", "e"],
-      ["appmodel", "panel", "questions, suggested answers"],
-      ["user", "panel", "answers"],
-      ["panel", "appmodel", "`respond(.answers(…))`"],
-      ["appmodel", "broker", "via `Engine.respond`"],
-      ["broker", "appmodel", "`.inputResolved`", "e"],
-      ["broker", "runner", "answers by question id", "r"],
-      ["runner", "store", "`setTurnStatus(.running)`"],
-      ["runner", "clarify", "answers", "r"],
-      ["clarify", "runner", "“question → answer” lines", "r"],
+      ["runner", "clarify", "`run({ questions })`", 'KuriAgent/TurnRunner.swift:223: let output = try await tool.run(arguments: Data(call.arguments.utf8), context: context)'],
+      ["clarify", "runner", "`context.interaction.clarify(…)`", 'KuriTools/BuiltIn/ClarifyTool.swift:102: let answers = try await context.interaction.clarify('],
+      ["runner", "store", "`setTurnStatus(.awaitingInput)`", 'KuriAgent/TurnRunner.swift:314: try await store.setTurnStatus(turnID, .awaitingInput)'],
+      ["runner", "broker", "`clarify(request)`", 'KuriAgent/TurnRunner.swift:306: try await waiting { try await base.clarify(request) }'],
+      ["broker", "appmodel", "`.inputRequested(.clarify)`", "e", 'KuriAgent/InteractionBroker.swift:43: emit(.inputRequested(request))'],
+      ["appmodel", "panel", "questions, suggested answers", 'App/Views/ChatView.swift:380: Text(question.question).font(.headline)'],
+      ["user", "panel", "answers", 'App/Views/ChatView.swift:390: TextField("Answer", text: Binding('],
+      ["panel", "appmodel", "`respond(.answers(…))`", 'App/Views/ChatView.swift:396: Task { await model.respond(to: request, with: .answers(answers)) }'],
+      ["appmodel", "broker", "via `Engine.respond`", 'KuriAgent/Engine.swift:380: await broker.respond(to: requestID, with: response)'],
+      ["broker", "appmodel", "`.inputResolved`", "e", 'KuriAgent/InteractionBroker.swift:33: emit(.inputResolved(requestID: id))'],
+      ["broker", "runner", "answers by question id", "r", 'KuriAgent/InteractionBroker.swift:21: guard case .answers(let answers) = try await ask(.clarify(request)) else { return [:] }'],
+      ["runner", "store", "`setTurnStatus(.running)`", 'KuriAgent/TurnRunner.swift:316: try await store.setTurnStatus(turnID, .running)'],
+      ["runner", "clarify", "answers", "r", 'KuriAgent/TurnRunner.swift:317: return answer'],
+      ["clarify", "runner", "“question → answer” lines", "r", 'KuriTools/BuiltIn/ClarifyTool.swift:108: return ToolOutput(lines.joined(separator: "\\n\\n"))'],
     ],
     notes: ["The sidebar badges a conversation while its question is open.",
             "The tool asks through the runner's interaction, which marks the turn as awaiting input, so the question survives a relaunch."] },
@@ -359,16 +376,16 @@ const FLOWS = [
     summary: "Stop cancels the turn's task. Whatever it's waiting on gives way: the HTTP stream, a pending question, or an MCP call, which is cancelled on the server too.",
     participants: ["user", "appmodel", "engine", "runner", "broker", "store", "provider", "llm", "server"],
     steps: [
-      ["user", "appmodel", "Stop"],
-      ["appmodel", "engine", "`cancel(id)`"],
-      ["engine", "runner", "`task.cancel()`"],
+      ["user", "appmodel", "Stop", 'App/Views/ChatView.swift:86: Button("Stop", systemImage: "stop.fill") { Task { await model.cancel() } }'],
+      ["appmodel", "engine", "`cancel(id)`", 'App/AppModel.swift:142: await engine.cancel(id)'],
+      ["engine", "runner", "`task.cancel()`", 'KuriAgent/Engine.swift:376: running[conversationID]?.cancel()'],
       { alt: [
-        ["streaming", [["provider", "llm", "request cancelled"]]],
-        ["waiting for the user", [["broker", "appmodel", "`.inputResolved`", "e"]]],
-        ["MCP call running", [["runner", "server", "`notifications/cancelled` via MCPServerConnection"]]],
+        ["streaming", [["provider", "llm", "request cancelled", 'KuriInference/SSE.swift:106: continuation.onTermination = { _ in task.cancel() }']]],
+        ["waiting for the user", [["broker", "appmodel", "`.inputResolved`", "e", 'KuriAgent/InteractionBroker.swift:53: emit(.inputResolved(requestID: id))']]],
+        ["MCP call running", [["runner", "server", "`notifications/cancelled` via MCPServerConnection", 'KuriMCP/MCPServerConnection.swift:85: Task { try? await client.cancelRequest(context.requestID, reason: "Cancelled by the user") }']]],
       ]},
-      ["runner", "store", "`finishTurn(.cancelled)`"],
-      ["runner", "appmodel", "`.turnFinished(.cancelled)`", "e"],
+      ["runner", "store", "`finishTurn(.cancelled)`", 'KuriAgent/TurnRunner.swift:57: try? await store.finishTurn(turn.id, status: .cancelled, stopReason: .cancelled, usage: usage)'],
+      ["runner", "appmodel", "`.turnFinished(.cancelled)`", "e", 'KuriAgent/TurnRunner.swift:63: emit(.turnFinished(conversationID: conversationID, turnID: turn.id, outcome))'],
     ],
     notes: ["A call left without a result gets a placeholder result (“Interrupted before completing.”) in the next request; providers reject dangling calls."] },
 
@@ -376,18 +393,18 @@ const FLOWS = [
     summary: "While a conversation is busy, sending queues the message. The running turn takes the queue at its next step, after the current tool round or when its answer would end the turn, so the message joins the same turn.",
     participants: ["user", "chat", "appmodel", "engine", "runner", "store"],
     steps: [
-      ["user", "chat", "types while the turn runs, ⌘↩"],
-      ["chat", "appmodel", "`send(text)`"],
-      ["appmodel", "engine", "`send(text, to: id)`"],
-      ["engine", "engine", "busy → append to the queue"],
-      ["engine", "appmodel", "`.queueChanged([text])`", "e"],
-      { note: "next step boundary: after the tool round,\nor when the answer would end the turn", over: "runner" },
-      ["runner", "engine", "`takeQueued()`"],
-      ["engine", "appmodel", "`.queueChanged([])`", "e"],
-      ["engine", "runner", "texts", "r"],
-      ["runner", "store", "`append(user message)`"],
-      ["runner", "appmodel", "`.itemAdded`", "e"],
-      ["runner", "runner", "the next request includes it"],
+      ["user", "chat", "types while the turn runs, ⌘↩", 'App/Views/ChatView.swift:91: .keyboardShortcut(.return, modifiers: .command)'],
+      ["chat", "appmodel", "`send(text)`", 'App/Views/ChatView.swift:123: Task { await model.send(text) }'],
+      ["appmodel", "engine", "`send(text, to: id)`", 'App/AppModel.swift:119: try await engine.send(text, to: id)'],
+      ["engine", "engine", "busy → append to the queue", 'KuriAgent/Engine.swift:301: queues[conversationID, default: []].append(QueuedMessage(text: text))'],
+      ["engine", "appmodel", "`.queueChanged([text])`", "e", 'KuriAgent/Engine.swift:302: broadcaster.emit(.queueChanged(conversationID: conversationID, queues[conversationID] ?? []))'],
+      { note: "next step boundary: after the tool round,\nor when the answer would end the turn", over: "runner", ref: 'KuriAgent/TurnRunner.swift:122: guard try await deliverQueued() else { return stop }' },
+      ["runner", "engine", "`takeQueued()`", 'KuriAgent/TurnRunner.swift:133: let messages = await takeQueued()'],
+      ["engine", "appmodel", "`.queueChanged([])`", "e", 'KuriAgent/Engine.swift:322: broadcaster.emit(.queueChanged(conversationID: conversationID, []))'],
+      ["engine", "runner", "texts", "r", 'KuriAgent/Engine.swift:323: return queue.map(\\.text)'],
+      ["runner", "store", "`append(user message)`", 'KuriAgent/TurnRunner.swift:135: try await append(.message(Message(role: .user, text: text)))'],
+      ["runner", "appmodel", "`.itemAdded`", "e", 'KuriAgent/TurnRunner.swift:235: emit(.itemAdded(item))'],
+      ["runner", "runner", "the next request includes it", 'KuriAgent/TurnRunner.swift:81: var request = makeRequest(items: items, tools: useTools ? await registry.specs() : [])'],
     ],
     notes: ["A queued message can be removed before delivery (<code>unqueue</code>).",
             "A message that arrives after the turn has ended, or was queued before Stop, starts the next turn as soon as the conversation is free; that's usually the redirection Stop was for.",
@@ -397,14 +414,14 @@ const FLOWS = [
     summary: "After a conversation's first completed turn, a small request names it, in the background, if titles are on and the user hasn't renamed it.",
     participants: ["appmodel", "engine", "runner", "store", "provider", "llm"],
     steps: [
-      ["runner", "engine", "`.completed` — the first completed turn", "r"],
-      ["engine", "store", "first exchange; title still provisional?"],
-      ["engine", "provider", "`stream(title request)` — utility model, else the conversation's", "a"],
-      ["provider", "llm", "`POST /responses`"],
-      ["llm", "provider", "“Chestnuts in Japanese”", "r"],
-      ["provider", "engine", "text → cleaned (labels, quotes, final period)", "r"],
-      ["engine", "store", "`updateConversation` — unless renamed meanwhile"],
-      ["engine", "appmodel", "`.conversationUpdated`", "e"],
+      ["runner", "engine", "`.completed` — the first completed turn", "r", 'KuriAgent/Engine.swift:436: if case .completed = outcome { await self?.generateTitleIfNeeded(conversationID) }'],
+      ["engine", "store", "first exchange; title still provisional?", 'KuriAgent/Engine.swift:475: conversation.title == Self.provisionalTitle(for: question)'],
+      ["engine", "provider", "`stream(title request)` — utility model, else the conversation's", "a", 'KuriAgent/TitleGenerator.swift:31: for try await event in provider.stream(request) {'],
+      ["provider", "llm", "`POST /responses`", 'KuriInference/OpenResponsesProvider.swift:25: session: session, url: baseURL.appending(path: "responses"), headers: headers,'],
+      ["llm", "provider", "“Chestnuts in Japanese”", "r", 'KuriInference/OpenResponsesProvider.swift:123: case "response.output_item.done":'],
+      ["provider", "engine", "text → cleaned (labels, quotes, final period)", "r", 'KuriAgent/TitleGenerator.swift:38: return Self.clean(text.isEmpty ? streamed : text)'],
+      ["engine", "store", "`updateConversation` — unless renamed meanwhile", 'KuriAgent/Engine.swift:493: try? await update(conversation)'],
+      ["engine", "appmodel", "`.conversationUpdated`", "e", 'KuriAgent/Engine.swift:278: broadcaster.emit(.conversationUpdated(conversation))'],
     ],
     notes: ["<code>generateTitles: false</code> in config.json (or the toggle in Settings › General) turns it off.",
             "A failure keeps the provisional title: the first line of the first message.",
@@ -414,21 +431,21 @@ const FLOWS = [
     summary: "A turn that was waiting for the user when Kuri quit picks up where it was. Nothing extra was stored: its tool call has no result yet, so running that call again through the normal path asks the question, or for approval, again.",
     participants: ["user", "appmodel", "engine", "store", "runner", "broker"],
     steps: [
-      { note: "left by the previous launch: a turn with status awaiting_input,\nand a tool call of that turn without a result", over: ["store", "runner"] },
-      ["appmodel", "engine", "`events()`", "a"],
-      ["appmodel", "engine", "`resumePendingTurns()`"],
-      ["engine", "store", "`turns(withStatus: .awaitingInput)`"],
-      ["store", "engine", "turns", "r"],
+      { note: "left by the previous launch: a turn with status awaiting_input,\nand a tool call of that turn without a result", over: ["store", "runner"], ref: 'KuriAgent/TurnRunner.swift:275: static func unansweredCalls(in items: [Item], turnID: UUID) -> [ToolCall] {' },
+      ["appmodel", "engine", "`events()`", "a", 'App/AppModel.swift:88: let events = engine.events()'],
+      ["appmodel", "engine", "`resumePendingTurns()`", 'App/AppModel.swift:92: await engine.resumePendingTurns()'],
+      ["engine", "store", "`turns(withStatus: .awaitingInput)`", 'KuriAgent/Engine.swift:360: guard let pending = try? await store.turns(withStatus: .awaitingInput) else { return }'],
+      ["store", "engine", "turns", "r", 'KuriStore/Store.swift:217: public func turns(withStatus status: Turn.Status) throws -> [Turn] {'],
       { loop: "each turn", steps: [
-        ["engine", "appmodel", "`.turnStarted`", "e"],
-        ["engine", "runner", "`Task { run(resuming: true) }`", "a"],
+        ["engine", "appmodel", "`.turnStarted`", "e", 'KuriAgent/Engine.swift:365: broadcaster.emit(.turnStarted(turn))'],
+        ["engine", "runner", "`Task { run(resuming: true) }`", "a", 'KuriAgent/Engine.swift:366: try await startRunner(for: turn, in: conversation, provider: provider, resuming: true)'],
       ]},
-      ["runner", "store", "`items(of:)` → the turn's unanswered calls"],
-      ["runner", "broker", "run each again → `approve` / `clarify`"],
-      ["broker", "appmodel", "`.inputRequested`", "e"],
-      ["user", "appmodel", "answers, as usual"],
-      ["broker", "runner", "answer", "r"],
-      ["runner", "runner", "tool runs, result stored, the loop goes on"],
+      ["runner", "store", "`items(of:)` → the turn's unanswered calls", 'KuriAgent/TurnRunner.swift:72: let pending = Self.unansweredCalls(in: try await store.items(of: conversationID), turnID: turn.id)'],
+      ["runner", "broker", "run each again → `approve` / `clarify`", 'KuriAgent/TurnRunner.swift:73: try await runCalls(pending, counts: &callCounts, interaction: interaction)'],
+      ["broker", "appmodel", "`.inputRequested`", "e", 'KuriAgent/InteractionBroker.swift:43: emit(.inputRequested(request))'],
+      ["user", "appmodel", "answers, as usual", 'App/Views/ChatView.swift:396: Task { await model.respond(to: request, with: .answers(answers)) }'],
+      ["broker", "runner", "answer", "r", 'KuriAgent/InteractionBroker.swift:34: continuation.resume(returning: response)'],
+      ["runner", "runner", "tool runs, result stored, the loop goes on", 'KuriAgent/TurnRunner.swift:186: try await append(.toolResult(ToolResult(callID: entry.call.id, output: output.text, isError: output.isError)))'],
     ],
     notes: ["Policies are checked again: if a tool is now allowed, it simply runs.",
             "If the turn's provider is no longer in config.json, the turn fails with “Couldn't resume”."] },
@@ -437,14 +454,14 @@ const FLOWS = [
     summary: "After a turn that was interrupted, failed or stopped, Continue starts a turn without a new message. The model sees where things stand and goes on.",
     participants: ["user", "appmodel", "engine", "store", "runner", "provider"],
     steps: [
-      ["user", "appmodel", "Continue"],
-      ["appmodel", "engine", "`continueConversation(id)`"],
-      ["engine", "store", "`beginTurn` — no new message"],
-      ["engine", "appmodel", "`.turnStarted`", "e"],
-      ["engine", "runner", "`Task { run() }`", "a"],
-      ["runner", "store", "`items(of:)`"],
-      { note: "a call left without a result gets\n“Interrupted before completing.”", over: "runner" },
-      ["runner", "provider", "`stream(request)` — then as in A turn"],
+      ["user", "appmodel", "Continue", 'App/Views/ChatView.swift:277: Button("Continue") { Task { await model.continueSelected() } }'],
+      ["appmodel", "engine", "`continueConversation(id)`", 'App/AppModel.swift:149: try await engine.continueConversation(id)'],
+      ["engine", "store", "`beginTurn` — no new message", 'KuriAgent/Engine.swift:351: let turn = try await store.beginTurn(conversationID: conversationID, model: model)'],
+      ["engine", "appmodel", "`.turnStarted`", "e", 'KuriAgent/Engine.swift:352: broadcaster.emit(.turnStarted(turn))'],
+      ["engine", "runner", "`Task { run() }`", "a", 'KuriAgent/Engine.swift:353: try await startRunner(for: turn, in: conversation, provider: provider, resuming: false)'],
+      ["runner", "store", "`items(of:)`", 'KuriAgent/TurnRunner.swift:80: var items = try await store.items(of: conversationID)'],
+      { note: "a call left without a result gets\n“Interrupted before completing.”", over: "runner", ref: 'KuriAgent/TurnRunner.swift:268: result.append(.toolResult(ToolResult(callID: call.id, output: "Interrupted before completing.", isError: true)))' },
+      ["runner", "provider", "`stream(request)` — then as in A turn", 'KuriAgent/TurnRunner.swift:105: for try await event in provider.stream(request) {'],
     ],
     notes: ["Turns that were mid-stream at quit aren't resumed automatically: a tool may have half-run. Continue lets the model decide what to redo."] },
 
@@ -452,20 +469,20 @@ const FLOWS = [
     summary: "Before each request the runner estimates its size. Past 75% of the model's context window it summarizes the start of the conversation, keeping the latest exchange verbatim, then sends the summary plus what it doesn't cover.",
     participants: ["appmodel", "runner", "compactor", "store", "provider", "llm"],
     steps: [
-      ["runner", "store", "`items(of:)`"],
-      ["runner", "runner", "estimate > 75% of `contextWindow`"],
-      ["runner", "compactor", "`cut(in: items, budget: 50%)`"],
-      ["compactor", "runner", "keep from the latest user message", "r"],
-      ["runner", "appmodel", "`.compacting(true)`", "e"],
-      ["runner", "compactor", "`compact(items, keepingFrom: cut)`"],
-      ["compactor", "provider", "`stream(…)` — transcript as plain text, no tools"],
-      ["provider", "llm", "`POST /responses`"],
-      ["llm", "provider", "summary", "r"],
-      ["provider", "compactor", "`.itemCompleted(.message)`", "r"],
-      ["compactor", "store", "`append(.compaction(summary, throughItemID))`"],
-      ["compactor", "runner", "compaction item", "r"],
-      ["runner", "appmodel", "`.itemAdded`, `.compacting(false)`", "e"],
-      ["runner", "provider", "`stream(request)` — summary + kept items"],
+      ["runner", "store", "`items(of:)`", 'KuriAgent/TurnRunner.swift:80: var items = try await store.items(of: conversationID)'],
+      ["runner", "runner", "estimate > 75% of `contextWindow`", 'KuriAgent/TurnRunner.swift:84: ContextEstimate.tokens(request) > Int(Double(window) * limits.compactionThreshold),'],
+      ["runner", "compactor", "`cut(in: items, budget: 50%)`", 'KuriAgent/TurnRunner.swift:85: let cut = Compactor.cut(in: items, budget: Int(Double(window) * limits.compactionKeepShare)) {'],
+      ["compactor", "runner", "keep from the latest user message", "r", 'KuriAgent/Compactor.swift:68: return latestUser > start ? latestUser : nil'],
+      ["runner", "appmodel", "`.compacting(true)`", "e", 'KuriAgent/TurnRunner.swift:86: emit(.compacting(conversationID: conversationID, true))'],
+      ["runner", "compactor", "`compact(items, keepingFrom: cut)`", 'KuriAgent/TurnRunner.swift:88: let item = try await compactor.compact(items, keepingFrom: cut, conversationID: conversationID,'],
+      ["compactor", "provider", "`stream(…)` — transcript as plain text, no tools", 'KuriAgent/Compactor.swift:40: for try await event in provider.stream(request) {'],
+      ["provider", "llm", "`POST /responses`", 'KuriInference/OpenResponsesProvider.swift:25: session: session, url: baseURL.appending(path: "responses"), headers: headers,'],
+      ["llm", "provider", "summary", "r", 'KuriInference/OpenResponsesProvider.swift:123: case "response.output_item.done":'],
+      ["provider", "compactor", "`.itemCompleted(.message)`", "r", 'KuriInference/OpenResponsesProvider.swift:126: return [.itemCompleted(payload)]'],
+      ["compactor", "store", "`append(.compaction(summary, throughItemID))`", 'KuriAgent/Compactor.swift:53: try await store.append(item)'],
+      ["compactor", "runner", "compaction item", "r", 'KuriAgent/Compactor.swift:54: return item'],
+      ["runner", "appmodel", "`.itemAdded`, `.compacting(false)`", "e", 'KuriAgent/TurnRunner.swift:90: emit(.itemAdded(item))'],
+      ["runner", "provider", "`stream(request)` — summary + kept items", 'KuriAgent/TurnRunner.swift:105: for try await event in provider.stream(request) {'],
     ],
     notes: ["The summary comes from <code>utilityModel</code> when one is set, otherwise from the conversation's model.",
             "If the latest exchange alone is too big, only its tail is kept, never splitting a tool call from its result. If summarizing fails, the turn goes on uncompacted.",
@@ -475,13 +492,13 @@ const FLOWS = [
     summary: "The toolbar's context meter has a Compact action, the only way to compact when the model's context window isn't set in config.json.",
     participants: ["user", "appmodel", "engine", "compactor", "store"],
     steps: [
-      ["user", "appmodel", "Compact (toolbar)"],
-      ["appmodel", "engine", "`compact(id)`"],
-      ["engine", "compactor", "`cut(in: items, budget: .max)`"],
-      ["engine", "appmodel", "`.compacting(true)`", "e"],
-      ["engine", "compactor", "`compact(…)` — as in Automatic compaction"],
-      ["compactor", "store", "`append(.compaction)`"],
-      ["engine", "appmodel", "`.itemAdded`, `.compacting(false)`", "e"],
+      ["user", "appmodel", "Compact (toolbar)", 'App/Views/ChatView.swift:303: Button("Compact Conversation", systemImage: "arrow.down.right.and.arrow.up.left") {'],
+      ["appmodel", "engine", "`compact(id)`", 'App/AppModel.swift:158: try await engine.compact(id)'],
+      ["engine", "compactor", "`cut(in: items, budget: .max)`", 'KuriAgent/Engine.swift:509: guard let cut = Compactor.cut(in: items, budget: .max) else {'],
+      ["engine", "appmodel", "`.compacting(true)`", "e", 'KuriAgent/Engine.swift:513: broadcaster.emit(.compacting(conversationID: conversationID, true))'],
+      ["engine", "compactor", "`compact(…)` — as in Automatic compaction", 'KuriAgent/Engine.swift:514: let task = Task { try await compactor.compact(items, keepingFrom: cut, conversationID: conversationID, turnID: nil) }'],
+      ["compactor", "store", "`append(.compaction)`", 'KuriAgent/Compactor.swift:53: try await store.append(item)'],
+      ["engine", "appmodel", "`.itemAdded`, `.compacting(false)`", "e", 'KuriAgent/Engine.swift:527: broadcaster.emit(.itemAdded(item))'],
     ],
     notes: ["While it works the conversation counts as running: the composer waits and Stop cancels it.",
             "A conversation that's a single exchange has nothing to summarize yet."] },
@@ -490,18 +507,18 @@ const FLOWS = [
     summary: "A one-time setup fetches what the VMs need: a Linux kernel, Apple's init filesystem and the container image. Only then does the model get a shell.",
     participants: ["user", "settings", "appmodel", "engine", "sandbox", "kata", "oci", "registry"],
     steps: [
-      ["user", "settings", "Set Up Sandbox"],
-      ["settings", "engine", "`setUpSandbox()` via AppModel"],
-      ["engine", "sandbox", "`install()`"],
-      ["sandbox", "kata", "`GET kata-static-…-arm64.tar.zst` (≈ 680 MB)"],
-      ["sandbox", "appmodel", "`.sandboxChanged(.installing(step, fraction))`", "e"],
-      ["sandbox", "sandbox", "two passes over the archive:\nfind what `vmlinux.container` points at, extract it"],
-      ["sandbox", "oci", "pull `ghcr.io/apple/containerization/vminit`"],
-      ["sandbox", "oci", "pull `python:3-slim`"],
-      ["sandbox", "sandbox", "unpack the image into a snapshot"],
-      ["sandbox", "appmodel", "`.sandboxChanged(.ready)`", "e"],
-      ["engine", "registry", "`register(ShellTool)`"],
-      ["registry", "appmodel", "`.toolsChanged`", "e"],
+      ["user", "settings", "Set Up Sandbox", 'App/Views/SettingsView.swift:247: Button("Set Up Sandbox") { Task { await model.setUpSandbox() } }'],
+      ["settings", "engine", "`setUpSandbox()` via AppModel", 'App/AppModel.swift:245: try await engine?.setUpSandbox()'],
+      ["engine", "sandbox", "`install()`", 'KuriAgent/Engine.swift:220: try await sandbox.install()'],
+      ["sandbox", "kata", "`GET kata-static-…-arm64.tar.zst` (≈ 680 MB)", 'KuriSandbox/KernelInstaller.swift:83: let (temporary, response) = try await URLSession.shared.download(from: url, delegate: delegate)'],
+      ["sandbox", "appmodel", "`.sandboxChanged(.installing(step, fraction))`", "e", 'KuriSandbox/Sandbox.swift:94: Task { await self.setStatus(.installing(step: step, fraction: fraction)) }'],
+      ["sandbox", "sandbox", "two passes over the archive:\nfind what `vmlinux.container` points at, extract it", 'KuriSandbox/KernelInstaller.swift:38: for (entry, _) in reader.makeStreamingIterator() {'],
+      ["sandbox", "oci", "pull `ghcr.io/apple/containerization/vminit`", 'KuriSandbox/Sandbox.swift:143: initfsReference: settings.initImage,'],
+      ["sandbox", "oci", "pull `python:3-slim`", 'KuriSandbox/Sandbox.swift:100: let image = try await manager.imageStore.get(reference: settings.image, pull: true)'],
+      ["sandbox", "sandbox", "unpack the image into a snapshot", 'KuriSandbox/Sandbox.swift:106: _ = try await manager.create(probe, image: image, networking: false, vm: resources) { _ in }'],
+      ["sandbox", "appmodel", "`.sandboxChanged(.ready)`", "e", 'KuriSandbox/Sandbox.swift:109: setStatus(.ready)'],
+      ["engine", "registry", "`register(ShellTool)`", 'KuriAgent/Engine.swift:232: await registry.register(ShellTool(sandbox: sandbox, scratch: { [home] in home.scratchFolder(for: $0) }),'],
+      ["registry", "appmodel", "`.toolsChanged`", "e", 'KuriAgent/Engine.swift:76: await registry.onChange { [broadcaster] in broadcaster.emit(.toolsChanged) }'],
     ],
     notes: ["On launch the engine only checks what's on disk (<code>refreshStatus()</code>), without the network, and offers the shell if everything is there.",
             "Only the kernel is kept from the tarball, which is then deleted. After setup the sandbox works offline; files live in <code>~/.config/kuri/sandbox</code>."] },
@@ -510,20 +527,20 @@ const FLOWS = [
     summary: "The shell tool runs a command in the conversation's container, starting it first if needed. The VM boots from a clone of the image's snapshot in about half a second; later commands take tens of milliseconds.",
     participants: ["runner", "shelltool", "sandbox", "ctrmanager", "vm"],
     steps: [
-      ["runner", "shelltool", "`run({ command, timeout_seconds })`"],
-      ["shelltool", "shelltool", "`SandboxMounts.plan(folders, scratch)`"],
-      ["shelltool", "sandbox", "`run(command, conversationID, mounts, timeout)`"],
+      ["runner", "shelltool", "`run({ command, timeout_seconds })`", 'KuriAgent/TurnRunner.swift:223: let output = try await tool.run(arguments: Data(call.arguments.utf8), context: context)'],
+      ["shelltool", "shelltool", "`SandboxMounts.plan(folders, scratch)`", 'KuriSandbox/ShellTool.swift:57: let mounts = SandboxMounts.plan(folders: context.folders, scratch: scratch(context.conversationID))'],
+      ["shelltool", "sandbox", "`run(command, conversationID, mounts, timeout)`", 'KuriSandbox/ShellTool.swift:58: let result = try await sandbox.run(args.command, conversationID: context.conversationID, mounts: mounts,'],
       { opt: "no container yet, or its folders changed", steps: [
-        ["sandbox", "ctrmanager", "`create(id, image, networking: false)`\nfolders shared at /work"],
-        ["ctrmanager", "ctrmanager", "clone the image snapshot (APFS)"],
-        ["sandbox", "vm", "`create()`, `start()`"],
+        ["sandbox", "ctrmanager", "`create(id, image, networking: false)`\nfolders shared at /work", 'KuriSandbox/Sandbox.swift:217: let container = try await manager.create(id, image: image, networking: false, vm: resources) { configuration in'],
+        ["ctrmanager", "ctrmanager", "clone the image snapshot (APFS)", 'KuriSandbox/Sandbox.swift:146: snapshots: try SnapshotManager(path: layout.snapshots))'],
+        ["sandbox", "vm", "`create()`, `start()`", 'KuriSandbox/Sandbox.swift:231: try await container.create()'],
       ]},
-      ["sandbox", "vm", "exec `/bin/sh -lc command` in /work"],
-      ["vm", "sandbox", "stdout and stderr", "r"],
-      ["vm", "sandbox", "exit code — or, past the timeout, SIGKILL", "r"],
-      ["sandbox", "sandbox", "reset the idle timer"],
-      ["sandbox", "shelltool", "`CommandResult`", "r"],
-      ["shelltool", "runner", "“Exit code N.” + output (start and end kept)", "r"],
+      ["sandbox", "vm", "exec `/bin/sh -lc command` in /work", 'KuriSandbox/Sandbox.swift:163: configuration.arguments = ["/bin/sh", "-lc", command]'],
+      ["vm", "sandbox", "stdout and stderr", "r", 'KuriSandbox/Sandbox.swift:168: configuration.stdout = output'],
+      ["vm", "sandbox", "exit code — or, past the timeout, SIGKILL", "r", 'KuriSandbox/Sandbox.swift:177: return try await process.wait(timeoutInSeconds: seconds)'],
+      ["sandbox", "sandbox", "reset the idle timer", 'KuriSandbox/Sandbox.swift:171: defer { touch(conversationID) }'],
+      ["sandbox", "shelltool", "`CommandResult`", "r", 'KuriSandbox/Sandbox.swift:187: return CommandResult(exitCode: status?.exitCode, output: output.text, timedOut: status == nil)'],
+      ["shelltool", "runner", "“Exit code N.” + output (start and end kept)", "r", 'KuriSandbox/ShellTool.swift:60: return Self.output(for: result, timeout: timeout)'],
     ],
     notes: ["Stopping the turn kills the running command.",
             "After <code>idleMinutes</code> without a command the container is stopped and deleted; the folders it mounted are untouched.",
@@ -533,12 +550,12 @@ const FLOWS = [
     summary: "Attaching a folder decides what /work is for the conversation. The container picks it up on its next command.",
     participants: ["user", "chat", "appmodel", "engine", "store", "sandbox"],
     steps: [
-      ["user", "chat", "Attach Folder, picks folders"],
-      ["chat", "appmodel", "`attach(urls)`"],
-      ["appmodel", "engine", "`setFolders(folders, for: id)`"],
-      ["engine", "store", "`setFolders(…)`"],
-      ["engine", "sandbox", "`stop(id)` — remounted on the next command"],
-      ["engine", "appmodel", "`.foldersChanged`", "e"],
+      ["user", "chat", "Attach Folder, picks folders", 'App/Views/ChatView.swift:102: Button("Attach Folder", systemImage: "folder.badge.plus") { choosingFolder = true }'],
+      ["chat", "appmodel", "`attach(urls)`", 'App/Views/ChatView.swift:75: if case .success(let urls) = result { Task { await model.attach(urls) } }'],
+      ["appmodel", "engine", "`setFolders(folders, for: id)`", 'App/AppModel.swift:261: try await engine.setFolders(updated, for: id)'],
+      ["engine", "store", "`setFolders(…)`", 'KuriAgent/Engine.swift:247: try await store.setFolders(folders, of: conversationID)'],
+      ["engine", "sandbox", "`stop(id)` — remounted on the next command", 'KuriAgent/Engine.swift:248: await sandbox.stop(conversationID)'],
+      ["engine", "appmodel", "`.foldersChanged`", "e", 'KuriAgent/Engine.swift:249: broadcaster.emit(.foldersChanged(conversationID: conversationID, folders))'],
     ],
     notes: ["One folder is /work; several are /work/&lt;name&gt;; none means a scratch folder for the conversation.",
             "The next request's instructions say which of the user's folders is mounted where, and which are read-only (from the chip's menu)."] },
@@ -547,25 +564,25 @@ const FLOWS = [
     summary: "MCPManager keeps connections in line with mcp.json. For each new or changed server it builds the environment, launches the transport, lets the SDK do the handshake, then lists the tools and registers them.",
     participants: ["appmodel", "engine", "mcp", "shell", "conn", "sdk", "server", "registry"],
     steps: [
-      ["engine", "mcp", "`apply(mcpConfig)`"],
-      { note: "diff against what runs: unchanged servers are skipped,\nremoved or disabled ones stopped", over: "mcp" },
-      ["mcp", "appmodel", "`.mcpServersChanged` (connecting)", "e"],
+      ["engine", "mcp", "`apply(mcpConfig)`", 'KuriAgent/Engine.swift:78: await mcp.apply(mcpConfig)'],
+      { note: "diff against what runs: unchanged servers are skipped,\nremoved or disabled ones stopped", over: "mcp", ref: 'KuriMCP/MCPManager.swift:73: if servers[name]?.config == serverConfig { continue }' },
+      ["mcp", "appmodel", "`.mcpServersChanged` (connecting)", "e", 'KuriMCP/MCPManager.swift:107: state: config.isEnabled ? .connecting : .disabled,'],
       { opt: "first stdio server", steps: [
-        ["mcp", "shell", "`$SHELL -ilc 'printf $PATH'`"],
-        ["shell", "mcp", "PATH", "r"],
+        ["mcp", "shell", "`$SHELL -ilc 'printf $PATH'`", 'KuriMCP/LoginShell.swift:31: process.arguments = ["-ilc", "printf \'\\(marker)%s\\(marker)\' \\"$PATH\\""]'],
+        ["shell", "mcp", "PATH", "r", 'KuriMCP/MCPManager.swift:211: if let path = await LoginShell.path() { environment["PATH"] = path }'],
       ]},
-      ["mcp", "conn", "`start(config, environment, headers)`"],
-      ["conn", "sdk", "`connect(transport)`\n60 s timeout"],
-      ["sdk", "server", "launch `ProcessTransport`\nor open `HTTPClientTransport`"],
-      ["sdk", "server", "`initialize`"],
-      ["server", "sdk", "capabilities, serverInfo", "r"],
-      ["sdk", "server", "`notifications/initialized`"],
-      ["mcp", "conn", "`listTools()`"],
-      ["conn", "server", "`tools/list` (while `nextCursor`)"],
-      ["server", "conn", "tools", "r"],
-      ["mcp", "registry", "`replace(source: .mcp(server), with: tools)`"],
-      ["registry", "appmodel", "`.toolsChanged`", "e"],
-      ["mcp", "appmodel", "`.mcpServersChanged` (connected)", "e"],
+      ["mcp", "conn", "`start(config, environment, headers)`", 'KuriMCP/MCPManager.swift:124: let info = try await connection.start('],
+      ["conn", "sdk", "`connect(transport)`\n60 s timeout", 'KuriMCP/MCPServerConnection.swift:55: group.addTask { try await client.connect(transport: transport) }'],
+      ["sdk", "server", "launch `ProcessTransport`\nor open `HTTPClientTransport`", 'KuriMCP/ProcessTransport.swift:82: try process.run()'],
+      ["sdk", "server", "`initialize`", 'KuriMCP/MCPServerConnection.swift:55: group.addTask { try await client.connect(transport: transport) }'],
+      ["server", "sdk", "capabilities, serverInfo", "r", 'KuriMCP/MCPManager.swift:133: servers[name]?.status.serverInfo = "\\(info.serverInfo.name) \\(info.serverInfo.version)"'],
+      ["sdk", "server", "`notifications/initialized`", 'KuriMCP/MCPServerConnection.swift:55: group.addTask { try await client.connect(transport: transport) }'],
+      ["mcp", "conn", "`listTools()`", 'KuriMCP/MCPManager.swift:142: let tools = try await connection.listTools()'],
+      ["conn", "server", "`tools/list` (while `nextCursor`)", 'KuriMCP/MCPServerConnection.swift:70: let page = try await client.listTools(cursor: cursor)'],
+      ["server", "conn", "tools", "r", 'KuriMCP/MCPServerConnection.swift:71: tools += page.tools'],
+      ["mcp", "registry", "`replace(source: .mcp(server), with: tools)`", 'KuriMCP/MCPManager.swift:144: await registry.replace('],
+      ["registry", "appmodel", "`.toolsChanged`", "e", 'KuriAgent/Engine.swift:76: await registry.onChange { [broadcaster] in broadcaster.emit(.toolsChanged) }'],
+      ["mcp", "appmodel", "`.mcpServersChanged` (connected)", "e", 'KuriMCP/MCPManager.swift:148: servers[name]?.status.state = .connected'],
     ],
     notes: ["Tools are named <code>&lt;server&gt;__&lt;tool&gt;</code>. Read-only tools (<code>readOnlyHint</code>) default to allow, others to ask; config files override.",
             "<code>env</code> and <code>headers</code> values are secret references, resolved from the Keychain or the environment.",
@@ -575,17 +592,17 @@ const FLOWS = [
     summary: "An MCP tool is a Tool like any other to the runner. MCPTool forwards the call through the SDK and flattens the result into text.",
     participants: ["runner", "registry", "broker", "mcptool", "conn", "server"],
     steps: [
-      ["runner", "registry", "`policy(for:)`"],
+      ["runner", "registry", "`policy(for:)`", 'KuriAgent/TurnRunner.swift:211: switch await registry.policy(for: tool) {'],
       { opt: "policy is ask", steps: [
-        ["runner", "broker", "`approve(…)` — see Approval"],
+        ["runner", "broker", "`approve(…)` — see Approval", 'KuriAgent/TurnRunner.swift:215: let approved = try await interaction.approve(ApprovalRequest('],
       ]},
-      ["runner", "mcptool", "`run(arguments)`"],
-      ["mcptool", "conn", "`call(name, [String: Value])`"],
-      ["conn", "server", "`tools/call { name, arguments }`"],
-      ["server", "conn", "`{ content, isError }`", "r"],
-      ["conn", "mcptool", "content", "r"],
-      ["mcptool", "mcptool", "flatten to text"],
-      ["mcptool", "runner", "`ToolOutput`", "r"],
+      ["runner", "mcptool", "`run(arguments)`", 'KuriAgent/TurnRunner.swift:223: let output = try await tool.run(arguments: Data(call.arguments.utf8), context: context)'],
+      ["mcptool", "conn", "`call(name, [String: Value])`", 'KuriMCP/MCPTool.swift:37: let result = try await connection.call(originalName, arguments: values)'],
+      ["conn", "server", "`tools/call { name, arguments }`", 'KuriMCP/MCPServerConnection.swift:80: let context: RequestContext<CallTool.Result> = try await client.callTool(name: tool, arguments: arguments)'],
+      ["server", "conn", "`{ content, isError }`", "r", 'KuriMCP/MCPServerConnection.swift:83: try await context.value'],
+      ["conn", "mcptool", "content", "r", 'KuriMCP/MCPServerConnection.swift:87: return (result.content, result.isError ?? false)'],
+      ["mcptool", "mcptool", "flatten to text", 'KuriMCP/MCPTool.swift:43: static func text(from content: [MCP.Tool.Content]) -> String {'],
+      ["mcptool", "runner", "`ToolOutput`", "r", 'KuriMCP/MCPTool.swift:38: return ToolOutput(Self.text(from: result.content), isError: result.isError)'],
     ],
     notes: ["Text passes through; images and audio are described (Kuri doesn't send media to models yet); resource links become Markdown links."] },
 
@@ -593,15 +610,15 @@ const FLOWS = [
     summary: "A server may add or remove tools while connected. It says so with a notification; Kuri lists them again and swaps them in the registry.",
     participants: ["appmodel", "engine", "mcp", "registry", "conn", "server"],
     steps: [
-      ["server", "conn", "`notifications/tools/list_changed`"],
-      ["conn", "mcp", "`toolsChanged()`", "a"],
-      ["mcp", "conn", "`listTools()`"],
-      ["conn", "server", "`tools/list`"],
-      ["server", "conn", "tools", "r"],
-      ["mcp", "registry", "`replace(source: .mcp(server), with: tools)`"],
-      ["registry", "engine", "`onChange`", "a"],
-      ["engine", "appmodel", "`.toolsChanged`", "e"],
-      ["mcp", "appmodel", "`.mcpServersChanged`", "e"],
+      ["server", "conn", "`notifications/tools/list_changed`", 'KuriMCP/MCPServerConnection.swift:51: await client.onNotification(ToolListChangedNotification.self) { _ in handlers.toolsChanged() }'],
+      ["conn", "mcp", "`toolsChanged()`", "a", 'KuriMCP/MCPManager.swift:121: toolsChanged: { [weak self] in Task { await self?.refreshTools(name, generation: generation) } })'],
+      ["mcp", "conn", "`listTools()`", 'KuriMCP/MCPManager.swift:142: let tools = try await connection.listTools()'],
+      ["conn", "server", "`tools/list`", 'KuriMCP/MCPServerConnection.swift:70: let page = try await client.listTools(cursor: cursor)'],
+      ["server", "conn", "tools", "r", 'KuriMCP/MCPServerConnection.swift:71: tools += page.tools'],
+      ["mcp", "registry", "`replace(source: .mcp(server), with: tools)`", 'KuriMCP/MCPManager.swift:144: await registry.replace('],
+      ["registry", "engine", "`onChange`", "a", 'KuriTools/ToolRegistry.swift:116: for observer in observers { observer() }'],
+      ["engine", "appmodel", "`.toolsChanged`", "e", 'KuriAgent/Engine.swift:76: await registry.onChange { [broadcaster] in broadcaster.emit(.toolsChanged) }'],
+      ["mcp", "appmodel", "`.mcpServersChanged`", "e", 'KuriMCP/MCPManager.swift:201: onChange(statuses)'],
     ],
     notes: ["The next request to the model already lists the new tools."] },
 
@@ -609,16 +626,16 @@ const FLOWS = [
     summary: "When a stdio server dies, its transport ends the message stream (so the SDK stops reading) and reports the exit. The server is marked failed and its tools disappear until it's reconnected.",
     participants: ["user", "appmodel", "mcp", "registry", "conn", "transport", "server"],
     steps: [
-      ["server", "transport", "exits, stdout closes"],
-      ["transport", "conn", "message stream\nends with an error", "a"],
-      ["transport", "mcp", "`onExit(status)`\n→ `lost(name, generation)`", "a"],
-      ["mcp", "registry", "`removeAll(from: .mcp(server))`"],
-      ["mcp", "appmodel", "`.mcpServersChanged`\nfailed: “exited with status 3”", "e"],
-      ["mcp", "conn", "`stop()`"],
+      ["server", "transport", "exits, stdout closes", 'KuriMCP/ProcessTransport.swift:52: stdout.fileHandleForReading.readabilityHandler = { handle in'],
+      ["transport", "conn", "message stream\nends with an error", "a", 'KuriMCP/ProcessTransport.swift:56: continuation.finish(throwing: Closed())'],
+      ["transport", "mcp", "`onExit(status)`\n→ `lost(name, generation)`", "a", 'KuriMCP/ProcessTransport.swift:79: onExit(process.terminationStatus)'],
+      ["mcp", "registry", "`removeAll(from: .mcp(server))`", 'KuriMCP/MCPManager.swift:170: await registry.removeAll(from: .mcp(server: name))'],
+      ["mcp", "appmodel", "`.mcpServersChanged`\nfailed: “exited with status 3”", "e", 'KuriMCP/MCPManager.swift:168: servers[name]?.status.state = .failed(message)'],
+      ["mcp", "conn", "`stop()`", 'KuriMCP/MCPManager.swift:174: await connection?.stop()'],
       { note: "pending calls fail", over: "conn" },
-      ["user", "appmodel", "Reconnect"],
-      ["appmodel", "mcp", "`reconnect(name)` via Engine"],
-      ["mcp", "mcp", "stop, then connect again"],
+      ["user", "appmodel", "Reconnect", 'App/Views/SettingsView.swift:368: Button("Reconnect") { Task { await model.reconnect(mcpServer: server.name) } }'],
+      ["appmodel", "mcp", "`reconnect(name)` via Engine", 'KuriAgent/Engine.swift:210: await mcp.reconnect(name)'],
+      ["mcp", "mcp", "stop, then connect again", 'KuriMCP/MCPManager.swift:84: start(name, config: config)'],
     ],
     notes: ["Every (re)start bumps a generation number; callbacks from an older connection are ignored."] },
 
@@ -627,21 +644,21 @@ const FLOWS = [
     participants: ["user", "texteditor", "watcher", "engine", "loader", "registry", "mcp", "appmodel"],
     steps: [
       ["user", "texteditor", "saves mcp.json"],
-      ["texteditor", "watcher", "write + rename\nin ~/.config/kuri"],
-      { note: "debounced 250 ms", over: "watcher" },
-      ["watcher", "engine", "change", "a"],
-      ["engine", "loader", "`loadConfig()`, `loadMCP()`"],
+      ["texteditor", "watcher", "write + rename\nin ~/.config/kuri", 'KuriConfig/ConfigWatcher.swift:18: fileDescriptor: fd, eventMask: [.write, .rename, .delete], queue: queue)'],
+      { note: "debounced 250 ms", over: "watcher", ref: 'KuriConfig/ConfigWatcher.swift:22: queue.asyncAfter(deadline: .now() + debounce) {' },
+      ["watcher", "engine", "change", "a", 'KuriAgent/Engine.swift:138: await self?.reloadConfig()'],
+      ["engine", "loader", "`loadConfig()`, `loadMCP()`", 'KuriAgent/Engine.swift:115: config = try loader.loadConfig()'],
       { alt: [
         ["invalid", [
-          ["loader", "engine", "error", "r"],
-          ["engine", "appmodel", "`.configFailed(message)`", "e"],
+          ["loader", "engine", "error", "r", 'KuriConfig/ConfigLoader.swift:37: throw KuriError.invalidConfig(file: url.lastPathComponent, reason: Self.describe(error))'],
+          ["engine", "appmodel", "`.configFailed(message)`", "e", 'KuriAgent/Engine.swift:125: broadcaster.emit(.configFailed(error.localizedDescription))'],
         ]],
         ["valid", [
-          ["loader", "engine", "`Config`, `MCPConfig`", "r"],
-          ["engine", "registry", "`setPolicies(merged)`"],
-          ["engine", "mcp", "`apply(mcpConfig)` — diff"],
-          ["engine", "engine", "drop cached providers, rediscover models", "a"],
-          ["engine", "appmodel", "`.configReloaded`", "e"],
+          ["loader", "engine", "`Config`, `MCPConfig`", "r", 'KuriConfig/ConfigLoader.swift:35: return try Self.decode(type, from: data)'],
+          ["engine", "registry", "`setPolicies(merged)`", 'KuriAgent/Engine.swift:131: await registry.setPolicies(mcpConfig.toolPolicies.merging(config.tools ?? [:]) { _, global in global })'],
+          ["engine", "mcp", "`apply(mcpConfig)` — diff", 'KuriAgent/Engine.swift:119: await mcp.apply(mcpConfig)'],
+          ["engine", "engine", "drop cached providers, rediscover models", "a", 'KuriAgent/Engine.swift:117: providers.removeAll()'],
+          ["engine", "appmodel", "`.configReloaded`", "e", 'KuriAgent/Engine.swift:123: broadcaster.emit(.configReloaded)'],
         ]],
       ]},
     ],
@@ -652,19 +669,19 @@ const FLOWS = [
     summary: "Settings › Models asks each provider which models it serves and offers them in the model id field. Registering one edits config.json, which then reloads like any other change.",
     participants: ["user", "settings", "appmodel", "engine", "factory", "llm", "editor", "disk"],
     steps: [
-      ["user", "settings", "opens Settings › Models"],
-      ["settings", "appmodel", "`availableModels(provider:)`"],
-      ["appmodel", "engine", "`availableModels(provider:)`"],
-      ["engine", "factory", "`discoverModels(…)`"],
-      ["factory", "llm", "`GET /models`"],
-      ["llm", "factory", "`{ data: [{ id }] }`", "r"],
-      ["factory", "settings", "sorted ids → suggestions", "r"],
-      ["user", "settings", "picks or types an id, Add"],
-      ["settings", "engine", "`register(ModelConfig, provider:)`\nvia AppModel"],
-      ["engine", "editor", "`register(…)`"],
-      ["editor", "disk", "read, edit as a JSON tree,\nvalidate, write JSON5"],
-      ["engine", "engine", "`reloadConfig()` — see Config hot-reload"],
-      ["engine", "appmodel", "`.configReloaded`", "e"],
+      ["user", "settings", "opens Settings › Models", 'App/Views/SettingsView.swift:202: .task(id: name) { await discover() }'],
+      ["settings", "appmodel", "`availableModels(provider:)`", 'App/Views/SettingsView.swift:209: available = try await model.availableModels(provider: name)'],
+      ["appmodel", "engine", "`availableModels(provider:)`", 'App/AppModel.swift:206: return try await engine.availableModels(provider: provider)'],
+      ["engine", "factory", "`discoverModels(…)`", 'KuriAgent/Engine.swift:158: return try await factory.discoverModels(name: name, config: providerConfig)'],
+      ["factory", "llm", "`GET /models`", 'KuriInference/InferenceProvider.swift:69: let data = try await HTTP.getJSON(session: session, url: baseURL.appending(path: "models"), headers: headers)'],
+      ["llm", "factory", "`{ data: [{ id }] }`", "r", 'KuriInference/InferenceProvider.swift:70: return Array(Set(try JSONDecoder().decode(List.self, from: data).data.map(\\.id))).sorted()'],
+      ["factory", "settings", "sorted ids → suggestions", "r", 'App/Views/SettingsView.swift:210: discoveryError = available.isEmpty ? "\\(name) lists no models." : nil'],
+      ["user", "settings", "picks or types an id, Add", 'App/Views/SettingsView.swift:176: Button("Add", action: add)'],
+      ["settings", "engine", "`register(ModelConfig, provider:)`\nvia AppModel", 'App/AppModel.swift:211: try await engine?.register(model, provider: provider)'],
+      ["engine", "editor", "`register(…)`", 'KuriAgent/Engine.swift:163: try ConfigEditor(home: home).register(model, provider: provider)'],
+      ["editor", "disk", "read, edit as a JSON tree,\nvalidate, write JSON5", 'KuriConfig/ConfigEditor.swift:32: try Data(text.utf8).write(to: home.configFile, options: .atomic)'],
+      ["engine", "engine", "`reloadConfig()` — see Config hot-reload", 'KuriAgent/Engine.swift:164: await reloadConfig()'],
+      ["engine", "appmodel", "`.configReloaded`", "e", 'KuriAgent/Engine.swift:123: broadcaster.emit(.configReloaded)'],
     ],
     notes: ["Keys Kuri doesn't know survive the edit; comments don't.",
             "The watcher also sees the write and reloads again; the diff makes that a no-op.",
@@ -674,12 +691,12 @@ const FLOWS = [
     summary: "Memories change in one transaction, from Settings or from the model's memory tool. Either way the app hears about it through the same event.",
     participants: ["user", "settings", "appmodel", "engine", "store"],
     steps: [
-      ["user", "settings", "Add / Edit / Forget"],
-      ["settings", "appmodel", "`changeMemories([.add | .update | .remove])`"],
-      ["appmodel", "engine", "`changeMemories(…)`"],
-      ["engine", "store", "`applyMemoryChanges(source: .user)`"],
-      ["engine", "appmodel", "`.memoriesChanged`", "e"],
-      ["appmodel", "engine", "`memories()`"],
+      ["user", "settings", "Add / Edit / Forget", 'App/Views/SettingsView.swift:453: Button("Forget", role: .destructive) {'],
+      ["settings", "appmodel", "`changeMemories([.add | .update | .remove])`", 'App/Views/SettingsView.swift:507: Task { await model.changeMemories([.add(content)]) }'],
+      ["appmodel", "engine", "`changeMemories(…)`", 'App/AppModel.swift:292: try await engine?.changeMemories(changes)'],
+      ["engine", "store", "`applyMemoryChanges(source: .user)`", 'KuriAgent/Engine.swift:261: try await store.applyMemoryChanges(changes, source: .user)'],
+      ["engine", "appmodel", "`.memoriesChanged`", "e", 'KuriAgent/Engine.swift:262: broadcaster.emit(.memoriesChanged)'],
+      ["appmodel", "engine", "`memories()`", 'App/AppModel.swift:299: memories = (try? await engine?.memories()) ?? memories'],
     ],
     notes: ["The model's edits go through the memory tool (with a 4,000-character budget) and arrive as <code>.toolFinished</code> → <code>.memoriesChanged</code>.",
             "Active memories are part of every request's instructions, in <code>&lt;user_memory&gt;</code>, with their ids."] },
@@ -705,12 +722,23 @@ const segments = text => text.split("`").map((t, i) => ({ t, mono: i % 2 === 1 }
 function width(text, font = FONT) {
   return segments(text).reduce((sum, s) => { ctx.font = s.mono ? MONO : font; return sum + ctx.measureText(s.t).width; }, 0);
 }
-function textSVG(text, x, y, anchor, cls) {
-  const spans = segments(text).map(s => s.mono
-    ? `<tspan style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px">${esc(s.t)}</tspan>`
-    : `<tspan>${esc(s.t)}</tspan>`).join("");
+function textSVG(text, x, y, anchor, cls, number) {
+  const prefix = number ? `<tspan class="t-num">${number}</tspan>` : "";
+  const spans = prefix + segments(text).map((s, i) => {
+    const gap = number && i === 0 ? ` dx="6"` : "";
+    return s.mono
+      ? `<tspan${gap} style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px">${esc(s.t)}</tspan>`
+      : `<tspan${gap}>${esc(s.t)}</tspan>`;
+  }).join("");
   return `<text x="${x}" y="${y}" text-anchor="${anchor}" class="${cls}">${spans}</text>`;
 }
+
+const REF = /^(\S+\.swift):(\d+): (.*)$/;
+function parseMsg(step) {
+  const [from, to, label, ...rest] = step;
+  return { from, to, label, type: rest.find(r => !REF.test(r)) ?? "c", ref: rest.find(r => REF.test(r)) };
+}
+const NUM_W = 20;  // room for an arrow's number before its label
 
 function walk(steps, visit) {
   for (const step of steps) {
@@ -737,7 +765,7 @@ function render(flow) {
       const [from, to, label] = step.msg;
       const a = idx[from], b = idx[to];
       if (a === undefined || b === undefined) throw new Error(`${flow.id}: unknown participant in ${step.msg}`);
-      const w = Math.max(...label.split("\n").map(l => width(l))) + 24;
+      const w = Math.max(...label.split("\n").map(l => width(l))) + 24 + NUM_W;
       if (a === b) {
         // Self-message labels may run over the next lifelines (they have a halo);
         // only the last column needs room on its right.
@@ -765,24 +793,26 @@ function render(flow) {
   const H0 = 42;
 
   const back = [], front = [];
-  let y = H0 + 26;
+  let y = H0 + 26, number = 0;
   const left = 6, right = W - 6;
 
-  function message([from, to, label, type = "c"], depth) {
+  function message(step, depth) {
+    const { from, to, label, type } = parseMsg(step);
     const a = x[idx[from]], b = x[idx[to]];
+    number += 1;
     const cls = { c: "m-call", r: "m-ret", e: "m-event", a: "m-async" }[type];
     const marker = { c: "call", r: "open", e: "event", a: "open" }[type];
     const lines = label ? label.split("\n") : [];
     if (from === to) {
       front.push(`<path d="M${a},${y} h28 v16 h-26" class="${cls}" marker-end="url(#${flow.id}-${marker})"/>`);
-      lines.forEach((line, i) => front.push(textSVG(line, a + 36, y + 12 + i * 15, "start", `t-${type} halo`)));
+      lines.forEach((line, i) => front.push(textSVG(line, a + 36, y + 12 + i * 15, "start", `t-${type} halo`, i === 0 && number)));
       y += 38 + Math.max(0, lines.length - 1) * 15;
     } else {
       y += Math.max(0, lines.length - 1) * 15;
       const dir = b > a ? 1 : -1;
       front.push(`<line x1="${a}" y1="${y}" x2="${b - dir * 2}" y2="${y}" class="${cls}" marker-end="url(#${flow.id}-${marker})"/>`);
       lines.forEach((line, i) =>
-        front.push(textSVG(line, (a + b) / 2, y - 7 - (lines.length - 1 - i) * 15, "middle", `t-${type} halo`)));
+        front.push(textSVG(line, (a + b) / 2, y - 7 - (lines.length - 1 - i) * 15, "middle", `t-${type} halo`, i === 0 && number)));
       y += 30;
     }
   }
@@ -870,6 +900,7 @@ function render(flow) {
       .frame-split { stroke: var(--group-stroke); stroke-dasharray: 5 4; }
       .t-frame { font: 11.5px ui-sans-serif, -apple-system, system-ui, sans-serif; fill: var(--muted); }
       .t-frame-kind { font-weight: 700; fill: var(--ink); }
+      .t-num { font: 700 11px ui-sans-serif, -apple-system, system-ui, sans-serif; fill: var(--accent); }
     </style>
     <defs>
       ${m("call", "M0,0 L10,5 L0,10 z", "fill: var(--ink)")}
@@ -882,6 +913,29 @@ function render(flow) {
     ${boxes(0)}
     ${boxes(bottomY)}
   </svg>`;
+}
+
+// ─── Code references ─────────────────────────────────────────────────────────
+const inline = text => segments(text.replace(/\n/g, " ")).map(s => s.mono ? `<code>${esc(s.t)}</code>` : esc(s.t)).join("");
+function refCell(ref) {
+  const [, path, line, code] = ref.match(REF);
+  const file = path.startsWith("App/") ? `../${path}` : `../Packages/KuriKit/Sources/${path}`;
+  return `<a class="path" href="${file}" title="${esc(file.slice(3))}">${esc(path)}:${line}</a><code class="line">${esc(code)}</code>`;
+}
+function codeList(flow) {
+  const rows = [];
+  let number = 0;
+  walk(flow.steps, step => {
+    if (step.msg) {
+      const { from, to, label, ref } = parseMsg(step.msg);
+      number += 1;
+      rows.push(`<tr><td class="no">${number}</td><td class="who">${esc(P[from][0])} → ${esc(P[to][0])}</td>` +
+        `<td>${inline(label)}</td><td class="at">${ref ? refCell(ref) : `<span class="outside">outside Kuri</span>`}</td></tr>`);
+    } else if (step.note && step.ref) {
+      rows.push(`<tr><td class="no">·</td><td class="who">note</td><td>${inline(step.note)}</td><td class="at">${refCell(step.ref)}</td></tr>`);
+    }
+  });
+  return `<details class="code"><summary>Code</summary><table><tbody>${rows.join("")}</tbody></table></details>`;
 }
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -904,7 +958,8 @@ for (const flow of FLOWS) {
   card.id = flow.id;
   card.innerHTML = `<h3>${esc(flow.title)}</h3><p class="summary">${esc(flow.summary)}</p>` +
     `<div class="diagram">${render(flow)}</div>` +
-    (flow.notes ? `<ul class="notes">${flow.notes.map(n => `<li>${n}</li>`).join("")}</ul>` : "");
+    (flow.notes ? `<ul class="notes">${flow.notes.map(n => `<li>${n}</li>`).join("")}</ul>` : "") +
+    codeList(flow);
   flowsEl.appendChild(card);
   tocGroup.insertAdjacentHTML("beforeend", `<a href="#${flow.id}">${esc(flow.title)}</a>`);
 }

@@ -333,7 +333,7 @@ public actor Engine {
         let text = texts[0]
 
         if conversation.title.isEmpty {
-            // Placeholder until title generation with the utility model lands.
+            // Provisional: replaced by a generated title after the first completed turn.
             conversation.title = Self.provisionalTitle(for: text)
         }
         conversation.model = model

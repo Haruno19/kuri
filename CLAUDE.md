@@ -5,7 +5,7 @@ Kuri is a native macOS app for working with language models, local or hosted: an
 - [README.md](README.md): what Kuri is, its principles, architecture, tools, providers and dependencies.
 - [docs/roadmap.md](docs/roadmap.md): what's done and what comes next.
 - [docs/design.md](docs/design.md): how each part works, in detail.
-- [docs/flows.html](docs/flows.html): every flow as a sequence diagram, plus the engine-event and protocol reference.
+- [docs/flows.html](docs/flows.html): every flow as a sequence diagram with the code behind each step, plus the engine-event and protocol reference.
 - [docs/decisions/](docs/decisions/): why things are the way they are. Don't reverse a decision without a new record that supersedes it.
 - [docs/config.md](docs/config.md): every configuration key.
 
@@ -27,7 +27,7 @@ The backend comes first. The UI will be redesigned from scratch once the engine 
 
 - Commit directly on `main`, one commit per coherent step. Commit messages say what changed and why. Push only when asked.
 - Never name the author's employer or its projects in code, comments, docs or commit messages.
-- When a flow changes, update its diagram in `docs/flows.html` (flows are data at the bottom of the page) and the event reference if events change.
+- When a flow changes, update its diagram in `docs/flows.html` (flows are data at the bottom of the page) and the event reference if events change. Every step names the line that does it (`'path:line: code'`); when code moves, run `python3 docs/sync-flow-refs.py`. `FlowReferenceTests` fails until every reference holds its code.
 - When a config key is added or changes meaning, update `docs/config.md` and the template in `ConfigLoader`.
 - When making a decision that future work should respect, add a record in `docs/decisions/`.
 - Database migrations are append-only: never edit a shipped one in `Migrations.swift`, add the next.
