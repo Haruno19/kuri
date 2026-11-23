@@ -9,9 +9,6 @@ struct MainView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     @State private var columns: NavigationSplitViewVisibility = .detailOnly
-    /// Where the sidebar toggle sits while the sidebar is closed: just past
-    /// the traffic lights, where macOS put its own.
-    static let trafficLights: CGFloat = 96
 
     var body: some View {
         @Bindable var model = model
@@ -37,17 +34,24 @@ struct MainView: View {
                     ChatView()
                 }
             }
-            // The two panes' toggles, drawn by the chat so they stay outside
-            // both: macOS would put its own sidebar toggle inside the open
-            // sidebar, and a toolbar button over the inspector.
-            .overlay(alignment: .topLeading) {
-                PaneToggle(glyph: .sidebar, help: columns == .detailOnly ? "Show the sidebar (⌃⌘S)" : "Hide the sidebar (⌃⌘S)") {
-                    columns = columns == .detailOnly ? .all : .detailOnly
+            // The sidebar's toggle is a toolbar item of the chat's column:
+            // macOS keeps it at the column's leading edge, next to the
+            // traffic lights or just outside the open sidebar, and moves it
+            // with the sidebar. Its own toggle would sit inside the sidebar.
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    PaneToggle(glyph: .sidebar, help: columns == .detailOnly ? "Show the sidebar (⌃⌘S)" : "Hide the sidebar (⌃⌘S)") {
+                        columns = columns == .detailOnly ? .all : .detailOnly
+                    }
+                    // macOS leaves 4 points after the open sidebar; this
+                    // makes it the inspector toggle's inset.
+                    .padding(.leading, columns == .detailOnly ? 0 : PaneToggle.inset - 4)
+                    .animation(Tune.move, value: columns)
                 }
-                // Past the traffic lights while the sidebar is closed.
-                .padding(.leading, columns == .detailOnly ? Self.trafficLights : PaneToggle.inset)
-                .padding(.top, PaneToggle.top)
+                .sharedBackgroundVisibility(.hidden)
             }
+            // The inspector's is drawn by the chat: as a toolbar item, macOS
+            // would put it over the inspector.
             .overlay(alignment: .topTrailing) {
                 if model.phase.isReady {
                     PaneToggle(glyph: .inspector, help: model.showsInspector ? "Hide the inspector (⌥⌘I)" : "Show the inspector (⌥⌘I)") {
@@ -66,14 +70,6 @@ struct MainView: View {
             }
         }
         .toolbar(removing: .title)
-        // An empty toolbar collapses, and the traffic lights move up out of
-        // line with the toggles: an invisible item keeps its height.
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Color.clear.frame(width: 1, height: 1).accessibilityHidden(true)
-            }
-            .sharedBackgroundVisibility(.hidden)
-        }
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .alert("Something went wrong", isPresented: Binding(
             get: { model.errorMessage != nil },

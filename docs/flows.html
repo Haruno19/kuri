@@ -457,8 +457,8 @@ const FLOWS = [
     summary: "A chat is renamed in place in the sidebar. The new title wins over one still being generated, and the chat keeps its place in the list.",
     participants: ["user", "sidebar", "appmodel", "engine", "store"],
     steps: [
-      ["user", "sidebar", "Rename, double-click, or Return", 'App/Views/MainView.swift:109: Button("Rename") { renaming = conversation.id }'],
-      ["sidebar", "appmodel", "Return or click away: `rename(id, to:)`", 'App/Views/MainView.swift:207: Task { await model.rename(id, to: text) }'],
+      ["user", "sidebar", "Rename, double-click, or Return", 'App/Views/MainView.swift:105: Button("Rename") { renaming = conversation.id }'],
+      ["sidebar", "appmodel", "Return or click away: `rename(id, to:)`", 'App/Views/MainView.swift:203: Task { await model.rename(id, to: text) }'],
       ["appmodel", "engine", "`rename(id, to:)`", 'App/AppModel.swift:251: try await engine?.rename(id, to: title)'],
       ["engine", "engine", "drop a title still being generated", 'KuriAgent/Engine.swift:291: titling[conversationID]?.cancel()'],
       ["engine", "store", "`updateConversation` — `updatedAt` unchanged", 'KuriAgent/Engine.swift:294: try await store.updateConversation(conversation)'],
