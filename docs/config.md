@@ -59,6 +59,7 @@ Anywhere a secret is accepted (`apiKey`, `headers`, an MCP server's `env`), the 
 | `startInBackground` | bool | `false` | Launch with only the menu bar icon: no main window, no Dock icon until one opens. Settings › General sets it. (Opening at login is a macOS login item, set in Settings › General, not here.) |
 | `compactAt` | integer, 50 to 95 | `75` | Summarize earlier messages when a request would fill this percentage of the model's context window (it needs the model's `contextWindow`); the latest exchange stays verbatim. Settings › General sets it. |
 | `appearance` | `"system"`, `"light"` or `"dark"` | `"system"` | The app's colour scheme: following macOS, or always light or dark. Applies as soon as the file is saved. Settings › General sets it. |
+| `meadow` | bool | `true` | The pixel meadow along the bottom of the new chat page: a chestnut tree, grass, leaves in the wind. Click the tree to shake it. Still while Reduce Motion is on. Settings › General toggles it. |
 | `providers` | object | `{}` | Providers by name; the name is the part before the slash in model references. |
 | `tools` | object | `{}` | Tool policies, see below. |
 | `sandbox` | object | defaults below | The Linux sandbox. |

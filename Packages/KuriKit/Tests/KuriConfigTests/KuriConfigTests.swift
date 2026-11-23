@@ -204,6 +204,21 @@ import Testing
     }
 }
 
+@Suite struct MeadowSettingTests {
+    @Test func writesFalseAndLeavesTheDefaultOut() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-meadow-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let home = KuriHome(root: root)
+        try home.prepare()
+        try Data(#"{ providers: {} }"#.utf8).write(to: home.configFile)
+        #expect(try ConfigLoader(home: home).loadConfig().meadow == nil)
+        try ConfigEditor(home: home).setMeadow(false)
+        #expect(try ConfigLoader(home: home).loadConfig().meadow == false)
+        try ConfigEditor(home: home).setMeadow(true)
+        #expect(try ConfigLoader(home: home).loadConfig().meadow == nil)
+    }
+}
+
 @Suite struct GenerateTitlesSettingTests {
     @Test func editorWritesTheToggle() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "kuri-titles-\(UUID().uuidString)")

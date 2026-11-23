@@ -65,6 +65,9 @@ public struct ConfigLoader: Sendable {
           // "system" (the default), "light" or "dark".
           appearance: "system",
 
+          // The pixel meadow along the bottom of the new chat page.
+          meadow: true,
+
           // Launch with only the menu bar icon, no main window.
           startInBackground: false,
 

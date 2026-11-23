@@ -87,6 +87,15 @@ public struct ConfigEditor: Sendable {
         }
     }
 
+    /// `true` is the default, so it leaves the key out.
+    public func setMeadow(_ enabled: Bool) throws {
+        try edit { tree in
+            guard case .object(var root) = tree else { return }
+            root["meadow"] = enabled ? nil : .bool(false)
+            tree = .object(root)
+        }
+    }
+
     public func setAppearance(_ appearance: Appearance) throws {
         try edit { tree in
             guard case .object(var root) = tree else { return }

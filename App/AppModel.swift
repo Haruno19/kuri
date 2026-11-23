@@ -423,6 +423,14 @@ final class AppModel {
         }
     }
 
+    func setMeadow(_ enabled: Bool) async {
+        do {
+            try await engine?.setMeadow(enabled)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func setAppearance(_ appearance: Appearance) async {
         do {
             try await engine?.setAppearance(appearance)

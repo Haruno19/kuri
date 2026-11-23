@@ -23,6 +23,8 @@ public struct Config: Codable, Sendable, Hashable {
     public var appearance: Appearance?
     /// Launch with only the menu bar icon, no main window. Default `false`.
     public var startInBackground: Bool?
+    /// The pixel meadow along the bottom of the new chat page. Default `true`.
+    public var meadow: Bool?
     /// Summarize earlier messages when a request would fill this share of
     /// the model's context window, in percent. Default 75.
     public var compactAt: Int?
@@ -36,6 +38,7 @@ public struct Config: Codable, Sendable, Hashable {
         generateTitles: Bool? = nil,
         appearance: Appearance? = nil,
         startInBackground: Bool? = nil,
+        meadow: Bool? = nil,
         compactAt: Int? = nil
     ) {
         self.defaultModel = defaultModel
@@ -46,6 +49,7 @@ public struct Config: Codable, Sendable, Hashable {
         self.generateTitles = generateTitles
         self.appearance = appearance
         self.startInBackground = startInBackground
+        self.meadow = meadow
         self.compactAt = compactAt
     }
 
@@ -59,6 +63,7 @@ public struct Config: Codable, Sendable, Hashable {
         generateTitles = try container.decodeIfPresent(Bool.self, forKey: .generateTitles)
         appearance = try container.decodeIfPresent(Appearance.self, forKey: .appearance)
         startInBackground = try container.decodeIfPresent(Bool.self, forKey: .startInBackground)
+        meadow = try container.decodeIfPresent(Bool.self, forKey: .meadow)
         compactAt = try container.decodeIfPresent(Int.self, forKey: .compactAt)
     }
 

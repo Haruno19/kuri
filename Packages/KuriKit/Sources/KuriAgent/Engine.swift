@@ -560,6 +560,11 @@ public actor Engine {
         await reloadConfig()
     }
 
+    public func setMeadow(_ enabled: Bool) async throws {
+        try ConfigEditor(home: home).setMeadow(enabled)
+        await reloadConfig()
+    }
+
     public func setAppearance(_ appearance: Appearance) async throws {
         try ConfigEditor(home: home).setAppearance(appearance)
         await reloadConfig()

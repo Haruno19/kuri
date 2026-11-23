@@ -11,12 +11,20 @@ struct ChatView: View {
     @Environment(\.palette) private var palette
     @State private var draft = ""
     @State private var choosingFolder = false
+    /// The meadow's tree: a new one each window, the same one while it's open.
+    @State private var meadowSeed = UInt64.random(in: 0 ... .max)
     @Namespace private var space
 
     var body: some View {
         ZStack {
             palette.background.ignoresSafeArea()
             if showsWelcome {
+                if model.config.meadow ?? true {
+                    Meadowland(seed: meadowSeed)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .ignoresSafeArea(edges: .bottom)
+                        .transition(.opacity)
+                }
                 Welcome(composer: composer)
                     .transition(.opacity)
             } else {

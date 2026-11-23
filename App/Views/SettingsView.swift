@@ -39,6 +39,11 @@ private struct GeneralSettings: View {
                     Text("Dark").tag(Appearance.dark)
                 }
                 .pickerStyle(.segmented)
+                Toggle("Meadow", isOn: Binding(
+                    get: { model.config.meadow ?? true },
+                    set: { enabled in Task { await model.setMeadow(enabled) } }))
+                Text("A chestnut tree and autumn grass along the bottom of a new chat. Click the tree to shake it.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Startup") {
                 Toggle("Open at login", isOn: Binding(

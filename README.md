@@ -116,7 +116,7 @@ Any other provider works the same way with its own `format` and, if it isn't the
 
 ## Footprint
 
-Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows for conversations, LaTeX, the mini window and the inspector on the 23rd), as the memory figure Activity Monitor shows (physical footprint).
+Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows for conversations, LaTeX, the mini window, the inspector and the meadow on the 23rd), as the memory figure Activity Monitor shows (physical footprint).
 
 | | Kuri |
 |---|---|
@@ -127,6 +127,7 @@ Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows
 | Once a reply has LaTeX | + ≈ 25 MB for MathJax, kept until quit (4) |
 | Mini window open | + ≈ 18 MB, and ≈ 10 MB more with a chat in it, however long (5) |
 | Inspector open | + ≈ 2–4 MB, from a short chat to 200 commands and 150 changed files (6) |
+| The meadow on the new chat page | + ≈ 0.3 MB, ≈ 2% CPU while it's on screen (8) |
 | Sandbox VM, booted or doing light shell work | + ≈ 300 MB |
 | Sandbox VM after a 300 MB workload | + ≈ 600 MB until the container stops (2) |
 
@@ -137,6 +138,7 @@ Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows
 5. Measured like (3), with the app's own mini window views in an off-screen panel: its second model on the engine adds under 1 MB, the empty glass window ≈ 18 MB, and a chat of 40 or of 120 Markdown-heavy answers ≈ 10 MB more (its transcript is lazy too). It has no LaTeX, so MathJax never loads for it.
 6. Measured like (3), with the app's own main window in an off-screen window, opening the inspector on a chat of 8 commands, on one of 204 commands with output, and on the same with a repository of 150 changed files: + 2.4, + 2.8 and + 3.8 MB. Steps shows the latest few and lists the rest lazily on Show all (built in full, the 204 took ≈ 12 MB), and Git the first 12 changes of each repository (all 150 took ≈ 18 MB). Git status runs `git` in separate, short-lived processes. At rest, open or closed, the inspector takes no CPU.
 7. Measured with `python:3-slim` (a 45 MB download). Kuri's image is a 254 MB download; its total is estimated from the layer sizes, not yet measured.
+8. Memory measured like (3), the app's new chat page with `meadow` on and off; CPU measured in its sketch (`Sketches/Meadow.swift`) at 12 frames a second. It stops while the window is hidden and with Reduce Motion.
 
 None of this includes a model's weights. A local model runs in its own process (`qwen3.5:2b` takes about 3 GB in Ollama); a hosted one costs nothing locally.
 
