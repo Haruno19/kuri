@@ -19,6 +19,9 @@ struct ChatView: View {
         ZStack {
             palette.background.ignoresSafeArea()
             if showsWelcome {
+                DotGrid()
+                    .ignoresSafeArea()
+                    .transition(.opacity)
                 if model.config.meadow ?? true {
                     Meadowland(seed: meadowSeed)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -26,6 +29,10 @@ struct ChatView: View {
                         .transition(.opacity)
                 }
                 Welcome(composer: composer)
+                    .transition(.opacity)
+                StatusLine(aboveMeadow: model.config.meadow ?? true)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .ignoresSafeArea(edges: .bottom)
                     .transition(.opacity)
             } else {
                 Transcript(composer: composer)
@@ -86,6 +93,79 @@ private struct Welcome<C: View>: View {
         let hour = Calendar.current.component(.hour, from: .now)
         let part = hour < 5 ? "Still up" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
         return name.isEmpty ? "\(part)." : "\(part), \(name)."
+    }
+}
+
+/// Faint square dots behind the new chat page, like graph paper or an old
+/// desktop pattern: clearest around the greeting, gone by the edges. Drawn
+/// once per size, one path for every dot.
+private struct DotGrid: View {
+    /// On the meadow's 4-point grid, so dots and pixels line up.
+    static let spacing: CGFloat = 24
+    static let dot: CGFloat = 2
+    static let opacityDark = 0.13
+    static let opacityLight = 0.11
+    /// Where the pattern is clearest, as a share of the page, and how far
+    /// it reaches, as a share of the page's larger side.
+    static let centre = UnitPoint(x: 0.5, y: 0.44)
+    static let reach = 0.62
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        Canvas { context, size in
+            var dots = Path()
+            let s = Self.spacing
+            // From the bottom left, where the meadow's grid starts.
+            var y = size.height - s / 2
+            while y > 0 {
+                var x = s / 2
+                while x < size.width {
+                    dots.addRect(CGRect(x: x - Self.dot / 2, y: y - Self.dot / 2, width: Self.dot, height: Self.dot))
+                    x += s
+                }
+                y -= s
+            }
+            context.fill(dots, with: .color(palette.ink.opacity(palette.dark ? Self.opacityDark : Self.opacityLight)))
+        }
+        .mask {
+            GeometryReader { geometry in
+                RadialGradient(colors: [.black, .black.opacity(0.4), .clear], center: Self.centre, startRadius: 0,
+                               endRadius: max(geometry.size.width, geometry.size.height) * Self.reach)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// What the app is up to, in a word or two at the bottom left, the way old
+/// software kept a status bar: “Ready” most of the time.
+private struct StatusLine: View {
+    /// Clear of the meadow's grass when it's there.
+    let aboveMeadow: Bool
+    @Environment(AppModel.self) private var model
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        Text(text)
+            .font(Typeface.mono(11))
+            .foregroundStyle(palette.faint)
+            .contentTransition(.opacity)
+            .animation(Tune.status, value: text)
+            .padding(.leading, 20)
+            .padding(.bottom, aboveMeadow ? 30 : 16)
+            .allowsHitTesting(false)
+    }
+
+    private var text: String {
+        switch model.phase {
+        case .starting: return "Starting…"
+        case .failed: return "Not ready"
+        case .ready:
+            let others = model.running.count
+            if others > 0 { return others == 1 ? "Working in 1 chat" : "Working in \(others) chats" }
+            return model.models.isEmpty ? "No model set up" : "Ready"
+        }
     }
 }
 
