@@ -10,6 +10,7 @@ The brief for the redesign. Every app change is checked against it. Directions a
    - Every interaction answers: hover, press, click and drop give immediate, physical feedback.
    - Expect to iterate on timings with the author; keep them as named constants, easy to tune.
    - Motion never lays the transcript out again frame by frame: that's what makes a window stutter. Panels around it keep their room while something else moves and change after it (the plan above the composer goes once the inspector has finished sliding in), and a panel that folds open takes room only for its folded height, opening over the transcript instead of pushing it.
+   - Changing numbers crossfade (`.contentTransition(.opacity)`) rather than roll (`.numericText()`): the roll's blur and scale is drawn on the CPU at a new size every frame, and each size stays in the glyph cache, so the inspector's counts once grew the app by ≈ 170 MB over a few chat switches.
 3. **Space serves use.** In the chat, the text gets the room: wide reading column, little chrome. Settings and configuration go the other way: a compact, information-dense, slightly retro layout (tight rows, small type, grouped boxes) instead of airy spacing.
 
 ## Style

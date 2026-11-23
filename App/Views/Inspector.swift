@@ -212,7 +212,7 @@ private struct InspectorAccessory: View {
         }
         .font(Typeface.sans(11.5).monospacedDigit())
         .foregroundStyle(palette.faint)
-        .contentTransition(.numericText())
+        .contentTransition(.opacity)
         .animation(Tune.status, value: model.contextUsage?.tokens)
     }
 }
@@ -667,7 +667,7 @@ private struct ContextPane: View {
                 Text(TokenCount.short(usage.tokens))
                     .font(Typeface.serif(20))
                     .foregroundStyle(palette.ink)
-                    .contentTransition(.numericText())
+                    .contentTransition(.opacity)
                 Text(usage.window.map { "of \(TokenCount.short($0)) tokens" } ?? "tokens, about")
                     .font(Typeface.sans(12))
                     .foregroundStyle(palette.faint)
@@ -687,7 +687,7 @@ private struct ContextPane: View {
                                 Text(TokenCount.short(part.tokens))
                                     .foregroundStyle(palette.faint)
                                     .monospacedDigit()
-                                    .contentTransition(.numericText())
+                                    .contentTransition(.opacity)
                             }
                             .font(Typeface.sans(11.5))
                         }
