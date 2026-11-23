@@ -14,6 +14,9 @@ enum Tune {
     static let scroll = Animation.spring(response: 0.5, dampingFraction: 0.9)
     /// Status text swapping while the model works.
     static let status = Animation.spring(response: 0.35, dampingFraction: 0.9)
+    /// A panel making way once something else has finished moving: the
+    /// plan above the composer, after the inspector's slide.
+    static let fade = Animation.easeOut(duration: 0.18)
     /// Hover washes and highlights.
     static let hover = Animation.easeOut(duration: 0.14)
     /// A control becoming enabled or disabled.

@@ -151,10 +151,12 @@ private struct Transcript<C: View>: View {
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 8) {
+                    // First: open, it floats up over the transcript, and
+                    // nothing else in the stack may be under it.
+                    TaskListPanel()
                     ForEach(model.inputRequests.filter { $0.conversationID == model.selection }) { request in
                         InputRequestView(request: request)
                     }
-                    TaskListPanel()
                     QueuedMessages()
                     FolderBar()
                     composer
@@ -827,43 +829,60 @@ struct TurnEndBar: View {
     }
 }
 
-/// The current plan, pinned above the composer while it has open tasks
-/// (the inspector's Tasks section has it when that's open). It reads the
-/// inspector's state itself, so toggling the inspector doesn't rebuild the
-/// transcript around it.
+/// The current plan, above the composer while it has open tasks (the
+/// inspector's Tasks section has it when that's open). Only its folded
+/// height takes room in the column: open, it floats up over the transcript,
+/// so folding and unfolding it never lays the transcript out again.
 private struct TaskListPanel: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.palette) private var palette
     @State private var expanded = true
 
     var body: some View {
         let entries = model.taskList
-        if !model.showsInspector, entries.contains(where: { $0.status != .completed }) {
-            let done = entries.filter { $0.status == .completed }.count
-            VStack(alignment: .leading, spacing: 8) {
-                Button {
-                    withAnimation(Tune.move) { expanded.toggle() }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("Plan").foregroundStyle(palette.ink)
-                        Text("\(done)/\(entries.count)").foregroundStyle(palette.faint).monospacedDigit()
-                        Spacer()
-                        PencilIcon(glyph: .chevron, size: 11, color: palette.faint)
-                            .rotationEffect(.degrees(expanded ? 0 : -90))
+        if !model.planInInspector, entries.contains(where: { $0.status != .completed }) {
+            PlanCard(entries: entries, expanded: false) {}
+                .hidden()
+                .overlay(alignment: .bottom) {
+                    PlanCard(entries: entries, expanded: expanded) {
+                        withAnimation(Tune.move) { expanded.toggle() }
                     }
-                    .font(Typeface.sans(13))
-                    .contentShape(.rect)
+                    // Its own height, growing upwards from the folded slot.
+                    .fixedSize(horizontal: false, vertical: true)
                 }
-                .buttonStyle(.plain)
-                if expanded {
-                    TaskListRows(entries: entries)
-                        .transition(.opacity)
-                }
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .modifier(Pane())
+                .transition(.opacity)
         }
+    }
+}
+
+private struct PlanCard: View {
+    let entries: [TaskListTool.Entry]
+    let expanded: Bool
+    let toggle: () -> Void
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        let done = entries.filter { $0.status == .completed }.count
+        VStack(alignment: .leading, spacing: 8) {
+            Button(action: toggle) {
+                HStack(spacing: 6) {
+                    Text("Plan").foregroundStyle(palette.ink)
+                    Text("\(done)/\(entries.count)").foregroundStyle(palette.faint).monospacedDigit()
+                    Spacer()
+                    PencilIcon(glyph: .chevron, size: 11, color: palette.faint)
+                        .rotationEffect(.degrees(expanded ? 0 : -90))
+                }
+                .font(Typeface.sans(13))
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            if expanded {
+                TaskListRows(entries: entries)
+                    .transition(.opacity)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(Pane())
     }
 }
 

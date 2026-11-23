@@ -87,6 +87,10 @@ final class AppModel {
     /// The inspector is open (the main window's; ⌥⌘I). Not remembered:
     /// the window opens on the chat alone.
     var showsInspector = false
+    /// The plan shows in the inspector's Tasks section rather than above the
+    /// composer. Follows `showsInspector` once its slide is over
+    /// (`toggleInspector()`).
+    var planInInspector = false
     /// The model picked on the new-chat page, before a conversation exists.
     var draftModel: ModelRef?
 

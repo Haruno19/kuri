@@ -55,7 +55,7 @@ struct MainView: View {
             .overlay(alignment: .topTrailing) {
                 if model.phase.isReady {
                     PaneToggle(glyph: .inspector, help: model.showsInspector ? "Hide the inspector (⌥⌘I)" : "Show the inspector (⌥⌘I)") {
-                        model.showsInspector.toggle()
+                        model.toggleInspector()
                     }
                     .padding(.trailing, PaneToggle.inset)
                     .padding(.top, PaneToggle.top)
@@ -64,7 +64,11 @@ struct MainView: View {
             // Only the top: the content stays beside the sidebar, so the chat
             // shifts right when it opens instead of sliding under it.
             .ignoresSafeArea(edges: .top)
-            .inspector(isPresented: $model.showsInspector) {
+            // Through `toggleInspector()` even when macOS closes it itself.
+            .inspector(isPresented: Binding(
+                get: { model.showsInspector },
+                set: { if $0 != model.showsInspector { model.toggleInspector() } })
+            ) {
                 InspectorView()
                     .inspectorColumnWidth(min: 270, ideal: 320, max: 460)
             }
@@ -78,6 +82,21 @@ struct MainView: View {
             Button("OK") { model.errorMessage = nil }
         } message: {
             Text(model.errorMessage ?? "")
+        }
+    }
+}
+
+extension AppModel {
+    /// Shows or hides the inspector, for its button, View › Show Inspector
+    /// and ⌥⌘I alike. The plan above the composer hides (or comes back) only
+    /// once the slide is over: changing the composer area's height during
+    /// it would lay the transcript out again at every frame of the slide.
+    func toggleInspector() {
+        withAnimation(Tune.move, completionCriteria: .logicallyComplete) {
+            showsInspector.toggle()
+        } completion: { [self] in
+            guard planInInspector != showsInspector else { return }
+            withAnimation(Tune.fade) { planInInspector = showsInspector }
         }
     }
 }

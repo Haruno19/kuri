@@ -71,7 +71,7 @@ private struct InspectorCommands: View {
 
     var body: some View {
         Button(model.showsInspector ? "Hide Inspector" : "Show Inspector") {
-            withAnimation(Tune.move) { model.showsInspector.toggle() }
+            model.toggleInspector()
         }
         .keyboardShortcut("i", modifiers: [.command, .option])
         .disabled(model.phase.isReady == false)
