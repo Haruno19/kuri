@@ -321,7 +321,8 @@ private struct SandboxSettingsView: View {
                     Label("Not set up yet.", systemImage: "shippingbox")
                     Text("""
                         Setup downloads a Linux kernel release (about 680 MB, of which only the 18 MB kernel is \
-                        kept), Apple's init image and the container image: about 0.8 GB on disk in the end. After \
+                        kept), Apple's init image and the container image (about 250 MB for Kuri's, 45 MB for \
+                        Python's): about 1.6 GB on disk in the end with Kuri's image, 0.8 GB with Python's. After \
                         that the sandbox works offline.
                         """)
                     .font(.callout).foregroundStyle(.secondary)
