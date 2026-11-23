@@ -82,12 +82,10 @@ struct Themed: ViewModifier {
 
 // MARK: - Type
 
-/// The three faces of decision 0015: Publico Text for the model and
-/// accents, DM Sans for the interface, iA Writer Mono for code.
+/// The three faces, all bundled (decisions 0015 and 0018): Literata for the
+/// model and accents, DM Sans for the interface, iA Writer Mono for code.
 enum Typeface {
-    static func serif(_ size: CGFloat) -> Font {
-        .custom(FontLibrary.shared.publicoReady ? "Publico Text" : "Iowan Old Style", size: size)
-    }
+    static func serif(_ size: CGFloat) -> Font { .custom("Literata", size: size) }
 
     static func sans(_ size: CGFloat) -> Font { .custom("DM Sans", size: size) }
 
@@ -100,34 +98,18 @@ enum Typeface {
     static let monoScale: CGFloat = 0.86
 }
 
-/// Loads the bundled fonts and asks macOS for Publico Text, an Apple font it
-/// downloads on request. Until that arrives the serif is Iowan Old Style.
-@Observable final class FontLibrary {
-    static let shared = FontLibrary()
-    private(set) var publicoReady = FontLibrary.installed("Publico Text")
-
-    func prepare() {
-        for url in Bundle.main.urls(forResourcesWithExtension: "ttf", subdirectory: nil) ?? [] {
-            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+/// Registers the fonts in the app bundle for this process.
+enum FontLibrary {
+    static func prepare() {
+        for ext in ["ttf", "otf"] {
+            for url in Bundle.main.urls(forResourcesWithExtension: ext, subdirectory: nil) ?? [] {
+                CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+            }
         }
-        for url in Bundle.main.urls(forResourcesWithExtension: "otf", subdirectory: nil) ?? [] {
-            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
-        }
-        if !publicoReady { Self.download("Publico Text") }
     }
 
     nonisolated static func installed(_ family: String) -> Bool {
         NSFontManager.shared.availableMembers(ofFontFamily: family) != nil
-    }
-
-    private nonisolated static func download(_ family: String) {
-        let descriptor = CTFontDescriptorCreateWithAttributes([kCTFontFamilyNameAttribute: family] as CFDictionary)
-        CTFontDescriptorMatchFontDescriptorsWithProgressHandler([descriptor] as CFArray, nil) { state, _ in
-            if state == .didFinish {
-                Task { @MainActor in FontLibrary.shared.publicoReady = FontLibrary.installed(family) }
-            }
-            return true
-        }
     }
 }
 

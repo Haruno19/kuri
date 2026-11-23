@@ -1,5 +1,7 @@
 # 0015. Typography: Publico Text, DM Sans, iA Writer Mono
 
+*Amended by [0018](0018-literata.md): the serif is now Literata.*
+
 **Decided.** Kuri's text uses three faces:
 
 - **Publico Text** (serif: replies, headings, accents). An Apple-licensed font that macOS downloads on request; Kuri asks Core Text for it at launch and uses *Iowan Old Style*, which ships with macOS, until it arrives.

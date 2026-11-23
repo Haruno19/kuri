@@ -7,7 +7,7 @@ struct KuriApp: App {
     init() {
         let model = AppModel()
         _model = State(initialValue: model)
-        FontLibrary.shared.prepare()
+        FontLibrary.prepare()
         // The engine starts with the app, not with a window: Kuri keeps
         // running from the menu bar when every window is closed.
         Task { await model.start() }

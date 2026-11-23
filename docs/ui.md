@@ -16,8 +16,8 @@ The brief for the redesign. Every app change is checked against it. Directions a
 - **Classy and warm**, built from **layers and depth**: surfaces sit on surfaces, with real shadows and light from above.
 - **Light and dark** themes, following the system.
 - **Autumn palette**: chestnut, amber, toasted cream, warm brown-blacks. The accent is the app icon's chestnut gradient (top `p3(0.60, 0.35, 0.16)` → bottom `sRGB(0.73, 0.58, 0.34)`; the dark icon starts at `p3(0.50, 0.31, 0.14)`). No cold greys: neutrals are warm.
-- **Type** (see [decision 0015](decisions/0015-typography.md) for where each font comes from):
-  - **Serif** (model replies, headings, accents): *Publico Text*, an Apple font macOS downloads on request; *Iowan Old Style* until it's there.
+- **Type** (see decisions [0015](decisions/0015-typography.md) and [0018](decisions/0018-literata.md) for where each font comes from):
+  - **Serif** (model replies, headings, accents): *Literata*, bundled ([decision 0018](decisions/0018-literata.md)).
   - **Sans** (user messages and the rest of the UI: titles, model selector, buttons): *DM Sans*, bundled.
   - **Mono** (code): *iA Writer Mono*, bundled, set smaller than the text around it (×0.86).
 - **Code blocks**: syntax colours from the author's Everforest themes ([everforest-vscode](https://github.com/Haruno19/everforest-vscode)): *Higure* in dark mode, *Yoake* (its light counterpart) in light mode.
