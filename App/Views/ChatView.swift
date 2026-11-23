@@ -182,10 +182,7 @@ private struct Transcript<C: View>: View {
     /// What the running turn is doing, below the latest messages.
     @ViewBuilder private var live: some View {
         if !model.streamingReasoning.isEmpty && model.streamingText.isEmpty {
-            Text(model.streamingReasoning)
-                .font(Typeface.sans(13))
-                .foregroundStyle(palette.faint)
-                .lineSpacing(2)
+            LiveReasoning(text: model.streamingReasoning, room: visible)
                 .padding(.horizontal, 6)
         }
         if !model.streamingText.isEmpty {
@@ -475,6 +472,43 @@ private struct OrbitingDots: View {
 
 /// Text scrolling up past the pinned message blurs and fades into the
 /// background instead of being cut at the window's edge.
+/// Reasoning as it streams: a window of its latest lines, at most ten or
+/// about a third of the room between the pinned message and the composer;
+/// older lines fade out at the top.
+private struct LiveReasoning: View {
+    let text: String
+    /// The visible height of the transcript.
+    let room: CGFloat
+    @Environment(\.palette) private var palette
+    @State private var height: CGFloat = 0
+
+    private static let lineHeight: CGFloat = 19
+    private static let maxLines: CGFloat = 10
+    private static let minLines: CGFloat = 4
+    private static let roomShare: CGFloat = 0.3
+
+    var body: some View {
+        let cap = min(Self.maxLines * Self.lineHeight, max(Self.minLines * Self.lineHeight, room * Self.roomShare))
+        let overflows = height > cap + 0.5
+        Text(text)
+            .font(Typeface.sans(13))
+            .foregroundStyle(palette.faint)
+            .lineSpacing(2)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+            // The newest line stays at the bottom; the rest is cut off above.
+            .frame(height: overflows ? cap : nil, alignment: .bottom)
+            .clipped()
+            .mask {
+                LinearGradient(stops: [.init(color: overflows ? .clear : .black, location: 0),
+                                       .init(color: .black, location: overflows ? 0.4 : 0)],
+                               startPoint: .top, endPoint: .bottom)
+            }
+            .animation(Tune.status, value: overflows)
+    }
+}
+
 private struct TopFade: View {
     @Environment(\.palette) private var palette
 
