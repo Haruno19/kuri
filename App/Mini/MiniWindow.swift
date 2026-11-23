@@ -1,12 +1,37 @@
 import AppKit
 import SwiftUI
 
-/// SwiftUI's own actions for opening the main window and Settings,
-/// captured from the main window when it first appears, so AppKit code
-/// (the status item, the mini window) can call them.
+/// SwiftUI's own actions for opening the main window and Settings, for
+/// AppKit code (the status item, the mini window). They're captured at
+/// launch by a SwiftUI view in a hidden one-point window, so they exist
+/// even when the main window never appeared (`startInBackground`).
 enum WindowActions {
     static var openWindow: OpenWindowAction?
     static var openSettings: OpenSettingsAction?
+    private static var catcher: NSWindow?
+
+    static func capture() {
+        let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: 1, height: 1),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: Catcher { window.orderOut(nil) })
+        window.orderBack(nil)
+        catcher = window
+    }
+
+    private struct Catcher: View {
+        let done: () -> Void
+        @Environment(\.openWindow) private var openWindow
+        @Environment(\.openSettings) private var openSettings
+
+        var body: some View {
+            Color.clear.frame(width: 1, height: 1).onAppear {
+                WindowActions.openWindow = openWindow
+                WindowActions.openSettings = openSettings
+                done()
+            }
+        }
+    }
 
     static func openMain() {
         Dock.show()
@@ -63,6 +88,8 @@ final class MiniController: NSObject, NSWindowDelegate {
     /// The main window's model; the mini window has its own, on the same
     /// engine, so the two can show different chats.
     var main: AppModel?
+    /// Set at launch from `startInBackground`.
+    var startsInBackground = false
     private let mini = AppModel()
     private var statusItem: NSStatusItem?
     private var panel: MiniPanel?
@@ -72,6 +99,7 @@ final class MiniController: NSObject, NSWindowDelegate {
     static let maxSize = NSSize(width: 560, height: 820)
 
     func install() {
+        WindowActions.capture()
         Dock.follow()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {

@@ -288,6 +288,14 @@ final class AppModel {
         }
     }
 
+    func setStartInBackground(_ enabled: Bool) async {
+        do {
+            try await engine?.setStartInBackground(enabled)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func setAppearance(_ appearance: Appearance) async {
         do {
             try await engine?.setAppearance(appearance)

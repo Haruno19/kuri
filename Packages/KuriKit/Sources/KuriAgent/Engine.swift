@@ -503,6 +503,11 @@ public actor Engine {
         await reloadConfig()
     }
 
+    public func setStartInBackground(_ enabled: Bool) async throws {
+        try ConfigEditor(home: home).setStartInBackground(enabled)
+        await reloadConfig()
+    }
+
     public func setAppearance(_ appearance: Appearance) async throws {
         try ConfigEditor(home: home).setAppearance(appearance)
         await reloadConfig()

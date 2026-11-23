@@ -190,6 +190,20 @@ import Testing
     }
 }
 
+@Suite struct StartInBackgroundSettingTests {
+    @Test func writesTrueAndLeavesTheDefaultOut() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-background-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let home = KuriHome(root: root)
+        try home.prepare()
+        try Data(#"{ providers: {} }"#.utf8).write(to: home.configFile)
+        try ConfigEditor(home: home).setStartInBackground(true)
+        #expect(try ConfigLoader(home: home).loadConfig().startInBackground == true)
+        try ConfigEditor(home: home).setStartInBackground(false)
+        #expect(try ConfigLoader(home: home).loadConfig().startInBackground == nil)
+    }
+}
+
 @Suite struct GenerateTitlesSettingTests {
     @Test func editorWritesTheToggle() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "kuri-titles-\(UUID().uuidString)")

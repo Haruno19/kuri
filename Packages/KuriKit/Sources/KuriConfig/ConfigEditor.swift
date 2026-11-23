@@ -78,6 +78,15 @@ public struct ConfigEditor: Sendable {
         }
     }
 
+    /// `false` is the default, so it leaves the key out.
+    public func setStartInBackground(_ enabled: Bool) throws {
+        try edit { tree in
+            guard case .object(var root) = tree else { return }
+            root["startInBackground"] = enabled ? .bool(true) : nil
+            tree = .object(root)
+        }
+    }
+
     public func setAppearance(_ appearance: Appearance) throws {
         try edit { tree in
             guard case .object(var root) = tree else { return }

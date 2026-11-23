@@ -39,8 +39,8 @@ struct MiniChat: View {
                 }
                 HStack(spacing: 2) {
                     MiniFolderButton(choosingFolder: $choosingFolder)
+                    Spacer(minLength: 8)
                     MiniModelPicker()
-                    Spacer(minLength: 0)
                 }
                 MiniComposer(draft: $draft)
             }
@@ -256,7 +256,7 @@ private struct MiniFolderButton: View {
     }
 }
 
-/// The model for this chat, small and dim beside the folder button.
+/// The model for this chat, small and dim, over the composer's right end.
 private struct MiniModelPicker: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette

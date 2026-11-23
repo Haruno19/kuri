@@ -100,7 +100,7 @@ Policies (`allow`, `ask`, `deny`) can be set per tool in `config.json` and per M
 
 ## Footprint
 
-Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows for conversations and LaTeX on the 23rd), as the memory figure Activity Monitor shows (physical footprint).
+Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows for conversations, LaTeX and the mini window on the 23rd), as the memory figure Activity Monitor shows (physical footprint).
 
 | | Kuri |
 |---|---|
@@ -109,6 +109,7 @@ Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows
 | Running, during an agent turn | ≈ 40–65 MB (1) |
 | A conversation open | + ≈ 30 MB for the transcript, however long it is (3) |
 | Once a reply has LaTeX | + ≈ 25 MB for MathJax, kept until quit (4) |
+| Mini window open | + ≈ 18 MB, and ≈ 10 MB more with a chat in it, however long (5) |
 | Sandbox VM, booted or doing light shell work | + ≈ 300 MB |
 | Sandbox VM after a 300 MB workload | + ≈ 600 MB until the container stops (2) |
 
@@ -116,6 +117,7 @@ Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows
 2. The Linux guest doesn't hand freed memory back to macOS, so a VM holds its peak until it stops: after `idleMinutes` (10 by default), on Stop, or on quit. `sandbox.memoryMiB` (2 GB by default) caps it.
 3. Measured by rendering the app's own reply views in an offscreen window, with 40 and with 120 Markdown-heavy answers (text, a list, a code block and a table each): both ≈ 32 MB. The transcript only builds the messages near the visible area; built in full, the same answers took ≈ 217 MB and ≈ 611 MB.
 4. MathJax loads the first time a formula appears; with 40 answers holding formulas the transcript came to ≈ 56 MB.
+5. Measured like (3), with the app's own mini window views in an off-screen panel: its second model on the engine adds under 1 MB, the empty glass window ≈ 18 MB, and a chat of 40 or of 120 Markdown-heavy answers ≈ 10 MB more (its transcript is lazy too). It has no LaTeX, so MathJax never loads for it.
 
 None of this includes a model's weights. A local model runs in its own process (`qwen3.5:2b` takes about 3 GB in Ollama); a hosted one costs nothing locally.
 
@@ -133,14 +135,14 @@ None of this includes a model's weights. A local model runs in its own process (
 
 ## Dependencies
 
-| Dependency | Why | When |
-|---|---|---|
-| Apple frameworks (SwiftUI, AppKit, Foundation, Security, SQLite3, Virtualization, FoundationModels) | Everything | Now |
-| [modelcontextprotocol/swift-sdk](https://github.com/modelcontextprotocol/swift-sdk) | MCP client | Now |
-| [apple/swift-log](https://github.com/apple/swift-log) | The SDK's logging API, which a custom transport has to implement | Now |
-| [apple/containerization](https://github.com/apple/containerization) | Sandbox (pinned to an exact version: its API moves between minor versions) | Now |
-| [MathJax](https://github.com/mathjax/MathJax) 3.2.2 | Typesetting LaTeX in replies, run in JavaScriptCore and bundled in `App/MathJax` (Apache 2.0; [decision 0019](docs/decisions/0019-latex-with-mathjax.md)) | Now |
-| [Literata](https://github.com/googlefonts/literata), [DM Sans](https://github.com/googlefonts/dm-fonts), [iA Writer Mono](https://github.com/iaolo/iA-Fonts) | The reply, interface and code faces, bundled under the SIL Open Font License (licences in `App/Fonts`; decisions [0015](docs/decisions/0015-typography.md), [0018](docs/decisions/0018-literata.md)) | Now |
+| Dependency | Why |
+|---|---|
+| Apple frameworks (SwiftUI, AppKit, Foundation, Security, SQLite3, Virtualization, FoundationModels, JavaScriptCore, ServiceManagement) | Everything |
+| [modelcontextprotocol/swift-sdk](https://github.com/modelcontextprotocol/swift-sdk) | MCP client |
+| [apple/swift-log](https://github.com/apple/swift-log) | The SDK's logging API, which a custom transport has to implement |
+| [apple/containerization](https://github.com/apple/containerization) | Sandbox (pinned to an exact version: its API moves between minor versions) |
+| [MathJax](https://github.com/mathjax/MathJax) 3.2.2 | Typesetting LaTeX in replies, run in JavaScriptCore and bundled in `App/MathJax` (Apache 2.0; [decision 0019](docs/decisions/0019-latex-with-mathjax.md)) |
+| [Literata](https://github.com/googlefonts/literata), [DM Sans](https://github.com/googlefonts/dm-fonts), [iA Writer Mono](https://github.com/iaolo/iA-Fonts) | The reply, interface and code faces, bundled under the SIL Open Font License (licences in `App/Fonts`; decisions [0015](docs/decisions/0015-typography.md), [0018](docs/decisions/0018-literata.md)) |
 
 The MCP SDK brings in, transitively, `apple/swift-system`, `apple/swift-log` and `mattt/eventsource` (SSE parsing for its HTTP transport); those are what end up linked into Kuri. SwiftPM also fetches `apple/swift-nio` and friends, used only by the SDK's own sample executables.
 

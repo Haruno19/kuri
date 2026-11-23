@@ -65,6 +65,9 @@ public struct ConfigLoader: Sendable {
           // "system" (the default), "light" or "dark".
           appearance: "system",
 
+          // Launch with only the menu bar icon, no main window.
+          startInBackground: false,
+
           providers: {
             // Anything that speaks Open Responses: Ollama, LM Studio, vLLM, OpenAI…
             ollama: {

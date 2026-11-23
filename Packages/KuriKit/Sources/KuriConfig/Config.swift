@@ -21,6 +21,8 @@ public struct Config: Codable, Sendable, Hashable {
     public var generateTitles: Bool?
     /// Light, dark, or following the system (the default).
     public var appearance: Appearance?
+    /// Launch with only the menu bar icon, no main window. Default `false`.
+    public var startInBackground: Bool?
 
     public init(
         defaultModel: ModelRef? = nil,
@@ -29,7 +31,8 @@ public struct Config: Codable, Sendable, Hashable {
         tools: [String: ToolPolicy]? = nil,
         sandbox: SandboxConfig? = nil,
         generateTitles: Bool? = nil,
-        appearance: Appearance? = nil
+        appearance: Appearance? = nil,
+        startInBackground: Bool? = nil
     ) {
         self.defaultModel = defaultModel
         self.utilityModel = utilityModel
@@ -38,6 +41,7 @@ public struct Config: Codable, Sendable, Hashable {
         self.sandbox = sandbox
         self.generateTitles = generateTitles
         self.appearance = appearance
+        self.startInBackground = startInBackground
     }
 
     public init(from decoder: any Decoder) throws {
@@ -49,6 +53,7 @@ public struct Config: Codable, Sendable, Hashable {
         sandbox = try container.decodeIfPresent(SandboxConfig.self, forKey: .sandbox)
         generateTitles = try container.decodeIfPresent(Bool.self, forKey: .generateTitles)
         appearance = try container.decodeIfPresent(Appearance.self, forKey: .appearance)
+        startInBackground = try container.decodeIfPresent(Bool.self, forKey: .startInBackground)
     }
 
     /// Every model declared in the file, in a stable order.

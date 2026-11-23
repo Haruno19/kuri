@@ -5,6 +5,8 @@ import SwiftUI
 struct KuriApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model: AppModel
+    /// Read at launch: with it, only the menu bar icon appears.
+    private let startsInBackground: Bool
 
     init() {
         let model = AppModel()
@@ -13,7 +15,10 @@ struct KuriApp: App {
         FontLibrary.prepare()
         // Read now, before the first window draws; the engine's copy of the
         // config, loaded asynchronously, takes over from there.
-        AppModel.apply(try? ConfigLoader(home: KuriHome.resolve()).loadConfig().appearance)
+        let config = try? ConfigLoader(home: KuriHome.resolve()).loadConfig()
+        AppModel.apply(config?.appearance)
+        startsInBackground = config?.startInBackground ?? false
+        MiniController.shared.startsInBackground = startsInBackground
         // The engine starts with the app, not with a window: Kuri keeps
         // running from the menu bar when every window is closed.
         Task { await model.start() }
@@ -44,6 +49,7 @@ struct KuriApp: App {
         }
         .windowToolbarStyle(.unified)
         .defaultSize(width: 1040, height: 760)
+        .defaultLaunchBehavior(startsInBackground ? .suppressed : .automatic)
 
         Settings {
             SettingsView()
@@ -57,6 +63,8 @@ struct KuriApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         MiniController.shared.install()
+        // Starting in the background: no window, so no Dock icon either.
+        if MiniController.shared.startsInBackground { Dock.update() }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }

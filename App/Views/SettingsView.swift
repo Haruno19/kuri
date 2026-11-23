@@ -4,6 +4,7 @@ import KuriMCP
 import KuriSandbox
 import KuriStore
 import KuriTools
+import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
@@ -23,6 +24,8 @@ struct SettingsView: View {
 
 private struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
+    /// macOS keeps this, not config.json: it's the system's login item.
+    @State private var loginItem = SMAppService.mainApp.status
 
     var body: some View {
         Form {
@@ -36,6 +39,20 @@ private struct GeneralSettings: View {
                     Text("Dark").tag(Appearance.dark)
                 }
                 .pickerStyle(.segmented)
+            }
+            Section("Startup") {
+                Toggle("Open at login", isOn: Binding(
+                    get: { loginItem == .enabled },
+                    set: { setOpenAtLogin($0) }))
+                if loginItem == .requiresApproval {
+                    Text("Allow Kuri in System Settings › General › Login Items.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Toggle("Start in the background", isOn: Binding(
+                    get: { model.config.startInBackground ?? false },
+                    set: { enabled in Task { await model.setStartInBackground(enabled) } }))
+                Text("Only the menu bar icon at launch, no main window. Click it for the mini window.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Conversations") {
                 Toggle("Generate titles", isOn: Binding(
@@ -58,6 +75,15 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func setOpenAtLogin(_ enabled: Bool) {
+        do {
+            if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+        } catch {
+            model.errorMessage = error.localizedDescription
+        }
+        loginItem = SMAppService.mainApp.status
     }
 
     private func fileRow(_ title: String, url: URL) -> some View {
