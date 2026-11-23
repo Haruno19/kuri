@@ -227,7 +227,8 @@ private struct ProviderModelsSection: View {
                 }
             }
         }
-        .task(id: name) { await discover() }
+        // Again once a key is saved: without one, a hosted API lists nothing.
+        .task(id: [name, provider.apiKey?.description ?? ""]) { await discover() }
     }
 
     private func discover() async {
