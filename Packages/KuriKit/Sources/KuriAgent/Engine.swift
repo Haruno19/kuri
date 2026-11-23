@@ -542,11 +542,6 @@ public actor Engine {
         await reloadConfig()
     }
 
-    public func setInspectorLayout(_ layout: InspectorLayout) async throws {
-        try ConfigEditor(home: home).setInspectorLayout(layout)
-        await reloadConfig()
-    }
-
     public func setAppearance(_ appearance: Appearance) async throws {
         try ConfigEditor(home: home).setAppearance(appearance)
         await reloadConfig()

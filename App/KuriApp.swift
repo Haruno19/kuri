@@ -65,8 +65,7 @@ struct KuriApp: App {
     }
 }
 
-/// View › Show Inspector (⌥⌘I) and Inspector Layout, next to the sidebar's
-/// own items.
+/// View › Show Inspector (⌥⌘I), next to the sidebar's own item.
 private struct InspectorCommands: View {
     @Bindable var model: AppModel
 
@@ -76,13 +75,6 @@ private struct InspectorCommands: View {
         }
         .keyboardShortcut("i", modifiers: [.command, .option])
         .disabled(model.phase.isReady == false)
-        Picker("Inspector Layout", selection: Binding(
-            get: { model.config.inspectorLayout ?? .stacked },
-            set: { layout in Task { await model.setInspectorLayout(layout) } })
-        ) {
-            Text("Stacked").tag(InspectorLayout.stacked)
-            Text("Tabs").tag(InspectorLayout.tabs)
-        }
         Divider()
     }
 }

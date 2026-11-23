@@ -6,14 +6,6 @@ public enum Appearance: String, Codable, Sendable, Hashable, CaseIterable {
     case system, light, dark
 }
 
-/// How the main window's inspector arranges its sections.
-public enum InspectorLayout: String, Codable, Sendable, Hashable, CaseIterable {
-    /// One box per section, in a column (the default).
-    case stacked
-    /// One section at a time, picked from a row of icons.
-    case tabs
-}
-
 /// The contents of `config.json`.
 public struct Config: Codable, Sendable, Hashable {
     /// The model new conversations start with.
@@ -31,8 +23,6 @@ public struct Config: Codable, Sendable, Hashable {
     public var appearance: Appearance?
     /// Launch with only the menu bar icon, no main window. Default `false`.
     public var startInBackground: Bool?
-    /// The inspector's sections stacked (the default) or as tabs.
-    public var inspectorLayout: InspectorLayout?
 
     public init(
         defaultModel: ModelRef? = nil,
@@ -42,8 +32,7 @@ public struct Config: Codable, Sendable, Hashable {
         sandbox: SandboxConfig? = nil,
         generateTitles: Bool? = nil,
         appearance: Appearance? = nil,
-        startInBackground: Bool? = nil,
-        inspectorLayout: InspectorLayout? = nil
+        startInBackground: Bool? = nil
     ) {
         self.defaultModel = defaultModel
         self.utilityModel = utilityModel
@@ -53,7 +42,6 @@ public struct Config: Codable, Sendable, Hashable {
         self.generateTitles = generateTitles
         self.appearance = appearance
         self.startInBackground = startInBackground
-        self.inspectorLayout = inspectorLayout
     }
 
     public init(from decoder: any Decoder) throws {
@@ -66,7 +54,6 @@ public struct Config: Codable, Sendable, Hashable {
         generateTitles = try container.decodeIfPresent(Bool.self, forKey: .generateTitles)
         appearance = try container.decodeIfPresent(Appearance.self, forKey: .appearance)
         startInBackground = try container.decodeIfPresent(Bool.self, forKey: .startInBackground)
-        inspectorLayout = try container.decodeIfPresent(InspectorLayout.self, forKey: .inspectorLayout)
     }
 
     /// Every model declared in the file, in a stable order.

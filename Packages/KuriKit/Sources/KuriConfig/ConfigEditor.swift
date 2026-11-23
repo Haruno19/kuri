@@ -87,15 +87,6 @@ public struct ConfigEditor: Sendable {
         }
     }
 
-    /// `stacked` is the default, so it leaves the key out.
-    public func setInspectorLayout(_ layout: InspectorLayout) throws {
-        try edit { tree in
-            guard case .object(var root) = tree else { return }
-            root["inspectorLayout"] = layout == .stacked ? nil : .string(layout.rawValue)
-            tree = .object(root)
-        }
-    }
-
     public func setAppearance(_ appearance: Appearance) throws {
         try edit { tree in
             guard case .object(var root) = tree else { return }

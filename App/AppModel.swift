@@ -340,14 +340,6 @@ final class AppModel {
         }
     }
 
-    func setInspectorLayout(_ layout: InspectorLayout) async {
-        do {
-            try await engine?.setInspectorLayout(layout)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
     func setAppearance(_ appearance: Appearance) async {
         do {
             try await engine?.setAppearance(appearance)

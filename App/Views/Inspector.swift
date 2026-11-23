@@ -13,9 +13,8 @@ import SwiftUI
 // except git, which is read from the attached folders.
 
 /// The inspector's sections.
-enum InspectorPane: String, CaseIterable, Identifiable {
+enum InspectorPane: String {
     case steps = "Steps", tasks = "Tasks", context = "Context", git = "Git", sandbox = "Sandbox"
-    var id: String { rawValue }
 
     var glyph: Glyph {
         switch self {
@@ -31,7 +30,6 @@ enum InspectorPane: String, CaseIterable, Identifiable {
 struct InspectorView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
-    @AppStorage("inspectorTab") private var tab: InspectorPane = .steps
     /// Git status of the attached folders that are repositories, by path.
     @State private var repositories: [String: RepositoryStatus] = [:]
     /// Bumped when Kuri comes back to the front: files may have changed.
@@ -39,12 +37,7 @@ struct InspectorView: View {
 
     var body: some View {
         let steps = InspectorStep.turns(from: model.items, isLive: model.isSelectedRunning, live: model.liveOutput)
-        Group {
-            switch model.config.inspectorLayout ?? .stacked {
-            case .stacked: stacked(steps)
-            case .tabs: tabbed(steps)
-            }
-        }
+        sections
         .background(surface.ignoresSafeArea())
         .environment(\.inspectorSteps, steps)
         .environment(\.repositories, repositories)
@@ -57,12 +50,13 @@ struct InspectorView: View {
         }
     }
 
-    private func stacked(_ turns: [InspectorTurn]) -> some View {
+    /// One box per section, in a column; the sandbox pinned at the bottom.
+    private var sections: some View {
         ScrollView {
             VStack(spacing: 8) {
-                InspectorSection(pane: .steps) { StepsPane(limit: 6) }
+                InspectorSection(pane: .steps) { StepsPane() }
                 InspectorSection(pane: .tasks) { TasksPane() }
-                InspectorSection(pane: .context) { ContextPane(compact: true) }
+                InspectorSection(pane: .context) { ContextPane() }
                 if !repositories.isEmpty {
                     InspectorSection(pane: .git) { GitPane() }
                         .transition(.opacity)
@@ -80,7 +74,7 @@ struct InspectorView: View {
         // The sandbox stays in view at the bottom, as the composer does in
         // the chat: it's what moves while the model works.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            InspectorSection(pane: .sandbox) { SandboxPane(alwaysOpen: false) }
+            InspectorSection(pane: .sandbox) { SandboxPane() }
                 .padding(.horizontal, 10)
                 .padding(.top, 14)
                 .padding(.bottom, 10)
@@ -89,41 +83,6 @@ struct InspectorView: View {
                                    startPoint: .top, endPoint: .bottom)
                 }
         }
-    }
-
-    private func tabbed(_ turns: [InspectorTurn]) -> some View {
-        VStack(spacing: 0) {
-            TabStrip(selection: $tab)
-                .padding(.horizontal, 10)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(tab.rawValue).font(Typeface.sans(15).weight(.medium)).foregroundStyle(palette.ink)
-                        Spacer()
-                        InspectorAccessory(pane: tab)
-                    }
-                    Group {
-                        switch tab {
-                        case .steps: StepsPane(limit: nil)
-                        case .tasks: TasksPane()
-                        case .context: ContextPane(compact: false)
-                        case .git: GitPane()
-                        case .sandbox: SandboxPane(alwaysOpen: true)
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 6)
-                .padding(.bottom, 16)
-                .id(tab)
-                .transition(.opacity.combined(with: .offset(y: 6)))
-            }
-            .scrollEdgeEffectStyle(.soft, for: .top)
-        }
-        .ignoresSafeArea(edges: .top)
-        .animation(Tune.move, value: tab)
     }
 
     /// Warm like the chat, a step off it: the native inspector is a cool grey.
@@ -255,37 +214,6 @@ private struct InspectorAccessory: View {
     }
 }
 
-/// Tabs: one pencil icon each, the chosen one washed.
-private struct TabStrip: View {
-    @Binding var selection: InspectorPane
-    @Environment(\.palette) private var palette
-    @Namespace private var space
-
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(InspectorPane.allCases) { pane in
-                Button { selection = pane } label: {
-                    PencilIcon(glyph: pane.glyph, size: 16, color: selection == pane ? palette.accent : palette.secondary, weight: 1.4)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .background {
-                            if selection == pane {
-                                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    .fill(palette.wash)
-                                    .matchedGeometryEffect(id: "tab", in: space)
-                            }
-                        }
-                        .modifier(HoverWash())
-                }
-                .buttonStyle(Squish())
-                .help(pane.rawValue)
-            }
-        }
-        .padding(3)
-        .modifier(InspectorBox())
-    }
-}
-
 /// Quiet text for a section with nothing to show yet.
 private struct Quiet: View {
     let text: String
@@ -327,8 +255,6 @@ struct InspectorStep: Identifiable {
     let failed: Bool
     let running: Bool
     let seconds: Double?
-    /// About what it costs in the context.
-    let tokens: Int
 
     /// The conversation's tool calls, grouped under the message before them.
     static func turns(from items: [Item], isLive: Bool, live: [String: String]) -> [InspectorTurn] {
@@ -404,14 +330,13 @@ struct InspectorStep: Identifiable {
         self.timedOut = timedOut
         self.output = output
         failed = timedOut || (exitCode.map { $0 != 0 } ?? false) || (result?.isError ?? false)
-        tokens = (call.arguments.count + (result?.output.count ?? 0)) / 4
     }
 }
 
 /// Every tool call, turn by turn; commands up front, the rest quieter.
 private struct StepsPane: View {
-    /// Stacked, only the latest few show at first.
-    let limit: Int?
+    /// How many of the latest steps show until Show all.
+    static let latest = 6
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     @Environment(\.inspectorSteps) private var turns
@@ -421,7 +346,7 @@ private struct StepsPane: View {
     var body: some View {
         let all = turns.flatMap(\.steps)
         let visible = all.filter { !commandsOnly || $0.isShell }
-        let shownIDs = Set((limit.map { showAll ? visible : Array(visible.suffix($0)) } ?? visible).map(\.id))
+        let shownIDs = Set((showAll ? visible : Array(visible.suffix(Self.latest))).map(\.id))
         // Lazy: a long chat has hundreds of steps, and only those in view
         // need building (eager, 200 commands held about 12 MB).
         LazyVStack(alignment: .leading, spacing: 1) {
@@ -760,13 +685,10 @@ private struct TaskCheck: View {
 
 // MARK: - Context
 
-/// What fills the window: one bar, its parts, and (in tabs) the biggest
-/// results.
+/// What fills the window: one bar and its parts.
 private struct ContextPane: View {
-    let compact: Bool
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
-    @Environment(\.inspectorSteps) private var turns
 
     var body: some View {
         if let usage = model.contextUsage, model.selection != nil {
@@ -806,24 +728,6 @@ private struct ContextPane: View {
                                     .contentTransition(.numericText())
                             }
                             .font(Typeface.sans(11.5))
-                        }
-                    }
-                }
-            }
-            if !compact {
-                let largest = turns.flatMap(\.steps).filter { $0.tokens > 0 }.sorted { $0.tokens > $1.tokens }.prefix(3)
-                if !largest.isEmpty {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Largest results").font(Typeface.sans(11)).foregroundStyle(palette.faint)
-                        ForEach(Array(largest)) { step in
-                            HStack(spacing: 7) {
-                                Text(step.title)
-                                    .font(step.isShell ? Typeface.mono(11) : Typeface.sans(11.5))
-                                    .foregroundStyle(palette.secondary)
-                                    .lineLimit(1)
-                                Spacer(minLength: 6)
-                                Text(TokenCount.short(step.tokens)).font(Typeface.sans(11.5).monospacedDigit()).foregroundStyle(palette.faint)
-                            }
                         }
                     }
                 }
@@ -1023,10 +927,9 @@ private enum SandboxState {
     }
 }
 
-/// The VM at a glance, and a live tail of what runs in it. Stacked, the
+/// The VM at a glance, and a live tail of what runs in it. The
 /// terminal opens only while the model works.
 private struct SandboxPane: View {
-    let alwaysOpen: Bool
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     @Environment(\.inspectorSteps) private var turns
@@ -1052,13 +955,10 @@ private struct SandboxPane: View {
                     .foregroundStyle(palette.faint)
                     .fixedSize()
             }
-            // Stacked, it opens once the running turn has run a command.
-            if alwaysOpen && lines.isEmpty {
-                Quiet("No commands for the latest message")
-            }
-            if (alwaysOpen || model.isSelectedRunning) && !lines.isEmpty {
+            // Open once the running turn has run a command.
+            if model.isSelectedRunning && !lines.isEmpty {
                 TerminalText(lines: lines, cursor: isRunning(state))
-                    .frame(height: alwaysOpen ? 320 : 140)
+                    .frame(height: 140)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
                 ForEach(mounts, id: \.guestPath) { mount in
                     Text("\(mount.guestPath)  ←  \(mount.isScratch ? "this chat's scratch folder" : Self.abbreviate(mount.hostPath))")

@@ -45,7 +45,7 @@ The brief for the redesign. Every app change is checked against it. Directions a
 3. **Menu bar icon and mini window** *(done)*: left click opens a small chat in Liquid Glass that floats like picture in picture; right click a native menu (Open Kuri, Settings, Quit). This also covers the floating window, item 5.
 4. Settings window (compact, retro, dense).
 5. Floating window: the mini window above; a global hotkey for it is still to do.
-6. **Right sidebar** *(done)*: an inspector for the conversation, in sections (sketched in `Sketches/Inspector.swift`; stacked boxes by default, or tabs, set by `inspectorLayout`). Its toggle mirrors the sidebar's, in the chat's top-right corner; the cards start at the column's top edge, with sans headers. The sandbox section shows what the model ran for the latest message:
+6. **Right sidebar** *(done)*: an inspector for the conversation, in sections (sketched in `Sketches/Inspector.swift`): boxes stacked in a column, each folding from its header, the sandbox pinned at the bottom. Its toggle mirrors the sidebar's, in the chat's top-right corner; the cards start at the column's top edge, with sans headers. The sandbox section shows what the model ran for the latest message:
    - **Steps**: every tool call of the conversation, with the shell commands in the foreground.
    - **Tasks**: the model's task list, when it made one, editable by the user.
    - **Context**: what fills the context window.
