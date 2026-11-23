@@ -30,17 +30,14 @@ enum InspectorPane: String {
 struct InspectorView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
-    /// Git status of the attached folders that are repositories, by path.
-    @State private var repositories: [String: RepositoryStatus] = [:]
     /// Bumped when Kuri comes back to the front: files may have changed.
     @State private var activations = 0
+    /// The first git read since the inspector opened has happened.
+    @State private var settled = false
 
     var body: some View {
-        let steps = InspectorStep.turns(from: model.items, isLive: model.isSelectedRunning, live: model.liveOutput)
         sections
         .background(surface.ignoresSafeArea())
-        .environment(\.inspectorSteps, steps)
-        .environment(\.repositories, repositories)
         .task(id: GitKey(folders: model.folders.map(\.path), results: model.items.count,
                          running: model.isSelectedRunning, activations: activations)) {
             await loadRepositories()
@@ -57,7 +54,7 @@ struct InspectorView: View {
                 InspectorSection(pane: .steps) { StepsPane() }
                 InspectorSection(pane: .tasks) { TasksPane() }
                 InspectorSection(pane: .context) { ContextPane() }
-                if !repositories.isEmpty {
+                if !model.currentRepositories.isEmpty {
                     InspectorSection(pane: .git) { GitPane() }
                         .transition(.opacity)
                 }
@@ -65,7 +62,6 @@ struct InspectorView: View {
             .padding(.horizontal, 10)
             .padding(.top, 10)
             .padding(.bottom, 16)
-            .animation(Tune.move, value: repositories.isEmpty)
         }
         // Right from the column's top edge: nothing sits above the cards
         // (the toggle is over the chat).
@@ -89,12 +85,16 @@ struct InspectorView: View {
     private var surface: Color { palette.inspector }
 
     private func loadRepositories() async {
-        var found: [String: RepositoryStatus] = [:]
+        var found = model.repositories
         for folder in model.folders {
-            if let status = await RepositoryStatus.read(at: folder.path) { found[folder.path] = status }
+            found[folder.path] = await RepositoryStatus.read(at: folder.path)
         }
         guard !Task.isCancelled else { return }
-        withAnimation(Tune.move) { repositories = found }
+        defer { settled = true }
+        guard found != model.repositories else { return }
+        // Not while the inspector slides open: a box growing in the middle
+        // of the slide makes both stutter.
+        withAnimation(settled ? Tune.move : nil) { model.repositories = found }
     }
 
     private struct GitKey: Hashable {
@@ -105,9 +105,11 @@ struct InspectorView: View {
     }
 }
 
-extension EnvironmentValues {
-    @Entry var inspectorSteps: [InspectorTurn] = []
-    @Entry var repositories: [String: RepositoryStatus] = [:]
+extension AppModel {
+    /// The selected conversation's folders that are repositories, with their status.
+    var currentRepositories: [(folder: ConversationFolder, status: RepositoryStatus)] {
+        folders.compactMap { folder in repositories[folder.path].map { (folder, $0) } }
+    }
 }
 
 // MARK: - Frame
@@ -161,9 +163,11 @@ struct InspectorBox: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
         content
-            .background(shape.fill(palette.inspectorBox))
+            // The shadow is the solid fill's: on the whole box it would be
+            // drawn offscreen, text and all, at every frame of a resize.
+            .background(shape.fill(palette.inspectorBox)
+                .shadow(color: palette.shadow.opacity(palette.dark ? 0.25 : 0.05), radius: 1.5, y: 1))
             .overlay(shape.strokeBorder(palette.ink.opacity(palette.dark ? 0.07 : 0.06), lineWidth: 1))
-            .shadow(color: palette.shadow.opacity(palette.dark ? 0.25 : 0.05), radius: 1.5, y: 1)
     }
 }
 
@@ -171,14 +175,12 @@ private struct InspectorAccessory: View {
     let pane: InspectorPane
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
-    @Environment(\.inspectorSteps) private var turns
-    @Environment(\.repositories) private var repositories
 
     var body: some View {
         Group {
             switch pane {
             case .steps:
-                let steps = turns.flatMap(\.steps)
+                let steps = model.inspectorTurns.flatMap(\.steps)
                 let commands = steps.filter { $0.isShell }.count
                 if !steps.isEmpty {
                     Text(commands > 0 ? (commands == 1 ? "1 command" : "\(commands) commands")
@@ -196,7 +198,8 @@ private struct InspectorAccessory: View {
                     }
                 }
             case .git:
-                let changes = repositories.values.reduce(0) { $0 + $1.changes.count }
+                let repositories = model.currentRepositories
+                let changes = repositories.reduce(0) { $0 + $1.status.changes.count }
                 if !repositories.isEmpty { Text(changes == 1 ? "1 change" : "\(changes) changes") }
             case .sandbox:
                 switch SandboxState(model) {
@@ -234,30 +237,17 @@ private struct Quiet: View {
 // MARK: - Steps
 
 /// A message of the user's and the tool calls that followed it.
-struct InspectorTurn: Identifiable {
+struct InspectorTurn: Identifiable, Equatable {
     let id: UUID
     let prompt: String?
     let date: Date
     var steps: [InspectorStep]
-}
-
-/// One tool call, as the inspector lists it.
-struct InspectorStep: Identifiable {
-    let id: String
-    let call: ToolCall
-    let glyph: Glyph
-    let title: String
-    let isShell: Bool
-    /// The command's output (without the exit line), or the tool's result.
-    let output: String
-    let exitCode: Int?
-    let timedOut: Bool
-    let failed: Bool
-    let running: Bool
-    let seconds: Double?
 
     /// The conversation's tool calls, grouped under the message before them.
-    static func turns(from items: [Item], isLive: Bool, live: [String: String]) -> [InspectorTurn] {
+    /// Built when the items change, not on every render; `summaries` keeps
+    /// each call's decoded arguments, so a new item doesn't decode them all
+    /// again.
+    static func turns(from items: [Item], summaries: inout [String: ToolSummary]) -> [InspectorTurn] {
         var results: [String: (result: ToolResult, date: Date)] = [:]
         for item in items {
             if case .toolResult(let result) = item.payload { results[result.callID] = (result, item.createdAt) }
@@ -268,69 +258,61 @@ struct InspectorStep: Identifiable {
             case .message(let message) where message.role == .user:
                 turns.append(InspectorTurn(id: item.id, prompt: message.text, date: item.createdAt, steps: []))
             case .toolCall(let call):
+                let summary = summaries[call.id] ?? ToolSummary(call)
+                summaries[call.id] = summary
                 let found = results[call.id]
-                let step = InspectorStep(call: call, result: found?.result,
-                                         seconds: found.map { $0.date.timeIntervalSince(item.createdAt) },
-                                         running: found == nil && isLive, live: live[call.id])
+                let step = InspectorStep(id: call.id, summary: summary, result: found?.result,
+                                         seconds: found.map { $0.date.timeIntervalSince(item.createdAt) })
                 if turns.isEmpty { turns.append(InspectorTurn(id: item.id, prompt: nil, date: item.createdAt, steps: [])) }
                 turns[turns.count - 1].steps.append(step)
             default:
                 continue
             }
         }
-        return turns.filter { !$0.steps.isEmpty }
+        return turns
     }
+}
 
-    init(call: ToolCall, result: ToolResult?, seconds: Double?, running: Bool, live: String?) {
-        id = call.id
-        self.call = call
+/// One tool call, as the inspector lists it.
+struct InspectorStep: Identifiable, Equatable {
+    let id: String
+    let summary: ToolSummary
+    let result: ToolResult?
+    let seconds: Double?
+    /// The command's output (without its status line), the plan, or the
+    /// tool's result. While a command runs, its output is `liveOutput`.
+    let output: String
+    let exitCode: Int?
+    let timedOut: Bool
+
+    init(id: String, summary: ToolSummary, result: ToolResult?, seconds: Double?) {
+        self.id = id
+        self.summary = summary
+        self.result = result
         self.seconds = seconds
-        self.running = running
-        let arguments = (try? JSONDecoder().decode([String: JSONValue].self, from: Data(call.arguments.utf8))) ?? [:]
         var exitCode: Int?
         var timedOut = false
-        var output = result?.output ?? live ?? ""
-        isShell = call.name == "shell"
-        switch call.name {
-        case "shell":
-            glyph = .terminal
-            let command = arguments["command"]?.stringValue ?? ""
-            title = command.split(whereSeparator: \.isNewline).first.map(String.init) ?? command
-            if let result {
-                // "Exit code 1." or "Timed out after 120 s; …", then the output.
-                let lines = result.output.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
-                let status = lines.first.map(String.init) ?? ""
-                if status.hasPrefix("Exit code "), let code = Int(status.dropFirst(10).dropLast()) { exitCode = code }
-                timedOut = status.hasPrefix("Timed out")
-                output = lines.count > 1 ? String(lines[1]) : ""
-                if output == "(no output)" { output = "" }
-            }
-        case "tasklist":
-            glyph = .checklist
-            let entries = TaskListTool.entries(fromArguments: call.arguments) ?? []
-            let done = entries.filter { $0.status == .completed }.count
-            title = TaskListTool.isUserEdit(call) ? "You edited the plan" : "Updated the plan · \(done)/\(entries.count)"
-            output = entries.map { ($0.status == .completed ? "✓ " : $0.status == .inProgress ? "→ " : "· ") + $0.content }
+        var output = result?.output ?? ""
+        if summary.isShell, let result {
+            // "Exit code 1." or "Timed out after 120 s; …", then the output.
+            let lines = result.output.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+            let status = lines.first.map(String.init) ?? ""
+            if status.hasPrefix("Exit code "), let code = Int(status.dropFirst(10).dropLast()) { exitCode = code }
+            timedOut = status.hasPrefix("Timed out")
+            output = lines.count > 1 ? String(lines[1]) : ""
+            if output == "(no output)" { output = "" }
+        } else if !summary.tasks.isEmpty {
+            output = summary.tasks.map { ($0.status == .completed ? "✓ " : $0.status == .inProgress ? "→ " : "· ") + $0.content }
                 .joined(separator: "\n")
-        case "memory":
-            glyph = .bookmark
-            title = result == nil ? "Updating memory" : "Updated memory"
-        case "conversation_search":
-            glyph = .search
-            title = "Searched past conversations" + (arguments["query"]?.stringValue.map { " for “\($0)”" } ?? "")
-        case "clarify":
-            glyph = .question
-            title = result == nil ? "Waiting for your answer" : "Asked you"
-        default:
-            glyph = .puzzle
-            let parts = call.name.components(separatedBy: "__")
-            title = parts.count > 1 ? "\(parts[0]) › \(parts.dropFirst().joined(separator: "__"))" : call.name
         }
         self.exitCode = exitCode
         self.timedOut = timedOut
         self.output = output
-        failed = timedOut || (exitCode.map { $0 != 0 } ?? false) || (result?.isError ?? false)
     }
+
+    var isShell: Bool { summary.isShell }
+    var title: String { summary.title(finished: result != nil) }
+    var failed: Bool { timedOut || (exitCode.map { $0 != 0 } ?? false) || (result?.isError ?? false) }
 }
 
 /// Every tool call, turn by turn; commands up front, the rest quieter.
@@ -339,11 +321,12 @@ private struct StepsPane: View {
     static let latest = 6
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
-    @Environment(\.inspectorSteps) private var turns
     @AppStorage("inspectorCommandsOnly") private var commandsOnly = false
     @State private var showAll = false
 
     var body: some View {
+        let turns = model.inspectorTurns
+        let isLive = model.isSelectedRunning
         let all = turns.flatMap(\.steps)
         let visible = all.filter { !commandsOnly || $0.isShell }
         let shownIDs = Set((showAll ? visible : Array(visible.suffix(Self.latest))).map(\.id))
@@ -382,7 +365,7 @@ private struct StepsPane: View {
                             .padding(.vertical, 3)
                         }
                         ForEach(rows) { step in
-                            StepRow(step: step)
+                            StepRow(step: step, running: step.result == nil && isLive)
                                 .transition(.opacity.combined(with: .offset(y: 6)))
                         }
                     }
@@ -416,13 +399,15 @@ private struct Pill: View {
 
 private struct StepRow: View {
     let step: InspectorStep
+    let running: Bool
+    @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     @State private var expanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 7) {
-                StepStatus(step: step).frame(width: 16)
+                StepStatus(step: step, running: running).frame(width: 16)
                 Text(step.title)
                     .font(step.isShell ? Typeface.mono(11.5) : Typeface.sans(12))
                     .foregroundStyle(step.isShell ? palette.ink : palette.secondary)
@@ -442,12 +427,12 @@ private struct StepRow: View {
             .help(hasDetail ? "Click to see \(step.isShell ? "the output" : "the details")" : step.title)
             if expanded {
                 VStack(alignment: .leading, spacing: 4) {
-                    if step.isShell, step.call.arguments.contains("\\n") {
+                    if let command = step.summary.command, command != step.summary.commandLine {
                         // A multi-line command: the title showed its first line.
-                        TerminalText(lines: TermLine.lines(callID: step.id + "-cmd", text: fullCommand), cursor: false)
+                        TerminalText(lines: TermLine.lines(callID: step.id + "-cmd", text: command), cursor: false)
                     }
-                    if !step.output.isEmpty {
-                        TerminalText(lines: TermLine.lines(callID: step.id, text: step.output), cursor: false)
+                    if !output.isEmpty {
+                        TerminalText(lines: TermLine.lines(callID: step.id, text: output), cursor: false)
                     }
                 }
                 .frame(maxHeight: 180)
@@ -459,12 +444,13 @@ private struct StepRow: View {
         }
     }
 
-    private var hasDetail: Bool { !step.output.isEmpty }
-
-    private var fullCommand: String {
-        let arguments = (try? JSONDecoder().decode([String: JSONValue].self, from: Data(step.call.arguments.utf8))) ?? [:]
-        return arguments["command"]?.stringValue ?? ""
+    /// Only a call still waiting for its result reads the live output, so
+    /// finished rows don't redraw as a command prints.
+    private var output: String {
+        step.result == nil ? model.liveOutput[step.id] ?? "" : step.output
     }
+
+    private var hasDetail: Bool { !output.isEmpty }
 
     static func duration(_ seconds: Double) -> String {
         if seconds < 0.05 { return "<0.1s" }
@@ -476,10 +462,11 @@ private struct StepRow: View {
 /// Running, passed, failed (with its exit code), or the tool's own mark.
 private struct StepStatus: View {
     let step: InspectorStep
+    let running: Bool
     @Environment(\.palette) private var palette
 
     var body: some View {
-        if step.running {
+        if running {
             Orb(size: 6)
         } else if step.failed {
             Text(step.exitCode.map(String.init) ?? "!")
@@ -492,7 +479,7 @@ private struct StepStatus: View {
         } else if step.isShell {
             PencilIcon(glyph: .check, size: 12, color: palette.faint)
         } else {
-            PencilIcon(glyph: step.glyph, size: 12, color: palette.faint, weight: 1.3)
+            PencilIcon(glyph: step.summary.glyph, size: 12, color: palette.faint, weight: 1.3)
         }
     }
 }
@@ -804,30 +791,33 @@ enum TokenCount {
 
 // MARK: - Git
 
-/// Read-only: Kuri isn't a git client, this is so you know where things stand.
+/// Read-only: Kuri isn't a git client, this is so you know where things
+/// stand. Shown only for folders that are repositories.
 private struct GitPane: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.palette) private var palette
-    @Environment(\.repositories) private var repositories
 
     var body: some View {
-        if model.folders.isEmpty {
-            Quiet("Attach a folder to see where it stands in git")
-        } else if repositories.isEmpty {
-            Quiet(RepositoryStatus.isGitAvailable ? "None of this chat's folders is a git repository"
-                                                  : "Git status needs git: install Xcode's Command Line Tools")
-        } else {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(model.folders.filter { repositories[$0.path] != nil }, id: \.path) { folder in
-                    if let status = repositories[folder.path] { repository(folder, status) }
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(model.currentRepositories, id: \.folder.path) { repository in
+                RepositoryView(folder: repository.folder, status: repository.status)
             }
         }
     }
+}
 
-    private func repository(_ folder: ConversationFolder, _ status: RepositoryStatus) -> some View {
+private struct RepositoryView: View {
+    let folder: ConversationFolder
+    let status: RepositoryStatus
+    /// How many changes show until Show all: a big change set would build
+    /// hundreds of rows as the inspector opens.
+    static let latest = 12
+    @Environment(\.palette) private var palette
+    @State private var showAll = false
+
+    var body: some View {
         let code = CodeTheme(dark: palette.dark)
-        return VStack(alignment: .leading, spacing: 6) {
+        let changes = showAll ? status.changes : Array(status.changes.prefix(Self.latest))
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 PencilIcon(glyph: .folder, size: 12, color: palette.faint)
                 Text(URL(filePath: folder.path).lastPathComponent).font(Typeface.sans(12)).foregroundStyle(palette.secondary).lineLimit(1)
@@ -846,7 +836,7 @@ private struct GitPane: View {
                 Quiet("No changes")
             } else {
                 VStack(spacing: 1) {
-                    ForEach(status.changes, id: \.path) { change in
+                    ForEach(changes, id: \.path) { change in
                         HStack(spacing: 7) {
                             Text(String(change.kind.rawValue))
                                 .font(Typeface.mono(10.5).weight(.bold))
@@ -865,6 +855,13 @@ private struct GitPane: View {
                         .modifier(HoverWash(shape: RoundedRectangle(cornerRadius: 6, style: .continuous)))
                         .help(change.path)
                     }
+                }
+                if changes.count < status.changes.count {
+                    Button("Show all \(status.changes.count)") { withAnimation(Tune.move) { showAll = true } }
+                        .buttonStyle(.plain)
+                        .font(Typeface.sans(11.5))
+                        .foregroundStyle(palette.secondary)
+                        .padding(.horizontal, 6)
                 }
             }
             if let commit = status.lastCommit {
@@ -911,13 +908,8 @@ private enum SandboxState {
         case .installing(let step, _): self = .unavailable(step)
         case .failed(let message): self = .unavailable(message)
         case .ready:
-            let commands = TranscriptRow.rows(from: model.items).compactMap { row -> ToolCall? in
-                if case .tool(_, let call, nil) = row, call.name == "shell" { call } else { nil }
-            }
-            if model.isSelectedRunning, let call = commands.last {
-                let arguments = (try? JSONDecoder().decode([String: JSONValue].self, from: Data(call.arguments.utf8))) ?? [:]
-                let command = arguments["command"]?.stringValue ?? ""
-                self = .running(command.split(whereSeparator: \.isNewline).first.map(String.init) ?? command)
+            if let step = model.runningCommand {
+                self = .running(step.summary.commandLine)
             } else if let id = model.selection, model.sandboxUp.contains(id) {
                 self = .awake
             } else {
@@ -932,7 +924,6 @@ private enum SandboxState {
 private struct SandboxPane: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
-    @Environment(\.inspectorSteps) private var turns
 
     var body: some View {
         let state = SandboxState(model)
@@ -977,18 +968,14 @@ private struct SandboxPane: View {
     /// running command's so far. Not earlier turns': each command is a
     /// fresh shell, so older output isn't the sandbox's state.
     private var terminal: [TermLine] {
-        let latest = model.items.last { item in
-            if case .message(let message) = item.payload { message.role == .user } else { false }
-        }
-        let commands = (turns.first { $0.id == latest?.id }?.steps ?? []).filter(\.isShell).suffix(6)
+        let commands = (model.inspectorTurns.last?.steps ?? []).filter(\.isShell).suffix(6)
         return commands.flatMap { step -> [TermLine] in
-            let arguments = (try? JSONDecoder().decode([String: JSONValue].self, from: Data(step.call.arguments.utf8))) ?? [:]
-            let command = arguments["command"]?.stringValue ?? step.title
-            let output = step.running ? (model.liveOutput[step.id] ?? "") : step.output
-            return TermLine.lines(callID: step.id + "-prompt", text: command, prompt: true)
+            let output = step.result == nil ? model.liveOutput[step.id] ?? "" : step.output
+            return TermLine.lines(callID: step.id + "-prompt", text: step.summary.command ?? "", prompt: true)
                 + TermLine.lines(callID: step.id, text: output, tail: 60)
         }
     }
+
 
     private var mounts: [SandboxMount] {
         SandboxMounts.plan(folders: model.folders, scratch: URL(filePath: "/"))

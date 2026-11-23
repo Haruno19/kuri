@@ -32,7 +32,16 @@ final class AppModel {
     }
 
     /// Items of the selected conversation.
-    private(set) var items: [Item] = []
+    private(set) var items: [Item] = [] {
+        didSet { deriveFromItems() }
+    }
+    /// The selected conversation's tool calls, grouped by message, for the
+    /// inspector, and its current plan. Read from `items` when they change,
+    /// so views don't decode tool arguments on every render.
+    private(set) var inspectorTurns: [InspectorTurn] = []
+    private(set) var plan: [TaskListTool.Entry] = []
+    /// Each call's summary, by call id: built once per call.
+    @ObservationIgnored private var summaries: [String: ToolSummary] = [:]
     /// Live output of the selected conversation's running turn.
     private(set) var streamingText = ""
     private(set) var streamingReasoning = ""
@@ -70,6 +79,10 @@ final class AppModel {
     private(set) var sandboxStatus: SandboxStatus = .notInstalled
     /// Folders attached to the selected conversation.
     private(set) var folders: [ConversationFolder] = []
+    /// Git status of attached folders that are repositories, by path. Kept
+    /// here, not in the inspector, so the Git box is already there when the
+    /// inspector opens again.
+    var repositories: [String: RepositoryStatus] = [:]
     var errorMessage: String?
     /// The inspector is open (the main window's; ⌥⌘I). Not remembered:
     /// the window opens on the chat alone.
@@ -92,7 +105,24 @@ final class AppModel {
     /// The selected conversation's current plan, from its latest `tasklist`
     /// call, or the user's edit waiting for the running turn.
     var taskList: [TaskListTool.Entry] {
-        selection.flatMap { pendingTasks[$0] } ?? TaskListTool.current(in: items)
+        selection.flatMap { pendingTasks[$0] } ?? plan
+    }
+
+    /// The working indicator's words: the tool in progress, or thinking.
+    var workingStatus: String {
+        guard let last = inspectorTurns.last?.steps.last, last.result == nil else { return "Thinking" }
+        return last.summary.status
+    }
+
+    /// The running command, if the selected conversation's turn is in one.
+    var runningCommand: InspectorStep? {
+        guard isSelectedRunning else { return nil }
+        return inspectorTurns.last?.steps.last { $0.isShell && $0.result == nil }
+    }
+
+    private func deriveFromItems() {
+        inspectorTurns = InspectorTurn.turns(from: items, summaries: &summaries)
+        plan = TaskListTool.current(in: items)
     }
 
     /// The user's edit is waiting for the running turn's next step.
@@ -266,6 +296,7 @@ final class AppModel {
         streamingText = ""
         streamingReasoning = ""
         liveOutput = [:]
+        summaries = [:]
         guard let engine, let id = selection else {
             items = []
             lastTurn = nil

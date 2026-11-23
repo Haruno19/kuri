@@ -173,7 +173,7 @@ private struct MiniTranscript: View {
                 ForEach(rows) { row in
                     TranscriptRowView(row: row, isLive: model.isSelectedRunning)
                 }
-                live
+                LiveTail(room: 300)
             }
             .padding(.horizontal, 12)
             .padding(.top, 4)
@@ -182,26 +182,6 @@ private struct MiniTranscript: View {
         .defaultScrollAnchor(.bottom)
         .defaultScrollAnchor(.bottom, for: .sizeChanges)
         .scrollEdgeEffectStyle(.soft, for: .vertical)
-    }
-
-    @ViewBuilder private var live: some View {
-        if !model.streamingReasoning.isEmpty && model.streamingText.isEmpty {
-            LiveReasoning(text: model.streamingReasoning, room: 300)
-                .padding(.horizontal, 6)
-        }
-        if !model.streamingText.isEmpty {
-            ReplyText(text: model.streamingText)
-        }
-        if let id = model.selection, model.compacting.contains(id) {
-            Working(status: "Summarizing earlier messages")
-                .padding(.horizontal, 6)
-        } else if model.isSelectedRunning && model.streamingText.isEmpty {
-            Working(status: TranscriptRow.workingStatus(model.items))
-                .padding(.horizontal, 6)
-                .transition(.opacity.combined(with: .offset(y: 6)))
-        } else if !model.isSelectedRunning, let turn = model.lastTurn {
-            TurnEndBar(turn: turn)
-        }
     }
 }
 

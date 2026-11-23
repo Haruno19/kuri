@@ -121,7 +121,7 @@ private struct Transcript<C: View>: View {
                         ForEach(current) { row in
                             TranscriptRowView(row: row, isLive: model.isSelectedRunning, footer: footers[row.id])
                         }
-                        live
+                        LiveTail(room: visible)
                     }
                     // The room left once the bottom padding is counted, so at
                     // rest the message sits just under the top frost.
@@ -158,8 +158,7 @@ private struct Transcript<C: View>: View {
                     ForEach(model.inputRequests.filter { $0.conversationID == model.selection }) { request in
                         InputRequestView(request: request)
                     }
-                    // The inspector's Tasks section has it when that's open.
-                    if !model.showsInspector { TaskListPanel(entries: model.taskList) }
+                    TaskListPanel()
                     QueuedMessages()
                     FolderBar()
                     composer
@@ -199,10 +198,19 @@ private struct Transcript<C: View>: View {
         return footers
     }
 
-    /// What the running turn is doing, below the latest messages.
-    @ViewBuilder private var live: some View {
+}
+
+/// What the running turn is doing, below the latest messages. A view of its
+/// own, so a streamed token redraws this and not the whole transcript.
+struct LiveTail: View {
+    /// The visible height of the transcript, for the reasoning window.
+    let room: CGFloat
+    @Environment(AppModel.self) private var model
+    @Environment(\.palette) private var palette
+
+    var body: some View {
         if !model.streamingReasoning.isEmpty && model.streamingText.isEmpty {
-            LiveReasoning(text: model.streamingReasoning, room: visible)
+            LiveReasoning(text: model.streamingReasoning, room: room)
                 .padding(.horizontal, 6)
         }
         if !model.streamingText.isEmpty {
@@ -218,16 +226,13 @@ private struct Transcript<C: View>: View {
             Working(status: "Summarizing earlier messages")
                 .padding(.horizontal, 6)
         } else if model.isSelectedRunning && model.streamingText.isEmpty {
-            Working(status: status)
+            Working(status: model.workingStatus)
                 .padding(.horizontal, 6)
                 .transition(.opacity.combined(with: .offset(y: 6)))
         } else if !model.isSelectedRunning, let turn = model.lastTurn {
             TurnEndBar(turn: turn)
         }
     }
-
-    private var status: String { TranscriptRow.workingStatus(model.items) }
-
 }
 
 /// What the transcript shows: items, except that a tool result is folded
@@ -245,20 +250,6 @@ enum TranscriptRow: Identifiable {
 
     var isUserMessage: Bool {
         if case .item(let item) = self, case .message(let message) = item.payload { message.role == .user } else { false }
-    }
-
-    /// The working indicator's words: the tool in progress, or thinking.
-    static func workingStatus(_ items: [Item]) -> String {
-        if let last = rows(from: items).last, case .tool(_, let call, nil) = last {
-            switch call.name {
-            case "shell": return "Running a command"
-            case "conversation_search": return "Searching past conversations"
-            case "memory": return "Updating memory"
-            case "clarify": return "Waiting for your answer"
-            default: return "Using \(call.name.replacingOccurrences(of: "__", with: " › "))"
-            }
-        }
-        return "Thinking"
     }
 
     static func rows(from items: [Item]) -> [TranscriptRow] {
@@ -840,14 +831,18 @@ struct TurnEndBar: View {
     }
 }
 
-/// The current plan, pinned above the composer while it has open tasks.
+/// The current plan, pinned above the composer while it has open tasks
+/// (the inspector's Tasks section has it when that's open). It reads the
+/// inspector's state itself, so toggling the inspector doesn't rebuild the
+/// transcript around it.
 private struct TaskListPanel: View {
-    let entries: [TaskListTool.Entry]
+    @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     @State private var expanded = true
 
     var body: some View {
-        if !entries.isEmpty, entries.contains(where: { $0.status != .completed }) {
+        let entries = model.taskList
+        if !model.showsInspector, entries.contains(where: { $0.status != .completed }) {
             let done = entries.filter { $0.status == .completed }.count
             VStack(alignment: .leading, spacing: 8) {
                 Button {

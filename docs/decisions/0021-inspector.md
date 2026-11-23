@@ -12,4 +12,4 @@ The sandbox preview needs output while a command runs; the shell result only arr
 
 macOS places trailing toolbar items over the inspector column whatever the view they're declared on, and its own sidebar toggle inside the open sidebar, so toggles that stay with the chat have to be drawn by the chat.
 
-**Cost.** User edits show in the transcript as a step of their own (“You edited the plan”). A model that ignores the result's wording could take the edit for its own; in practice the result text is enough. Git status needs git installed; without it the section explains why it's empty. The pinned sandbox and the stacked boxes take room; sections fold to their headers when they're not wanted.
+**Cost.** User edits show in the transcript as a step of their own (“You edited the plan”). A model that ignores the result's wording could take the edit for its own; in practice the result text is enough. Git status needs git installed; without it the section stays hidden. The pinned sandbox and the stacked boxes take room; sections fold to their headers when they're not wanted.
