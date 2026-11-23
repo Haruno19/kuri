@@ -16,6 +16,7 @@ enum Instructions {
         conversation: Conversation,
         folders: [ConversationFolder],
         mounts: [SandboxMount] = [],
+        image: String? = nil,
         memories: [Memory],
         tools: Set<String>,
         now: Date = .now
@@ -32,7 +33,7 @@ enum Instructions {
         sections.append("Today is \(now.formatted(.dateTime.weekday(.wide).day().month(.wide).year())).")
 
         if tools.contains("shell") {
-            sections.append(workspace(mounts))
+            sections.append(workspace(mounts, image: image))
         } else if !folders.isEmpty {
             let list = folders.map { "- \($0.path)\($0.readOnly ? " (read-only)" : "")" }.joined(separator: "\n")
             sections.append("""
@@ -59,8 +60,11 @@ enum Instructions {
     }
 
     /// Where things are inside the sandbox, for the `shell` tool.
-    static func workspace(_ mounts: [SandboxMount]) -> String {
-        let intro = "Your `shell` tool runs commands in a Linux sandbox with no network access, starting in /work."
+    static func workspace(_ mounts: [SandboxMount], image: String? = nil) -> String {
+        var intro = "Your `shell` tool runs commands in a Linux sandbox with no network access, starting in /work."
+        if image == SandboxSettings.kuriImage {
+            intro += " It has \(SandboxSettings.kuriImageContents); nothing else can be installed."
+        }
         if let scratch = mounts.first, mounts.count == 1, scratch.isScratch {
             return intro + " /work is a scratch folder for this conversation: the user hasn't attached a folder of theirs. Files you create there persist, and the user can open them."
         }

@@ -96,7 +96,7 @@ Settings › Tools lists every server with its state, the server's own name and 
 - **The container is disposable; the folders are not.** One attached folder is mounted at `/work`, several at `/work/<name>`; with none, a per-conversation scratch folder (`~/.config/kuri/scratch/<id>`) is. Read-only folders are mounted read-only. Edits land directly on disk; anything else (installed packages, files outside `/work`) disappears with the container.
 - **No network.** Containers get no network interface at all.
 - **The shell is the only way the model touches files.** Commands run with `/bin/sh -lc` from `/work`, with a timeout (120 s by default, 900 at most). Output keeps its start and end when it's long; stopping the turn kills the command.
-- **The image** is `python:3-slim` by default (Debian with bash, coreutils and Python), configurable as `sandbox.image`. Since there's no network, what the image ships with is what the model can use.
+- **The image** is Kuri's own by default, `ghcr.io/haruno19/kuri-sandbox` ([decision 0022](decisions/0022-kuri-sandbox-image.md)): `python:3-slim` (Debian with bash, coreutils and Python) plus poppler-utils, pandoc, ImageMagick, ripgrep, jq, git and sqlite3, and the Python libraries pypdf, pdfplumber, pandas, openpyxl, python-docx, Pillow and matplotlib. Since there's no network, what the image ships with is what the model can use; with Kuri's image its instructions say what's there. `Sandbox/Dockerfile` defines it, `.github/workflows/sandbox-image.yml` builds it for arm64 and publishes it to GitHub's container registry when `Sandbox/` changes, tagged with `Sandbox/VERSION`; `SandboxSettings.kuriImage` pins that tag, and a test keeps the two in step. Settings › Sandbox also offers plain `python:3-slim`, or any other image as `sandbox.image`.
 - **Setup, once** (Settings › Sandbox). It downloads:
   - a Linux kernel: Kata Containers publishes its container-tuned kernel only inside its release tarball (about 680 MB), so Kuri downloads it once and keeps just the kernel;
   - Apple's init filesystem (`ghcr.io/apple/containerization/vminit`, matching the package version);
@@ -148,7 +148,7 @@ Every key is documented in [config.md](config.md). Both config files are **JSON5
 
   // The Linux sandbox. All optional; these are the defaults.
   // kernel: "/path/to/vmlinux" uses a kernel you already have instead of downloading one.
-  sandbox: { image: "docker.io/library/python:3-slim", cpus: 4, memoryMiB: 2048, idleMinutes: 10 },
+  sandbox: { image: "ghcr.io/haruno19/kuri-sandbox:1", cpus: 4, memoryMiB: 2048, idleMinutes: 10 },
 }
 ```
 

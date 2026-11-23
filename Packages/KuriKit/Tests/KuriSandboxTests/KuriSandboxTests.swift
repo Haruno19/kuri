@@ -83,6 +83,21 @@ import Testing
     }
 }
 
+@Suite struct SandboxImageTests {
+    /// The image Kuri pulls by default is the one the workflow publishes:
+    /// its tag is Sandbox/VERSION, and the Dockerfile says where it's from.
+    @Test func defaultIsKurisImageAtTheCurrentVersion() throws {
+        let root = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "../../../../Sandbox")
+        let version = try String(contentsOf: root.appending(path: "VERSION"), encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(SandboxSettings.defaultImage == SandboxSettings.kuriImage)
+        #expect(SandboxSettings.kuriImage == "ghcr.io/haruno19/kuri-sandbox:\(version)")
+        let workflow = try String(contentsOf: root.appending(path: "../.github/workflows/sandbox-image.yml"), encoding: .utf8)
+        #expect(workflow.contains("IMAGE: ghcr.io/haruno19/kuri-sandbox"))
+        #expect(SandboxSettings.presets.map(\.image) == [SandboxSettings.kuriImage, SandboxSettings.pythonImage])
+    }
+}
+
 @Suite struct SandboxSettingsTests {
     @Test func defaultsAndOverrides() {
         let defaults = SandboxSettings()

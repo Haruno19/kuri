@@ -1,0 +1,53 @@
+# Builds Kuri's sandbox image (Sandbox/Dockerfile) and publishes it to
+# GitHub's container registry as ghcr.io/haruno19/kuri-sandbox:<VERSION>.
+# Runs when anything in Sandbox/ changes on main, or by hand from the
+# Actions tab.
+
+name: Sandbox image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Sandbox/**"
+      - ".github/workflows/sandbox-image.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Lets the workflow's own token publish to ghcr.io: no secret to set up.
+  packages: write
+
+env:
+  IMAGE: ghcr.io/haruno19/kuri-sandbox
+
+jobs:
+  build:
+    # Kuri's VMs are arm64 Linux, so the image is built on arm64.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read the version
+        id: version
+        run: echo "tag=$(tr -d '[:space:]' < Sandbox/VERSION)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: Sandbox
+          platforms: linux/arm64
+          push: true
+          # A plain image: no attestation manifests beside it.
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.version.outputs.tag }}
+            ${{ env.IMAGE }}:latest

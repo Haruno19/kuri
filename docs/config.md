@@ -124,14 +124,14 @@ Defaults when no rule matches: built-in tools and `shell` allow; MCP tools allow
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `image` | OCI reference | `docker.io/library/python:3-slim` | The image conversation containers start from. There's no network, so what it ships with is what the model can use. |
+| `image` | OCI reference | `ghcr.io/haruno19/kuri-sandbox:1` | The image conversation containers start from. There's no network, so what it ships with is what the model can use. The default is Kuri's own image (`Sandbox/Dockerfile`): Python with tools and libraries for documents and data. Settings also offers `docker.io/library/python:3-slim` (Python and basic Unix tools); any other reference works too. |
 | `cpus` | int | `4` | Virtual CPUs per container VM. |
 | `memoryMiB` | int | `2048` | Memory per container VM. A VM keeps its peak use until it stops, so this caps its worst case. |
 | `idleMinutes` | int | `10` | Minutes without a command before a conversation's container stops and its memory is released. |
 | `kernel` | path | none | A Linux kernel (`vmlinux`) already on disk, used instead of downloading one. |
 | `kernelURL` | URL | Kata Containers 4.3.1 arm64 tarball | Where setup downloads the kernel tarball from. |
 
-Settings › Sandbox edits `image`, `cpus`, `memoryMiB` and `idleMinutes` (a value equal to its default is written as no key). Changing `image`, `cpus`, `memoryMiB` or the kernel stops running containers; a new image needs setup again.
+Settings › Sandbox edits `image` (Kuri, Python (slim), or a custom reference), `cpus`, `memoryMiB` and `idleMinutes` (a value equal to its default is written as no key). Changing `image`, `cpus`, `memoryMiB` or the kernel stops running containers; a new image needs setup again.
 
 ## mcp.json
 

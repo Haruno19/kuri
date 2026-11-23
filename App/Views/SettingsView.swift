@@ -362,6 +362,8 @@ private struct SandboxSettingsView: View {
 private struct SandboxOptions: View {
     @Environment(AppModel.self) private var model
     @State private var image = ""
+    /// Custom is picked, or config.json names an image that isn't a preset.
+    @State private var custom = false
     @FocusState private var editingImage: Bool
 
     private var settings: SandboxSettings { SandboxSettings(model.config.sandbox) }
@@ -372,12 +374,32 @@ private struct SandboxOptions: View {
 
     var body: some View {
         Section {
-            LabeledContent("Image") {
-                TextField("Image", text: $image, prompt: Text(SandboxSettings.defaultImage))
-                    .labelsHidden()
-                    .font(.body.monospaced())
-                    .focused($editingImage)
-                    .onSubmit(saveImage)
+            Picker("Image", selection: Binding(
+                get: { custom ? "" : settings.image },
+                set: { choice in
+                    if choice.isEmpty {
+                        custom = true
+                        editingImage = true
+                    } else {
+                        custom = false
+                        image = ""
+                        if choice != settings.image { save { $0.image = choice } }
+                    }
+                })
+            ) {
+                ForEach(SandboxSettings.presets, id: \.image) { preset in
+                    Text(preset.image == SandboxSettings.defaultImage ? "\(preset.name) (default)" : preset.name).tag(preset.image)
+                }
+                Text("Custom…").tag("")
+            }
+            if custom {
+                LabeledContent("Reference") {
+                    TextField("Reference", text: $image, prompt: Text("registry/name:tag"))
+                        .labelsHidden()
+                        .font(.body.monospaced())
+                        .focused($editingImage)
+                        .onSubmit(saveImage)
+                }
             }
             Picker("CPUs", selection: binding(\.cpus) { settings, value in settings.cpus = value }) {
                 ForEach(Self.choices(Self.cpuChoices, current: settings.cpus), id: \.self) { Text("\($0)").tag($0) }
@@ -391,11 +413,11 @@ private struct SandboxOptions: View {
         } header: {
             Text("Settings")
         } footer: {
-            Text("Changing the image, CPUs or memory stops running sandboxes; a new image needs setup again. Saved to config.json.")
+            Text("Kuri's image adds tools for documents and data to Python: PDFs, Word, Excel, images, pandoc, git. Changing the image, CPUs or memory stops running sandboxes; a new image needs setup again. Saved to config.json.")
                 .foregroundStyle(.secondary)
         }
-        .onAppear { image = model.config.sandbox?.image ?? "" }
-        .onChange(of: model.config.sandbox?.image) { _, value in if !editingImage { image = value ?? "" } }
+        .onAppear { syncImage(model.config.sandbox?.image) }
+        .onChange(of: model.config.sandbox?.image) { _, value in if !editingImage { syncImage(value) } }
         .onChange(of: editingImage) { _, focused in if !focused { saveImage() } }
     }
 
@@ -417,11 +439,18 @@ private struct SandboxOptions: View {
         Binding(get: { settings[keyPath: key] }, set: { value in save { set(&$0, value) } })
     }
 
+    /// A preset shows in the picker; anything else as Custom, in the field.
+    private func syncImage(_ value: String?) {
+        let isPreset = value == nil || SandboxSettings.presets.contains { $0.image == value }
+        custom = !isPreset
+        image = isPreset ? "" : value ?? ""
+    }
+
     private func saveImage() {
         let value = image.trimmingCharacters(in: .whitespaces)
-        let next = value.isEmpty ? SandboxSettings.defaultImage : value
-        guard next != settings.image else { return }
-        save { $0.image = next }
+        // An empty field keeps the current image: Custom with nothing typed.
+        guard !value.isEmpty, value != settings.image else { return }
+        save { $0.image = value }
     }
 
     /// The usual choices, plus whatever the file says if it's something else.

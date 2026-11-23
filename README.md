@@ -147,6 +147,8 @@ None of this includes a model's weights. A local model runs in its own process (
 | [MathJax](https://github.com/mathjax/MathJax) 3.2.2 | Typesetting LaTeX in replies, run in JavaScriptCore and bundled in `App/MathJax` (Apache 2.0; [decision 0019](docs/decisions/0019-latex-with-mathjax.md)) |
 | [Literata](https://github.com/googlefonts/literata), [DM Sans](https://github.com/googlefonts/dm-fonts), [iA Writer Mono](https://github.com/iaolo/iA-Fonts) | The reply, interface and code faces, bundled under the SIL Open Font License (licences in `App/Fonts`; decisions [0015](docs/decisions/0015-typography.md), [0018](docs/decisions/0018-literata.md)) |
 
+The sandbox's default image is Kuri's own ([`Sandbox/Dockerfile`](Sandbox/Dockerfile), published to `ghcr.io/haruno19/kuri-sandbox` by a GitHub Actions workflow; [decision 0022](docs/decisions/0022-kuri-sandbox-image.md)). It runs inside the VM, not in Kuri: the official `python:3-slim`, plus poppler-utils, pandoc, ImageMagick, ripgrep, jq, git and sqlite3 from Debian, and pypdf, pdfplumber, pandas, openpyxl, python-docx, Pillow and matplotlib from PyPI, so the model can work with PDFs, Office files, images and data without a network.
+
 The inspector's git status runs the host's `git` when one is installed (Homebrew's or the developer tools'); nothing is bundled for it.
 
 The MCP SDK brings in, transitively, `apple/swift-system`, `apple/swift-log` and `mattt/eventsource` (SSE parsing for its HTTP transport); those are what end up linked into Kuri. SwiftPM also fetches `apple/swift-nio` and friends, used only by the SDK's own sample executables.

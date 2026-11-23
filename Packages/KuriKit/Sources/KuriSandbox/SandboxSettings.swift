@@ -22,7 +22,19 @@ public struct SandboxSettings: Sendable, Hashable {
         case file(URL)
     }
 
-    public static let defaultImage = "docker.io/library/python:3-slim"
+    /// Kuri's own image (`Sandbox/Dockerfile`): Python with tools and
+    /// libraries for documents and data. The tag is `Sandbox/VERSION`.
+    public static let kuriImage = "ghcr.io/haruno19/kuri-sandbox:1"
+    /// What `kuriImage` adds to Python, for the model's instructions.
+    public static let kuriImageContents = """
+        Python 3 with pypdf, pdfplumber, pandas, openpyxl, python-docx, Pillow and matplotlib (Agg backend), \
+        and the tools pdftotext, pdftoppm and pdfinfo (poppler), pandoc, ImageMagick, ripgrep, jq, git and sqlite3
+        """
+    /// The official Python image, Debian slim: Python and basic Unix tools.
+    public static let pythonImage = "docker.io/library/python:3-slim"
+    /// The images Settings offers; any other reference works in config.json.
+    public static let presets: [(name: String, image: String)] = [("Kuri", kuriImage), ("Python (slim)", pythonImage)]
+    public static let defaultImage = kuriImage
     public static let defaultKernelTarball = URL(string:
         "https://github.com/kata-containers/kata-containers/releases/download/4.3.1/kata-static-4.3.1-arm64.tar.zst")!
     /// Keep in step with the Containerization version in Package.swift.

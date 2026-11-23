@@ -470,6 +470,7 @@ public actor Engine {
                                                  reasoningEffort: modelConfig?.reasoningEffort,
                                                  contextWindow: config.contextWindow(for: model)),
                 instructions: Instructions.build(conversation: conversation, folders: folders, mounts: mounts,
+                                                 image: SandboxSettings(config.sandbox).image,
                                                  memories: memories, tools: toolNames),
                 useTools: provider.supportsTools)
         }
@@ -646,6 +647,7 @@ public actor Engine {
         let instructions = Instructions.build(
             conversation: conversation, folders: folders,
             mounts: SandboxMounts.plan(folders: folders, scratch: home.scratchFolder(for: conversationID)),
+            image: SandboxSettings(config.sandbox).image,
             memories: try await store.memories(), tools: Set(tools.map(\.name)))
         let history = TurnRunner.history(from: items)
         let request = InferenceRequest(model: model?.model ?? "", instructions: instructions,

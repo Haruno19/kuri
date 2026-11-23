@@ -110,7 +110,7 @@ public struct ConfigLoader: Sendable {
           // tools: { memory: "deny", "github__*": "ask" },
 
           // The Linux sandbox behind the shell tool (set it up in Settings › Sandbox).
-          // sandbox: { image: "docker.io/library/python:3-slim", cpus: 4, memoryMiB: 2048, idleMinutes: 10 },
+          // sandbox: { image: "ghcr.io/haruno19/kuri-sandbox:1", cpus: 4, memoryMiB: 2048, idleMinutes: 10 },
         }
 
         """
