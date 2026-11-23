@@ -12,6 +12,8 @@ public enum EngineEvent: Sendable {
     case conversationUpdated(Conversation)
     case conversationDeleted(UUID)
     case itemAdded(Item)
+    /// Items deleted by a retry: everything after the last user message.
+    case itemsRemoved(conversationID: UUID, [UUID])
     /// Live output of the model, for display only. The finished items
     /// arrive separately as `itemAdded`.
     case inference(conversationID: UUID, InferenceEvent)

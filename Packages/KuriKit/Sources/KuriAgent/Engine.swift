@@ -353,6 +353,22 @@ public actor Engine {
         try await startRunner(for: turn, in: conversation, provider: provider, resuming: false)
     }
 
+    /// Answers the last user message again: everything after it (the
+    /// previous answer, its tool calls, any summary made meanwhile) is
+    /// removed, and a new turn starts from that message.
+    public func retry(_ conversationID: UUID) async throws {
+        let items = try await store.items(of: conversationID)
+        guard let message = items.last(where: { item in
+            if case .message(let message) = item.payload { message.role == .user } else { false }
+        }) else { return }
+        let (conversation, model, provider) = try await prepareTurn(in: conversationID)
+        let removed = try await store.removeItems(after: message.id, in: conversationID)
+        if !removed.isEmpty { broadcaster.emit(.itemsRemoved(conversationID: conversationID, removed)) }
+        let turn = try await store.beginTurn(conversationID: conversationID, model: model)
+        broadcaster.emit(.turnStarted(turn))
+        try await startRunner(for: turn, in: conversation, provider: provider, resuming: false)
+    }
+
     /// Picks up turns that were waiting for the user when Kuri quit: their
     /// questions and approvals are asked again. Call once subscribed to
     /// `events()`, so the requests aren't missed.

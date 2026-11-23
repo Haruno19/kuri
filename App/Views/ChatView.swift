@@ -102,15 +102,16 @@ private struct Transcript<C: View>: View {
         let rows = TranscriptRow.rows(from: model.items)
         let split = rows.lastIndex(where: \.isUserMessage) ?? 0
         let current = Array(rows[split...])
+        let footers = answerFooters
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     ForEach(rows[..<split]) { row in
-                        TranscriptRowView(row: row, isLive: false)
+                        TranscriptRowView(row: row, isLive: false, footer: footers[row.id])
                     }
                     VStack(alignment: .leading, spacing: 22) {
                         ForEach(current) { row in
-                            TranscriptRowView(row: row, isLive: model.isSelectedRunning)
+                            TranscriptRowView(row: row, isLive: model.isSelectedRunning, footer: footers[row.id])
                         }
                         live
                     }
@@ -155,6 +156,24 @@ private struct Transcript<C: View>: View {
                 TopFade().frame(height: Self.topMargin)
             }
         }
+    }
+
+    /// The status line goes under each finished turn's last reply; only
+    /// the latest one can be retried.
+    private var answerFooters: [UUID: AnswerFooter] {
+        var last: [UUID: UUID] = [:]  // turn → its last assistant message
+        for item in model.items {
+            if case .message(let message) = item.payload, message.role == .assistant, let turn = item.turnID {
+                last[turn] = item.id
+            }
+        }
+        var footers: [UUID: AnswerFooter] = [:]
+        for (turnID, itemID) in last {
+            guard let turn = model.turns[turnID], turn.endedAt != nil else { continue }
+            let latest = turnID == model.lastTurn?.id && !model.isSelectedRunning
+            footers[itemID] = AnswerFooter(turn: turn, canRetry: latest)
+        }
+        return footers
     }
 
     /// What the running turn is doing, below the latest messages.
@@ -237,6 +256,7 @@ enum TranscriptRow: Identifiable {
 private struct TranscriptRowView: View {
     let row: TranscriptRow
     let isLive: Bool
+    var footer: AnswerFooter?
 
     var body: some View {
         switch row {
@@ -244,9 +264,65 @@ private struct TranscriptRowView: View {
             ToolCallView(call: call, result: result, isLive: isLive)
                 .padding(.horizontal, 6)
         case .item(let item):
-            ItemView(payload: item.payload)
+            VStack(alignment: .leading, spacing: 8) {
+                ItemView(payload: item.payload)
+                if let footer { footer.transition(.opacity) }
+            }
         }
     }
+}
+
+/// Under a finished answer: when it ended and what it cost, dim and small
+/// like the context meter; the latest answer can be retried.
+private struct AnswerFooter: View {
+    let turn: Turn
+    let canRetry: Bool
+    @Environment(AppModel.self) private var model
+    @Environment(\.palette) private var palette
+    @State private var showsSplit = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(time)
+            if total > 0 {
+                // Hovering splits the count into what went in and came out.
+                Text(showsSplit
+                     ? "\(Self.count(turn.usage.inputTokens)) tok in · \(Self.count(turn.usage.outputTokens)) tok out"
+                     : "\(Self.count(total)) tok")
+                    .monospacedDigit()
+                    .contentTransition(.opacity)
+                    .onHover { hovering in withAnimation(Tune.hover) { showsSplit = hovering } }
+            }
+            Spacer()
+            if canRetry {
+                Button { Task { await model.retrySelected() } } label: {
+                    HStack(spacing: 4) {
+                        PencilIcon(glyph: .retry, size: 12, color: palette.faint)
+                        Text("Retry")
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .modifier(HoverWash())
+                }
+                .buttonStyle(Squish())
+                .help("Answer again, replacing this answer")
+            }
+        }
+        .font(Typeface.sans(12))
+        .foregroundStyle(palette.faint)
+        .padding(.horizontal, 6)
+    }
+
+    private var total: Int { turn.usage.inputTokens + turn.usage.outputTokens }
+
+    private var time: String {
+        let date = turn.endedAt ?? turn.startedAt
+        return Calendar.current.isDateInToday(date)
+            ? date.formatted(date: .omitted, time: .shortened)
+            : date.formatted(.dateTime.day().month(.abbreviated).hour().minute())
+    }
+
+    private static func count(_ tokens: Int) -> String { tokens.formatted(.number) }
 }
 
 private struct ItemView: View {

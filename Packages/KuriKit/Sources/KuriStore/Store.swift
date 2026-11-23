@@ -108,6 +108,22 @@ public actor Store {
         }
     }
 
+    /// Deletes every item after `itemID` in its conversation, returning
+    /// their ids in order. Retrying an answer is the one time items leave
+    /// the database (decision 0016); the search index follows by trigger.
+    public func removeItems(after itemID: UUID, in conversationID: UUID) throws -> [UUID] {
+        try db.transaction {
+            let ids = try db.query("""
+                SELECT id FROM items
+                WHERE conversation_id = ? AND seq > (SELECT seq FROM items WHERE id = ?) ORDER BY seq
+                """, .uuid(conversationID), .uuid(itemID)) { $0.uuid(0) }
+            try db.run("""
+                DELETE FROM items WHERE conversation_id = ? AND seq > (SELECT seq FROM items WHERE id = ?)
+                """, .uuid(conversationID), .uuid(itemID))
+            return ids
+        }
+    }
+
     public func items(of conversationID: UUID) throws -> [Item] {
         try db.query("""
             SELECT id, conversation_id, turn_id, kind, payload, created_at FROM items

@@ -249,7 +249,7 @@ struct Orb: View {
 /// Icons drawn as if with a pencil: strokes through slightly wobbly points,
 /// round caps, and a second faint pass for the graphite.
 enum Glyph {
-    case sidebar, folder, arrowUp, chevron, plus, compose, xmark
+    case sidebar, folder, arrowUp, chevron, plus, compose, xmark, retry
 
     /// Strokes on a 24-point grid.
     nonisolated var strokes: [[CGPoint]] {
@@ -271,6 +271,11 @@ enum Glyph {
                     [p(10, 14), p(10.6, 11.2), p(17.8, 4), p(20, 6.2), p(12.8, 13.4), p(10, 14)]]
         case .xmark:
             return [[p(7, 7), p(17, 17)], [p(17, 7), p(7, 17)]]
+        case .retry:
+            // An open circle turning clockwise, its arrowhead at the top right.
+            return [[p(17.4, 16.5), p(14.6, 18.5), p(11.3, 19.0), p(8.1, 17.8), p(5.8, 15.3), p(5.0, 12.0), p(5.8, 8.7),
+                     p(8.1, 6.2), p(11.3, 5.0), p(14.6, 5.5), p(17.4, 7.5)],
+                    [p(17.1, 4.1), p(17.4, 7.5), p(14.1, 6.6)]]
         }
     }
 }

@@ -41,6 +41,8 @@ final class AppModel {
     private(set) var fallbackNotices: [UUID: String] = [:]
     /// The selected conversation's latest turn, for the Continue bar.
     private(set) var lastTurn: Turn?
+    /// The selected conversation's turns, for each answer's time and tokens.
+    private(set) var turns: [UUID: Turn] = [:]
     /// Estimated tokens the selected conversation fills, and the model's window if known.
     private(set) var contextUsage: (tokens: Int, window: Int?)?
     private(set) var inputRequests: [InputRequest] = []
@@ -157,6 +159,16 @@ final class AppModel {
     }
 
     /// Picks up after a failed, stopped or interrupted turn.
+    /// Answers the last message again, replacing the previous answer.
+    func retrySelected() async {
+        guard let engine, let id = selection else { return }
+        do {
+            try await engine.retry(id)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func continueSelected() async {
         guard let engine, let id = selection else { return }
         do {
@@ -193,6 +205,7 @@ final class AppModel {
         guard let engine, let id = selection else {
             items = []
             lastTurn = nil
+            turns = [:]
             contextUsage = nil
             folders = []
             return
@@ -204,7 +217,9 @@ final class AppModel {
 
     private func refreshTurnState() async {
         guard let engine, let id = selection else { return }
-        lastTurn = (try? await engine.store.turns(of: id))?.last
+        let all = (try? await engine.store.turns(of: id)) ?? []
+        lastTurn = all.last
+        turns = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { $1 })
         contextUsage = try? await engine.contextUsage(id)
     }
 
@@ -334,6 +349,11 @@ final class AppModel {
             case .compaction: Task { await refreshTurnState() }
             default: break
             }
+
+        case .itemsRemoved(let id, let removed):
+            guard id == selection else { return }
+            let gone = Set(removed)
+            items.removeAll { gone.contains($0.id) }
 
         case .inference(let id, let event):
             guard id == selection else { return }

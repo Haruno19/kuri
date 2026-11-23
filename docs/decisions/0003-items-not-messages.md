@@ -11,4 +11,4 @@ A conversation is an ordered list of items: `message`, `reasoning`, `toolCall`, 
 ## Consequences
 - One model for every provider, and for the UI's transcript.
 - Adapters do the shape-shifting (for instance, a compaction becomes a user message for providers that have no such concept).
-- Storage stays simple and append-only; derived state (pending questions, the task list) can be read back from items.
+- Storage stays simple and append-only; derived state (pending questions, the task list) can be read back from items. *Amended by [0016](0016-retry-replaces-the-answer.md): Retry deletes the items after the last user message.*

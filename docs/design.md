@@ -34,7 +34,9 @@ Guards against runaway turns: a round limit per turn, detection of identical rep
 
 **Clarify and approvals suspend the turn.** The `clarify` tool asks the user and *waits*: the answer is the tool's return value, so the model continues the same turn. A tool whose policy is `ask` waits the same way for Allow or Deny. While waiting, the turn's status is `awaiting_input`.
 
-**Turns survive a relaunch.** Nothing extra is stored for a pending question: the tool call is already persisted, and a `toolCall` with no matching `toolResult` in an `awaiting_input` turn *is* the pending state. On launch, `Engine.resumePendingTurns()` re-runs those calls through the normal path, which asks the question (or for approval) again, and the turn carries on. Turns that were mid-stream when Kuri quit can't be resumed safely (a tool might have half-run), so they're marked failed with "Interrupted". **Continue** (`Engine.continueConversation`) starts a turn without a new message, after an interrupted, failed or stopped turn; a call left without a result gets a placeholder result, so the model knows and moves on.
+**Turns survive a relaunch.** Nothing extra is stored for a pending question: the tool call is already persisted, and a `toolCall` with no matching `toolResult` in an `awaiting_input` turn *is* the pending state. On launch, `Engine.resumePendingTurns()` re-runs those calls through the normal path, which asks the question (or for approval) again, and the turn carries on. Turns that were mid-stream when Kuri quit can't be resumed safely (a tool might have half-run), so they're marked failed with "Interrupted". **Continue** (`Engine.continueConversation`) starts a turn without a new message, after an interrupted, failed or stopped turn; a call left without a result gets a placeholder result, so the model knows and moves on. **Retry** (`Engine.retry`) answers the last user message again: everything after it is deleted (the one exception to append-only items, [decision 0016](decisions/0016-retry-replaces-the-answer.md)) and a new turn starts from it.
+
+**When a provider stops answering**, connection failures are reported as the provider being unreachable, naming its endpoint and whether it went away mid-reply, rather than in URLSession's networking terms: most providers are local servers.
 
 ## Compaction
 
@@ -196,11 +198,11 @@ memories             (id, content, source, status, supersedes_id, origin_convers
 
 ## App shell
 
-- **Main window**: sidebar of conversations, transcript, composer. The toolbar shows the model and an estimated context meter (with Compact); a turn that didn't complete ends with a Continue bar; pending questions and approvals sit above the composer and come back after a relaunch.
+- **Main window**: following [ui.md](ui.md): a collapsible native sidebar, the transcript, and a composer holding the folder button, the estimated context meter (with Compact), the model picker and send/stop. Each finished answer ends with a dim status line (when it ended, its turn's tokens, split into in and out on hover; Retry on the latest); a turn that didn't complete ends with a Continue bar; pending questions and approvals sit above the composer and come back after a relaunch.
 - **Menu bar** (`MenuBarExtra`): quick access and a compact chat; the app keeps running in the background with no windows open.
 - **Mini panel** *(planned)*: a floating, non-activating `NSPanel` summoned with a global hotkey.
 - **Settings**: *General* shows where the config lives; *Models* registers models per provider (with discovery) and sets the default; *Tools* lists built-in tools and MCP servers with their state and policies; *Memory* views and edits what Kuri remembers. Providers and MCP servers are still edited in their files.
-- **Styling**: every control gets its look from custom `ButtonStyle`/`ToggleStyle`/… implementations reading a theme from the environment, so the whole app can be re-skinned in one place. See `Sketches/` for what plain SwiftUI can do.
+- **Styling**: `App/Style/Style.swift` holds the palette (read from the environment), timings, faces, controls and pencil icons, so the look lives in one place. `Sketches/Autumn.swift` is where directions are tried first.
 
 ## Distribution and security
 
