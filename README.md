@@ -170,3 +170,7 @@ The inspector's git status runs the host's `git` when one is installed (Homebrew
 The MCP SDK brings in, transitively, `apple/swift-system`, `apple/swift-log` and `mattt/eventsource` (SSE parsing for its HTTP transport); those are what end up linked into Kuri. SwiftPM also fetches `apple/swift-nio` and friends, used only by the SDK's own sample executables.
 
 Containerization is the heavy one: it brings gRPC (`grpc/grpc-swift-2` and friends, to talk to the VM's init process), SwiftNIO, swift-crypto, swift-protobuf, `swift-server/async-http-client` and `facebook/zstd`. All come from Apple, the Swift server workgroup, gRPC or Meta; no personal libraries.
+
+## License
+
+Copyright 2026 Stefano Gini. Kuri is licensed under the [Apache License 2.0](LICENSE). Bundled fonts and MathJax keep their own licences, listed above.
