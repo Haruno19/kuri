@@ -52,16 +52,16 @@ private struct Welcome<C: View>: View {
     @Environment(\.palette) private var palette
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            // The greeting's baseline sits a little above the logo's bottom.
-            HStack(alignment: .lastTextBaseline, spacing: 16) {
-                Logo(size: 46)
-                    .alignmentGuide(.lastTextBaseline) { $0[.bottom] - 7 }
+        VStack(alignment: .leading, spacing: 18) {
+            // The greeting's baseline sits just above the logo's bottom.
+            HStack(alignment: .lastTextBaseline, spacing: 14) {
+                Logo(size: 40)
+                    .alignmentGuide(.lastTextBaseline) { $0[.bottom] - 2 }
                 Text(greeting)
                     .font(Typeface.serif(30))
                     .foregroundStyle(palette.ink)
             }
-            .padding(.leading, 18)
+            .padding(.leading, 6)
             .transition(.asymmetric(insertion: .opacity,
                                     removal: .opacity.combined(with: .scale(scale: 0.96, anchor: .leading)).combined(with: .offset(y: -12))))
             FolderBar()
