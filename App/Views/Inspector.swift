@@ -793,12 +793,15 @@ private struct RepositoryView: View {
                 Spacer(minLength: 6)
                 PencilIcon(glyph: .branch, size: 12, color: palette.faint, weight: 1.3)
                 Text(status.branch ?? "detached").font(Typeface.mono(11)).foregroundStyle(palette.ink).lineLimit(1).truncationMode(.middle)
-                if status.ahead > 0 || status.behind > 0 {
-                    Text([status.ahead > 0 ? "↑\(status.ahead)" : nil, status.behind > 0 ? "↓\(status.behind)" : nil]
-                        .compactMap { $0 }.joined(separator: " "))
-                        .font(Typeface.sans(11).monospacedDigit())
-                        .foregroundStyle(palette.faint)
-                        .help("Commits ahead of and behind its upstream")
+                // Drawn arrows: the text face's ↑ and ↓ come from a
+                // fallback font and sit clipped and off the baseline.
+                if status.ahead > 0 {
+                    count(status.ahead, down: false)
+                        .help(status.ahead == 1 ? "1 commit not pushed yet" : "\(status.ahead) commits not pushed yet")
+                }
+                if status.behind > 0 {
+                    count(status.behind, down: true)
+                        .help(status.behind == 1 ? "1 commit to pull" : "\(status.behind) commits to pull")
                 }
             }
             if status.changes.isEmpty {
@@ -850,6 +853,15 @@ private struct RepositoryView: View {
             .font(Typeface.sans(12))
             .lineLimit(1)
             .truncationMode(.head)
+    }
+
+    /// Commits ahead of (up) or behind (down) the branch's upstream.
+    private func count(_ n: Int, down: Bool) -> some View {
+        HStack(spacing: 1) {
+            PencilIcon(glyph: .arrowUp, size: 10, color: palette.faint, weight: 1.4)
+                .rotationEffect(.degrees(down ? 180 : 0))
+            Text("\(n)").font(Typeface.sans(11).monospacedDigit()).foregroundStyle(palette.faint)
+        }
     }
 
     private func tone(_ kind: RepositoryStatus.Change.Kind, _ code: CodeTheme) -> Color {
