@@ -47,7 +47,7 @@ struct MainView: View {
     }
 }
 
-/// New chat above the list, a size up from the conversations.
+/// New chat (the primary action) and Settings above the list.
 private struct Sidebar: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
@@ -68,21 +68,38 @@ private struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
-        .safeAreaInset(edge: .top, spacing: 4) {
-            Button { model.selection = nil } label: {
-                HStack(spacing: 8) {
-                    PencilIcon(glyph: .compose, size: 17, color: palette.ink)
-                    Text("New chat").font(Typeface.sans(14.5)).foregroundStyle(palette.ink)
-                    Spacer(minLength: 0)
+        .safeAreaInset(edge: .top, spacing: 8) {
+            VStack(spacing: 6) {
+                Button { model.selection = nil } label: {
+                    SidebarButtonLabel(glyph: .compose, title: "New chat", color: .white)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .modifier(HoverWash(shape: RoundedRectangle(cornerRadius: 8, style: .continuous)))
+                .buttonStyle(PrimaryButton())
+                .keyboardShortcut("n")
+
+                SettingsLink {
+                    SidebarButtonLabel(glyph: .sliders, title: "Settings", color: palette.ink)
+                }
+                .buttonStyle(SecondaryButton())
             }
-            .buttonStyle(Squish())
-            .keyboardShortcut("n")
             .padding(.horizontal, 10)
+            .padding(.top, 2)
         }
+    }
+}
+
+private struct SidebarButtonLabel: View {
+    let glyph: Glyph
+    let title: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            PencilIcon(glyph: glyph, size: 16, color: color, weight: 1.6)
+            Text(title).font(Typeface.sans(13.5))
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6.5)
     }
 }
 

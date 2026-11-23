@@ -166,6 +166,64 @@ struct QuietButton: View {
     }
 }
 
+/// The one main action of a place, filled like the send button.
+struct PrimaryButton: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Filled(configuration: configuration)
+    }
+
+    private struct Filled: View {
+        let configuration: Configuration
+        @Environment(\.palette) private var palette
+        @State private var hovering = false
+
+        var body: some View {
+            let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+            configuration.label
+                .foregroundStyle(.white)
+                .background {
+                    ZStack {
+                        shape.fill(palette.accentFill)
+                        shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
+                    }
+                    .shadow(color: palette.shadow.opacity(palette.dark ? 0.4 : 0.14), radius: 2, y: 1)
+                }
+                .brightness(configuration.isPressed ? -0.05 : hovering ? 0.04 : 0)
+                .contentShape(shape)
+                .scaleEffect(configuration.isPressed ? 0.97 : 1)
+                .onHover { hovering = $0 }
+                .animation(Tune.hover, value: hovering)
+                .animation(Tune.press, value: configuration.isPressed)
+        }
+    }
+}
+
+/// A secondary action: outlined, washed on hover.
+struct SecondaryButton: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Outlined(configuration: configuration)
+    }
+
+    private struct Outlined: View {
+        let configuration: Configuration
+        @Environment(\.palette) private var palette
+        @State private var hovering = false
+
+        var body: some View {
+            let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+            configuration.label
+                .foregroundStyle(palette.ink)
+                .background(shape.fill(palette.wash).opacity(hovering ? 1 : 0))
+                .overlay(shape.strokeBorder(palette.faint.opacity(0.45), lineWidth: 1))
+                .contentShape(shape)
+                .scaleEffect(configuration.isPressed ? 0.97 : 1)
+                .onHover { hovering = $0 }
+                .animation(Tune.hover, value: hovering)
+                .animation(Tune.press, value: configuration.isPressed)
+        }
+    }
+}
+
 /// A panel resting on the surface: a warm fill inside Liquid Glass, which
 /// gives the edge light and depth; no drawn shadows.
 struct Pane: ViewModifier {
@@ -231,7 +289,7 @@ struct Orb: View {
 /// Icons drawn as if with a pencil: strokes through slightly wobbly points,
 /// round caps, and a second faint pass for the graphite.
 enum Glyph {
-    case sidebar, folder, arrowUp, chevron, plus, compose, xmark, retry, copy, check
+    case sidebar, folder, arrowUp, chevron, plus, compose, xmark, retry, copy, check, sliders
 
     /// Strokes on a 24-point grid.
     nonisolated var strokes: [[CGPoint]] {
@@ -264,6 +322,16 @@ enum Glyph {
                     [p(15, 5.5), p(15, 4.5), p(5, 4.5), p(5, 15.5), p(6.5, 15.5)]]
         case .check:
             return [[p(5.5, 12.5), p(10, 17), p(18.5, 7)]]
+        case .sliders:
+            // Two rails, each with its knob.
+            func knob(_ x: CGFloat, _ y: CGFloat) -> [CGPoint] {
+                (0...10).map { k in
+                    let a = Double(k) / 10 * 2 * .pi - .pi / 2
+                    return p(x + 2.3 * CGFloat(cos(a)), y + 2.3 * CGFloat(sin(a)))
+                }
+            }
+            return [[p(4.5, 8), p(6.9, 8)], [p(11.5, 8), p(19.5, 8)], knob(9.2, 8),
+                    [p(4.5, 16), p(12.5, 16)], [p(17.1, 16), p(19.5, 16)], knob(14.8, 16)]
         }
     }
 }

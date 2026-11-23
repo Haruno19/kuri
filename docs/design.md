@@ -198,7 +198,7 @@ memories             (id, content, source, status, supersedes_id, origin_convers
 
 ## App shell
 
-- **Main window**: following [ui.md](ui.md): a collapsible native sidebar, the transcript, and a composer holding the folder button, the estimated context meter (with Compact), the model picker and send/stop. Each finished answer ends with a dim status line (when it ended, its turn's tokens, split into in and out on hover; Retry on the latest); a turn that didn't complete ends with a Continue bar; pending questions and approvals sit above the composer and come back after a relaunch.
+- **Main window**: following [ui.md](ui.md): a collapsible native sidebar (New chat as the filled primary button, Settings outlined below it, then the conversations), the transcript, and a composer holding the folder button, the estimated context meter (with Compact), the model picker and send/stop. Each finished answer ends with a dim status line (when it ended, its turn's tokens, split into in and out on hover; Retry on the latest); a turn that didn't complete ends with a Continue bar; pending questions and approvals sit above the composer and come back after a relaunch.
 - **Menu bar** (`MenuBarExtra`): quick access and a compact chat; the app keeps running in the background with no windows open.
 - **Mini panel** *(planned)*: a floating, non-activating `NSPanel` summoned with a global hotkey.
 - **Settings**: *General* shows where the config lives; *Models* registers models per provider (with discovery) and sets the default; *Tools* lists built-in tools and MCP servers with their state and policies; *Memory* views and edits what Kuri remembers. Providers and MCP servers are still edited in their files.
