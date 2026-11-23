@@ -96,6 +96,9 @@ private struct Transcript<C: View>: View {
     static var topMargin: CGFloat { 56 }
     /// How far the bottom frost rises above the composer.
     static var bottomRise: CGFloat { 32 }
+    /// Between the top frost and a pinned message, so the frost never
+    /// touches it.
+    static var pinGap: CGFloat { 10 }
 
     var body: some View {
         // The latest exchange (the last user message and what follows) is at
@@ -120,8 +123,14 @@ private struct Transcript<C: View>: View {
                         }
                         live
                     }
-                    .frame(minHeight: visible, alignment: .top)
+                    // The room left once the bottom padding is counted, so at
+                    // rest the message sits just under the top frost.
+                    .frame(minHeight: max(0, visible - Self.bottomRise - Self.pinGap), alignment: .top)
+                    // Scrolled to, the message lands the same way: the
+                    // target reaches `pinGap` above it.
+                    .padding(.top, Self.pinGap)
                     .id(current.first?.id)
+                    .padding(.top, -Self.pinGap)
                 }
                 .frame(maxWidth: 740)
                 .padding(.horizontal, 48)

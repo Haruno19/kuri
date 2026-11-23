@@ -279,8 +279,8 @@ const FLOWS = [
     summary: "The user sends a message; the engine stores it, opens a turn and returns. A TurnRunner task then asks the model and streams its answer back as events. Kuri is stateless towards the provider: each request carries the whole history, rebuilt from the database.",
     participants: ["user", "chat", "appmodel", "engine", "store", "runner", "provider", "llm"],
     steps: [
-      ["user", "chat", "types, Return", 'App/Views/ChatView.swift:573: .onSubmit(send)'],
-      ["chat", "appmodel", "`send(text)`", 'App/Views/ChatView.swift:608: Task { await model.send(text) }'],
+      ["user", "chat", "types, Return", 'App/Views/ChatView.swift:582: .onSubmit(send)'],
+      ["chat", "appmodel", "`send(text)`", 'App/Views/ChatView.swift:617: Task { await model.send(text) }'],
       ["appmodel", "engine", "`send(text, to: id)`", 'App/AppModel.swift:180: try await engine.send(text, to: id)'],
       ["engine", "store", "`append(user message)`", 'KuriAgent/Engine.swift:371: try await store.append(message)'],
       ["engine", "appmodel", "`.itemAdded`", "e", 'KuriAgent/Engine.swift:372: broadcaster.emit(.itemAdded(message))'],
@@ -344,9 +344,9 @@ const FLOWS = [
       ["runner", "store", "`setTurnStatus(.awaitingInput)`", 'KuriAgent/TurnRunner.swift:369: try await store.setTurnStatus(turnID, .awaitingInput)'],
       ["runner", "broker", "`approve(request)`", 'KuriAgent/TurnRunner.swift:365: try await waiting { try await base.approve(request) }'],
       ["broker", "appmodel", "`.inputRequested(.approval)`", "e", 'KuriAgent/InteractionBroker.swift:43: emit(.inputRequested(request))'],
-      ["appmodel", "panel", "shows tool and arguments", 'App/Views/ChatView.swift:906: Text("Allow **\\(approval.tool)** to run?")'],
-      ["user", "panel", "Allow / Deny", 'App/Views/ChatView.swift:909: Button("Deny") { Task { await model.respond(to: request, with: .approved(false)) } }'],
-      ["panel", "appmodel", "`respond(.approved(…))`", 'App/Views/ChatView.swift:910: Button("Allow") { Task { await model.respond(to: request, with: .approved(true)) } }'],
+      ["appmodel", "panel", "shows tool and arguments", 'App/Views/ChatView.swift:915: Text("Allow **\\(approval.tool)** to run?")'],
+      ["user", "panel", "Allow / Deny", 'App/Views/ChatView.swift:918: Button("Deny") { Task { await model.respond(to: request, with: .approved(false)) } }'],
+      ["panel", "appmodel", "`respond(.approved(…))`", 'App/Views/ChatView.swift:919: Button("Allow") { Task { await model.respond(to: request, with: .approved(true)) } }'],
       ["appmodel", "engine", "`respond(to: id, with:)`", 'App/AppModel.swift:262: await engine?.respond(to: request.id, with: response)'],
       ["engine", "broker", "`respond(…)`", 'KuriAgent/Engine.swift:437: await broker.respond(to: requestID, with: response)'],
       ["broker", "appmodel", "`.inputResolved`", "e", 'KuriAgent/InteractionBroker.swift:33: emit(.inputResolved(requestID: id))'],
@@ -369,9 +369,9 @@ const FLOWS = [
       ["runner", "store", "`setTurnStatus(.awaitingInput)`", 'KuriAgent/TurnRunner.swift:369: try await store.setTurnStatus(turnID, .awaitingInput)'],
       ["runner", "broker", "`clarify(request)`", 'KuriAgent/TurnRunner.swift:361: try await waiting { try await base.clarify(request) }'],
       ["broker", "appmodel", "`.inputRequested(.clarify)`", "e", 'KuriAgent/InteractionBroker.swift:43: emit(.inputRequested(request))'],
-      ["appmodel", "panel", "questions, suggested answers", 'App/Views/ChatView.swift:883: Text(question.question).font(Typeface.serif(15 * scale)).foregroundStyle(palette.ink)'],
-      ["user", "panel", "answers", 'App/Views/ChatView.swift:893: TextField("Answer", text: Binding('],
-      ["panel", "appmodel", "`respond(.answers(…))`", 'App/Views/ChatView.swift:901: Task { await model.respond(to: request, with: .answers(answers)) }'],
+      ["appmodel", "panel", "questions, suggested answers", 'App/Views/ChatView.swift:892: Text(question.question).font(Typeface.serif(15 * scale)).foregroundStyle(palette.ink)'],
+      ["user", "panel", "answers", 'App/Views/ChatView.swift:902: TextField("Answer", text: Binding('],
+      ["panel", "appmodel", "`respond(.answers(…))`", 'App/Views/ChatView.swift:910: Task { await model.respond(to: request, with: .answers(answers)) }'],
       ["appmodel", "broker", "via `Engine.respond`", 'KuriAgent/Engine.swift:437: await broker.respond(to: requestID, with: response)'],
       ["broker", "appmodel", "`.inputResolved`", "e", 'KuriAgent/InteractionBroker.swift:33: emit(.inputResolved(requestID: id))'],
       ["broker", "runner", "answers by question id", "r", 'KuriAgent/InteractionBroker.swift:21: guard case .answers(let answers) = try await ask(.clarify(request)) else { return [:] }'],
@@ -386,7 +386,7 @@ const FLOWS = [
     summary: "Stop cancels the turn's task. Whatever it's waiting on gives way: the HTTP stream, a pending question, or an MCP call, which is cancelled on the server too.",
     participants: ["user", "appmodel", "engine", "runner", "broker", "store", "provider", "llm", "server"],
     steps: [
-      ["user", "appmodel", "Stop", 'App/Views/ChatView.swift:655: if stops { Task { await model.cancel() } } else { send() }'],
+      ["user", "appmodel", "Stop", 'App/Views/ChatView.swift:664: if stops { Task { await model.cancel() } } else { send() }'],
       ["appmodel", "engine", "`cancel(id)`", 'App/AppModel.swift:213: await engine.cancel(id)'],
       ["engine", "runner", "`task.cancel()`", 'KuriAgent/Engine.swift:433: running[conversationID]?.cancel()'],
       { alt: [
@@ -403,8 +403,8 @@ const FLOWS = [
     summary: "While a conversation is busy, sending queues the message. The running turn takes the queue at its next step, after the current tool round or when its answer would end the turn, so the message joins the same turn.",
     participants: ["user", "chat", "appmodel", "engine", "runner", "store"],
     steps: [
-      ["user", "chat", "types while the turn runs, Return", 'App/Views/ChatView.swift:573: .onSubmit(send)'],
-      ["chat", "appmodel", "`send(text)`", 'App/Views/ChatView.swift:608: Task { await model.send(text) }'],
+      ["user", "chat", "types while the turn runs, Return", 'App/Views/ChatView.swift:582: .onSubmit(send)'],
+      ["chat", "appmodel", "`send(text)`", 'App/Views/ChatView.swift:617: Task { await model.send(text) }'],
       ["appmodel", "engine", "`send(text, to: id)`", 'App/AppModel.swift:180: try await engine.send(text, to: id)'],
       ["engine", "engine", "busy → append to the queue", 'KuriAgent/Engine.swift:318: queues[conversationID, default: []].append(QueuedMessage(text: text))'],
       ["engine", "appmodel", "`.queueChanged([text])`", "e", 'KuriAgent/Engine.swift:319: broadcaster.emit(.queueChanged(conversationID: conversationID, queues[conversationID] ?? []))'],
@@ -457,8 +457,8 @@ const FLOWS = [
     summary: "A chat is renamed in place in the sidebar. The new title wins over one still being generated, and the chat keeps its place in the list.",
     participants: ["user", "sidebar", "appmodel", "engine", "store"],
     steps: [
-      ["user", "sidebar", "Rename, double-click, or Return", 'App/Views/MainView.swift:84: Button("Rename") { renaming = conversation.id }'],
-      ["sidebar", "appmodel", "Return or click away: `rename(id, to:)`", 'App/Views/MainView.swift:182: Task { await model.rename(id, to: text) }'],
+      ["user", "sidebar", "Rename, double-click, or Return", 'App/Views/MainView.swift:109: Button("Rename") { renaming = conversation.id }'],
+      ["sidebar", "appmodel", "Return or click away: `rename(id, to:)`", 'App/Views/MainView.swift:207: Task { await model.rename(id, to: text) }'],
       ["appmodel", "engine", "`rename(id, to:)`", 'App/AppModel.swift:251: try await engine?.rename(id, to: title)'],
       ["engine", "engine", "drop a title still being generated", 'KuriAgent/Engine.swift:291: titling[conversationID]?.cancel()'],
       ["engine", "store", "`updateConversation` — `updatedAt` unchanged", 'KuriAgent/Engine.swift:294: try await store.updateConversation(conversation)'],
@@ -499,7 +499,7 @@ const FLOWS = [
       ["runner", "store", "`items(of:)` → the turn's unanswered calls", 'KuriAgent/TurnRunner.swift:78: let pending = Self.unansweredCalls(in: try await store.items(of: conversationID), turnID: turn.id)'],
       ["runner", "broker", "run each again → `approve` / `clarify`", 'KuriAgent/TurnRunner.swift:79: try await runCalls(pending, counts: &callCounts, interaction: interaction)'],
       ["broker", "appmodel", "`.inputRequested`", "e", 'KuriAgent/InteractionBroker.swift:43: emit(.inputRequested(request))'],
-      ["user", "appmodel", "answers, as usual", 'App/Views/ChatView.swift:901: Task { await model.respond(to: request, with: .answers(answers)) }'],
+      ["user", "appmodel", "answers, as usual", 'App/Views/ChatView.swift:910: Task { await model.respond(to: request, with: .answers(answers)) }'],
       ["broker", "runner", "answer", "r", 'KuriAgent/InteractionBroker.swift:34: continuation.resume(returning: response)'],
       ["runner", "runner", "tool runs, result stored, the loop goes on", 'KuriAgent/TurnRunner.swift:229: try await append(.toolResult(ToolResult(callID: entry.call.id, output: output.text, isError: output.isError)))'],
     ],
@@ -510,7 +510,7 @@ const FLOWS = [
     summary: "After a turn that was interrupted, failed or stopped, Continue starts a turn without a new message. The model sees where things stand and goes on.",
     participants: ["user", "appmodel", "engine", "store", "runner", "provider"],
     steps: [
-      ["user", "appmodel", "Continue", 'App/Views/ChatView.swift:811: Button("Continue") { Task { await model.continueSelected() } }'],
+      ["user", "appmodel", "Continue", 'App/Views/ChatView.swift:820: Button("Continue") { Task { await model.continueSelected() } }'],
       ["appmodel", "engine", "`continueConversation(id)`", 'App/AppModel.swift:230: try await engine.continueConversation(id)'],
       ["engine", "store", "`beginTurn` — no new message", 'KuriAgent/Engine.swift:383: let turn = try await store.beginTurn(conversationID: conversationID, model: model)'],
       ["engine", "appmodel", "`.turnStarted`", "e", 'KuriAgent/Engine.swift:384: broadcaster.emit(.turnStarted(turn))'],
@@ -525,7 +525,7 @@ const FLOWS = [
     summary: "Retry answers the last message again. Everything after that message (the previous answer, its tool calls, any summary made meanwhile) is deleted, the one time items leave the database, and a new turn starts from it.",
     participants: ["user", "appmodel", "engine", "store", "runner", "provider"],
     steps: [
-      ["user", "appmodel", "Retry, under the latest answer", 'App/Views/ChatView.swift:312: Button { Task { await model.retrySelected() } } label: {'],
+      ["user", "appmodel", "Retry, under the latest answer", 'App/Views/ChatView.swift:321: Button { Task { await model.retrySelected() } } label: {'],
       ["appmodel", "engine", "`retry(id)`", 'App/AppModel.swift:221: try await engine.retry(id)'],
       ["engine", "store", "`items(of:)` — find the last user message", 'KuriAgent/Engine.swift:401: let items = try await store.items(of: conversationID)'],
       ["engine", "store", "`removeItems(after:)`", 'KuriAgent/Engine.swift:406: let removed = try await store.removeItems(after: message.id, in: conversationID)'],
@@ -566,7 +566,7 @@ const FLOWS = [
     summary: "The composer's context meter has a Compact action, the only way to compact when the model's context window isn't set in config.json.",
     participants: ["user", "appmodel", "engine", "compactor", "store"],
     steps: [
-      ["user", "appmodel", "Compact (context meter)", 'App/Views/ChatView.swift:696: Button("Compact Conversation") { Task { await model.compactSelected() } }'],
+      ["user", "appmodel", "Compact (context meter)", 'App/Views/ChatView.swift:705: Button("Compact Conversation") { Task { await model.compactSelected() } }'],
       ["appmodel", "engine", "`compact(id)`", 'App/AppModel.swift:239: try await engine.compact(id)'],
       ["engine", "compactor", "`cut(in: items, budget: .max)`", 'KuriAgent/Engine.swift:609: guard let cut = Compactor.cut(in: items, budget: .max) else {'],
       ["engine", "appmodel", "`.compacting(true)`", "e", 'KuriAgent/Engine.swift:613: broadcaster.emit(.compacting(conversationID: conversationID, true))'],
@@ -624,8 +624,8 @@ const FLOWS = [
     summary: "The user ticks, renames, adds or removes a task in the inspector. The whole list is stored like the model's own <code>tasklist</code> calls, a call and its result, so the current plan is still read from the items and the model sees the change in its history.",
     participants: ["user", "inspector", "appmodel", "engine", "runner", "store"],
     steps: [
-      ["user", "inspector", "tick, double-click to rename, Add task, or remove", 'App/Views/Inspector.swift:594: save(updated)'],
-      ["inspector", "appmodel", "`editTasks(list)`", 'App/Views/Inspector.swift:666: Task { await model.editTasks(tasks) }'],
+      ["user", "inspector", "tick, double-click to rename, Add task, or remove", 'App/Views/Inspector.swift:596: save(updated)'],
+      ["inspector", "appmodel", "`editTasks(list)`", 'App/Views/Inspector.swift:668: Task { await model.editTasks(tasks) }'],
       { opt: "a turn is running", steps: [
         ["appmodel", "appmodel", "show the edit now, with “Kuri sees your changes at its next step”", 'App/AppModel.swift:106: if running.contains(id) { pendingTasks[id] = entries }'],
       ]},
@@ -646,7 +646,7 @@ const FLOWS = [
             "During a turn the edit can't go in right away: it would land between a call and its result, which providers refuse. An edit made after the turn's last step is stored when the turn ends."] },
 
   { group: "Inspector", id: "watch-command", title: "Watching a command",
-    summary: "While the model works, the inspector's sandbox section shows the running command and its output as it comes, then folds back to a status line.",
+    summary: "The inspector's sandbox section shows the commands run for the latest message, the running one's output as it comes. Stacked, it opens once the turn runs a command and folds back to a status line when the turn ends.",
     participants: ["runner", "shelltool", "sandbox", "vm", "appmodel", "inspector"],
     steps: [
       ["runner", "shelltool", "`run(arguments, context)`; the context's `progress` emits `.toolOutput`", 'KuriAgent/TurnRunner.swift:267: progress: { emit(.toolOutput(conversationID: conversationID, callID: call.id, $0)) })'],
@@ -657,11 +657,12 @@ const FLOWS = [
       { loop: "as the command prints", steps: [
         ["vm", "sandbox", "stdout and stderr", "r", 'KuriSandbox/Sandbox.swift:305: if !text.isEmpty { onText(text) }'],
         ["sandbox", "appmodel", "`.toolOutput(callID, text)`, in whole characters", "e", 'App/AppModel.swift:512: liveOutput[callID] = output'],
-        ["appmodel", "inspector", "the terminal follows its last line", 'App/Views/Inspector.swift:1076: let output = step.running ? (model.liveOutput[step.id] ?? "") : step.output'],
+        ["appmodel", "inspector", "the terminal follows its last line", 'App/Views/Inspector.swift:1087: let output = step.running ? (model.liveOutput[step.id] ?? "") : step.output'],
       ]},
       ["runner", "appmodel", "`.itemAdded` (the result), `.toolFinished`: the stored output takes over", "e", 'KuriAgent/TurnRunner.swift:230: emit(.toolFinished(conversationID: conversationID, call: entry.call, output: output))'],
     ],
     notes: ["Only the selected conversation's output is kept, the last 20,000 characters of each running command.",
+            "Earlier turns' commands aren't shown there: each command is a fresh shell, so their output isn't the sandbox's state (Steps keeps them all).",
             "When the container stops after its idle minutes, <code>.sandboxContainer(running: false)</code> turns the status to asleep."] },
 
   { group: "Inspector", id: "git-status", title: "Git status",
@@ -683,7 +684,7 @@ const FLOWS = [
     summary: "Attaching a folder decides what /work is for the conversation. The container picks it up on its next command.",
     participants: ["user", "chat", "appmodel", "engine", "store", "sandbox"],
     steps: [
-      ["user", "chat", "folder button, picks folders", 'App/Views/ChatView.swift:576: QuietButton(glyph: .folder) { choosingFolder = true }'],
+      ["user", "chat", "folder button, picks folders", 'App/Views/ChatView.swift:585: QuietButton(glyph: .folder) { choosingFolder = true }'],
       ["chat", "appmodel", "`attach(urls)`", 'App/Views/ChatView.swift:34: if case .success(let urls) = result { Task { await model.attach(urls) } }'],
       ["appmodel", "engine", "`setFolders(folders, for: id)`", 'App/AppModel.swift:395: try await engine.setFolders(updated, for: id)'],
       ["engine", "store", "`setFolders(…)`", 'KuriAgent/Engine.swift:251: try await store.setFolders(folders, of: conversationID)'],

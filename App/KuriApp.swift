@@ -51,6 +51,8 @@ struct KuriApp: App {
         .defaultSize(width: 1040, height: 760)
         .defaultLaunchBehavior(startsInBackground ? .suppressed : .automatic)
         .commands {
+            // View › Show Sidebar (⌃⌘S): Kuri draws its own sidebar toggle.
+            SidebarCommands()
             CommandGroup(after: .sidebar) {
                 InspectorCommands(model: model)
             }

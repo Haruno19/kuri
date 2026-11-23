@@ -1,6 +1,6 @@
 # 0021. The inspector: derived sections, user plan edits as tasklist calls
 
-**Decided.** The main window has an inspector on the right (SwiftUI's `.inspector`, ⌥⌘I, closed at launch) with five sections: Steps, Tasks, Context, Git and Sandbox. They're stacked boxes by default, with the sandbox pinned at the bottom; `inspectorLayout: "tabs"` shows one at a time instead. Its toggle is a glass circle drawn over the chat's top-right corner, mirroring the sidebar toggle, rather than a toolbar item.
+**Decided.** The main window has an inspector on the right (SwiftUI's `.inspector`, ⌥⌘I, closed at launch) with five sections: Steps, Tasks, Context, Git and Sandbox. They're stacked boxes by default, with the sandbox pinned at the bottom; `inspectorLayout: "tabs"` shows one at a time instead. Its toggle is a glass circle drawn over the chat's top-right corner rather than a toolbar item, and the sidebar's toggle is redrawn to match: Kuri's own, in the chat's top-left corner, outside the sidebar when it's open.
 
 - **Steps, Context and Sandbox are derived**: tool calls and results from the conversation's items, the context estimate split by `Engine.contextUsage` into system, memory, messages and tool output, and the sandbox state from two events, `.toolOutput` (what a running tool prints, as it comes) and `.sandboxContainer` (a conversation's container started or stopped). Nothing new is stored.
 - **The user's plan edits are `tasklist` calls.** Ticking, renaming, adding or removing a task stores the whole list as a `tasklist` call and its result, with an id starting `kuri_user_tasklist_`, exactly where the model's own calls go. During a turn the edit waits for the next step boundary, like a queued message, so it never lands between a call and its result.
@@ -10,6 +10,6 @@
 
 The sandbox preview needs output while a command runs; the shell result only arrives at the end. A progress callback on `ToolContext`, turned into an event by `TurnRunner`, keeps the engine free of UI and works for any future subscriber. Git status is the user's view of their own folder, so the host's git (the user's config, their repository) is the right one, not the sandbox's; it's never offered to the model, which has `git` in the sandbox.
 
-macOS places trailing toolbar items over the inspector column whatever the view they're declared on, so a toggle that stays with the chat has to be drawn by the chat.
+macOS places trailing toolbar items over the inspector column whatever the view they're declared on, and its own sidebar toggle inside the open sidebar, so toggles that stay with the chat have to be drawn by the chat.
 
 **Cost.** User edits show in the transcript as a step of their own (“You edited the plan”). A model that ignores the result's wording could take the edit for its own; in practice the result text is enough. Git status needs git installed; without it the section explains why it's empty. The pinned sandbox and the stacked boxes take room, which is what the tabs layout is for.

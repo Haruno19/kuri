@@ -175,6 +175,32 @@ struct QuietButton: View {
     }
 }
 
+/// Shows or hides a side pane: a pencil icon in a glass circle, sized and
+/// placed like macOS's own toolbar buttons. The sidebar's and the
+/// inspector's are a matching pair in the chat's top corners.
+struct PaneToggle: View {
+    let glyph: Glyph
+    let help: String
+    let action: () -> Void
+    @Environment(\.palette) private var palette
+
+    /// From the window's top edge, level with the traffic lights.
+    static let top: CGFloat = 8
+    /// From the chat's side edge when the pane next to it is open.
+    static let inset: CGFloat = 14
+
+    var body: some View {
+        Button { withAnimation(Tune.move) { action() } } label: {
+            PencilIcon(glyph: glyph, size: 17, color: palette.secondary, weight: 1.4)
+                .frame(width: 36, height: 36)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Circle())
+        .help(help)
+    }
+}
+
 /// The one main action of a place, filled like the send button.
 struct PrimaryButton: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {

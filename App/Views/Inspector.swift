@@ -422,7 +422,9 @@ private struct StepsPane: View {
         let all = turns.flatMap(\.steps)
         let visible = all.filter { !commandsOnly || $0.isShell }
         let shownIDs = Set((limit.map { showAll ? visible : Array(visible.suffix($0)) } ?? visible).map(\.id))
-        VStack(alignment: .leading, spacing: 1) {
+        // Lazy: a long chat has hundreds of steps, and only those in view
+        // need building (eager, 200 commands held about 12 MB).
+        LazyVStack(alignment: .leading, spacing: 1) {
             if all.isEmpty {
                 Quiet("Tool calls and commands show up here")
             } else {
@@ -1050,6 +1052,10 @@ private struct SandboxPane: View {
                     .foregroundStyle(palette.faint)
                     .fixedSize()
             }
+            // Stacked, it opens once the running turn has run a command.
+            if alwaysOpen && lines.isEmpty {
+                Quiet("No commands for the latest message")
+            }
             if (alwaysOpen || model.isSelectedRunning) && !lines.isEmpty {
                 TerminalText(lines: lines, cursor: isRunning(state))
                     .frame(height: alwaysOpen ? 320 : 140)
@@ -1067,9 +1073,14 @@ private struct SandboxPane: View {
         .animation(Tune.move, value: model.isSelectedRunning)
     }
 
-    /// The last few commands with their output, and the running one's so far.
+    /// What the model ran for the latest message, with the output, and the
+    /// running command's so far. Not earlier turns': each command is a
+    /// fresh shell, so older output isn't the sandbox's state.
     private var terminal: [TermLine] {
-        let commands = turns.flatMap(\.steps).filter(\.isShell).suffix(4)
+        let latest = model.items.last { item in
+            if case .message(let message) = item.payload { message.role == .user } else { false }
+        }
+        let commands = (turns.first { $0.id == latest?.id }?.steps ?? []).filter(\.isShell).suffix(6)
         return commands.flatMap { step -> [TermLine] in
             let arguments = (try? JSONDecoder().decode([String: JSONValue].self, from: Data(step.call.arguments.utf8))) ?? [:]
             let command = arguments["command"]?.stringValue ?? step.title
@@ -1188,25 +1199,5 @@ private struct Cursor: View {
             let on = Int(context.date.timeIntervalSinceReferenceDate / Self.blink) % 2 == 0
             Rectangle().fill(color).frame(width: 6, height: 11).opacity(on ? 0.85 : 0)
         }
-    }
-}
-
-// MARK: - Toggle
-
-/// Shows and hides the inspector: a glass circle in the chat's top-right
-/// corner, mirroring the sidebar toggle by the traffic lights.
-struct InspectorToggle: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.palette) private var palette
-
-    var body: some View {
-        Button { withAnimation(Tune.move) { model.showsInspector.toggle() } } label: {
-            PencilIcon(glyph: .inspector, size: 17, color: palette.secondary, weight: 1.4)
-                .frame(width: 36, height: 36)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Circle())
-        .help(model.showsInspector ? "Hide the inspector (⌥⌘I)" : "Show the inspector (⌥⌘I)")
     }
 }

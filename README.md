@@ -101,7 +101,7 @@ Policies (`allow`, `ask`, `deny`) can be set per tool in `config.json` and per M
 
 ## Footprint
 
-Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows for conversations, LaTeX and the mini window on the 23rd), as the memory figure Activity Monitor shows (physical footprint).
+Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows for conversations, LaTeX, the mini window and the inspector on the 23rd), as the memory figure Activity Monitor shows (physical footprint).
 
 | | Kuri |
 |---|---|
@@ -111,6 +111,7 @@ Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows
 | A conversation open | + ≈ 30 MB for the transcript, however long it is (3) |
 | Once a reply has LaTeX | + ≈ 25 MB for MathJax, kept until quit (4) |
 | Mini window open | + ≈ 18 MB, and ≈ 10 MB more with a chat in it, however long (5) |
+| Inspector open | + ≈ 2–4 MB stacked, + ≈ 2–6 MB as tabs, with a short chat and with 200 commands (6) |
 | Sandbox VM, booted or doing light shell work | + ≈ 300 MB |
 | Sandbox VM after a 300 MB workload | + ≈ 600 MB until the container stops (2) |
 
@@ -119,6 +120,7 @@ Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows
 3. Measured by rendering the app's own reply views in an offscreen window, with 40 and with 120 Markdown-heavy answers (text, a list, a code block and a table each): both ≈ 32 MB. The transcript only builds the messages near the visible area; built in full, the same answers took ≈ 217 MB and ≈ 611 MB.
 4. MathJax loads the first time a formula appears; with 40 answers holding formulas the transcript came to ≈ 56 MB.
 5. Measured like (3), with the app's own mini window views in an off-screen panel: its second model on the engine adds under 1 MB, the empty glass window ≈ 18 MB, and a chat of 40 or of 120 Markdown-heavy answers ≈ 10 MB more (its transcript is lazy too). It has no LaTeX, so MathJax never loads for it.
+6. Measured like (3), with the app's own main window in an off-screen window, opening the inspector on a chat of 4 commands and on one of 204 commands with output: stacked + 2.4 MB and + 3.5 MB, as tabs + 2.4 MB and + 5.5 MB (the Steps tab lists every command, lazily; built in full, the 204 took ≈ 12 MB). Git status runs `git` in separate, short-lived processes.
 
 None of this includes a model's weights. A local model runs in its own process (`qwen3.5:2b` takes about 3 GB in Ollama); a hosted one costs nothing locally.
 

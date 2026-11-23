@@ -3,17 +3,22 @@ import SwiftUI
 
 /// The standard macOS sidebar (collapsed at launch), the chat, and the
 /// inspector on the right (closed at launch). The toolbar is there but
-/// invisible: macOS draws its sidebar toggle next to the traffic lights,
-/// and the inspector's toggle mirrors it in the chat's top-right corner.
+/// invisible; the two toggles are Kuri's own, a matching pair in the
+/// chat's top corners.
 struct MainView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     @State private var columns: NavigationSplitViewVisibility = .detailOnly
+    /// Where the sidebar toggle sits while the sidebar is closed: just past
+    /// the traffic lights, where macOS put its own.
+    static let trafficLights: CGFloat = 96
 
     var body: some View {
         @Bindable var model = model
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar()
+                // Kuri draws its own, outside the sidebar.
+                .toolbar(removing: .sidebarToggle)
                 .navigationSplitViewColumnWidth(min: 240, ideal: 290, max: 380)
         } detail: {
             Group {
@@ -30,14 +35,26 @@ struct MainView: View {
                     .background(palette.background)
                 case .ready:
                     ChatView()
-                        // Like the sidebar toggle by the traffic lights, and
-                        // outside the inspector, which macOS would put a
-                        // toolbar button over.
-                        .overlay(alignment: .topTrailing) {
-                            InspectorToggle()
-                                .padding(.top, 8)
-                                .padding(.trailing, 14)
-                        }
+                }
+            }
+            // The two panes' toggles, drawn by the chat so they stay outside
+            // both: macOS would put its own sidebar toggle inside the open
+            // sidebar, and a toolbar button over the inspector.
+            .overlay(alignment: .topLeading) {
+                PaneToggle(glyph: .sidebar, help: columns == .detailOnly ? "Show the sidebar (⌃⌘S)" : "Hide the sidebar (⌃⌘S)") {
+                    columns = columns == .detailOnly ? .all : .detailOnly
+                }
+                // Past the traffic lights while the sidebar is closed.
+                .padding(.leading, columns == .detailOnly ? Self.trafficLights : PaneToggle.inset)
+                .padding(.top, PaneToggle.top)
+            }
+            .overlay(alignment: .topTrailing) {
+                if model.phase.isReady {
+                    PaneToggle(glyph: .inspector, help: model.showsInspector ? "Hide the inspector (⌥⌘I)" : "Show the inspector (⌥⌘I)") {
+                        model.showsInspector.toggle()
+                    }
+                    .padding(.trailing, PaneToggle.inset)
+                    .padding(.top, PaneToggle.top)
                 }
             }
             // Only the top: the content stays beside the sidebar, so the chat
@@ -49,6 +66,14 @@ struct MainView: View {
             }
         }
         .toolbar(removing: .title)
+        // An empty toolbar collapses, and the traffic lights move up out of
+        // line with the toggles: an invisible item keeps its height.
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Color.clear.frame(width: 1, height: 1).accessibilityHidden(true)
+            }
+            .sharedBackgroundVisibility(.hidden)
+        }
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .alert("Something went wrong", isPresented: Binding(
             get: { model.errorMessage != nil },
