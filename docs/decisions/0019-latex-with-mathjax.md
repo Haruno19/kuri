@@ -1,0 +1,7 @@
+# 0019. LaTeX with MathJax in JavaScriptCore
+
+**Decided.** Formulas in replies (`$…$` and `\(…\)` inline, `$$…$$` and `\[…\]` on their own line) are typeset by MathJax 3.2.2, bundled in `App/MathJax` (Apache 2.0). It runs in JavaScriptCore with its own lightweight DOM, turns TeX into SVG, and AppKit draws the SVG as a vector `NSImage`: inline formulas sit on the text's baseline, display ones are centred. Formulas are taken out of the text before the Markdown parser sees it (it would read `_` and `*`) and put back as images. Code spans and fenced blocks are left alone; a `$` only opens maths before a non-space and only closes it after one and not before a digit, so prices stay text. A formula MathJax can't parse shows its source in the mono face.
+
+**Why.** Nothing in Apple's frameworks typesets maths, and TeX layout is too large to write ourselves. MathJax is the reference implementation from the project behind maths on the web, which fits the dependency rule. Running it in JavaScriptCore rather than a web view keeps it in the app's process: no WebContent process, no page to lay out, and the result is a plain image SwiftUI can place inside `Text`.
+
+**Cost.** 2.1 MB of JavaScript in the bundle. MathJax loads the first time a reply has maths (about 0.1 s on the main thread, then kept for the session); each formula takes a few milliseconds and is cached. Formulas are images, so they can't be selected as text. Version 3 is used because its SVG output carries its fonts; version 4 loads fonts on demand, which needs more plumbing offline.

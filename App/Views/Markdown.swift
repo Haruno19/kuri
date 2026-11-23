@@ -3,7 +3,9 @@ import SwiftUI
 // Model replies as Markdown. Foundation's own parser (CommonMark with GitHub's
 // tables and strikethrough) reads the text; each run carries its block
 // structure as a `PresentationIntent`, which is turned back into a tree of
-// blocks here and drawn with SwiftUI.
+// blocks here and drawn with SwiftUI. LaTeX is lifted out before parsing
+// (Markdown would read its `_` and `*`), left as placeholders, and drawn by
+// `MathRenderer`.
 
 /// One block of a reply.
 indirect enum MarkdownBlock {
@@ -14,6 +16,24 @@ indirect enum MarkdownBlock {
     case list(ordered: Bool, [MarkdownListItem])
     case table(MarkdownTable)
     case rule
+    /// A paragraph holding only display maths: an index into the document's maths.
+    case math(Int)
+}
+
+/// A formula found in a reply.
+struct MarkdownMath {
+    let tex: String
+    let display: Bool
+}
+
+/// A parsed reply: its blocks, and the maths their placeholders point to.
+struct MarkdownDocument {
+    let blocks: [MarkdownBlock]
+    let math: [MarkdownMath]
+}
+
+extension EnvironmentValues {
+    @Entry var markdownMath: [MarkdownMath] = []
 }
 
 struct MarkdownListItem {
@@ -39,15 +59,114 @@ enum Markdown {
     }()
 
     private final class Parsed {
-        let blocks: [MarkdownBlock]
-        init(_ blocks: [MarkdownBlock]) { self.blocks = blocks }
+        let document: MarkdownDocument
+        init(_ document: MarkdownDocument) { self.document = document }
     }
 
-    static func blocks(_ text: String) -> [MarkdownBlock] {
-        if let hit = cache.object(forKey: text as NSString) { return hit.blocks }
-        let blocks = parse(text)
-        cache.setObject(Parsed(blocks), forKey: text as NSString)
-        return blocks
+    static func document(_ text: String) -> MarkdownDocument {
+        if let hit = cache.object(forKey: text as NSString) { return hit.document }
+        let (markdown, math) = extractMath(text)
+        let document = MarkdownDocument(blocks: parse(markdown), math: math)
+        cache.setObject(Parsed(document), forKey: text as NSString)
+        return document
+    }
+
+    /// Marks a formula's place in the text; private-use characters, so
+    /// neither Markdown nor a model would produce them.
+    static let mathOpen: Character = "\u{E000}", mathClose: Character = "\u{E001}"
+
+    /// Replaces `$$…$$` and `\[…\]` (display) and `$…$` and `\(…\)`
+    /// (inline) with placeholders, leaving code alone. A `$` opens inline
+    /// maths only before a non-space and closes it only after one, and not
+    /// before a digit, so prices ("$5 and $10") stay text.
+    static func extractMath(_ text: String) -> (String, [MarkdownMath]) {
+        guard text.contains("$") || text.contains("\\(") || text.contains("\\[") else { return (text, []) }
+        let c = Array(text)
+        var out = ""
+        var math: [MarkdownMath] = []
+        var i = 0
+        var inFence = false
+
+        func add(_ from: Int, _ to: Int, display: Bool) {
+            math.append(MarkdownMath(tex: String(c[from..<to]).trimmingCharacters(in: .whitespacesAndNewlines), display: display))
+            out.append(mathOpen)
+            out += String(math.count - 1)
+            out.append(mathClose)
+        }
+        func find(_ pattern: [Character], from: Int) -> Int? {
+            var j = from
+            while j + pattern.count <= c.count {
+                if Array(c[j..<(j + pattern.count)]) == pattern { return j }
+                j += 1
+            }
+            return nil
+        }
+        func copyLine() {
+            while i < c.count && c[i] != "\n" { out.append(c[i]); i += 1 }
+            if i < c.count { out.append(c[i]); i += 1 }
+        }
+
+        while i < c.count {
+            if i == 0 || c[i - 1] == "\n" {
+                var j = i
+                while j < c.count && c[j] == " " && j - i < 3 { j += 1 }
+                let fence = j + 2 < c.count && ((c[j] == "`" && c[j + 1] == "`" && c[j + 2] == "`") || (c[j] == "~" && c[j + 1] == "~" && c[j + 2] == "~"))
+                if fence { inFence.toggle(); copyLine(); continue }
+                if inFence { copyLine(); continue }
+            }
+            let ch = c[i]
+            if ch == "\\" && i + 1 < c.count {
+                if c[i + 1] == "(" || c[i + 1] == "[" {
+                    let display = c[i + 1] == "["
+                    if let end = find(["\\", display ? "]" : ")"], from: i + 2) {
+                        add(i + 2, end, display: display)
+                        i = end + 2
+                        continue
+                    }
+                }
+                out.append(ch)
+                out.append(c[i + 1])
+                i += 2
+                continue
+            }
+            if ch == "`" {
+                var n = 0
+                while i + n < c.count && c[i + n] == "`" { n += 1 }
+                let run = Array(repeating: Character("`"), count: n)
+                if let end = find(run, from: i + n) {
+                    out += String(c[i..<(end + n)])
+                    i = end + n
+                } else {
+                    out += String(run)
+                    i += n
+                }
+                continue
+            }
+            if ch == "$" {
+                if i + 1 < c.count && c[i + 1] == "$" {
+                    if let end = find(["$", "$"], from: i + 2), end > i + 2 {
+                        add(i + 2, end, display: true)
+                        i = end + 2
+                        continue
+                    }
+                } else if i + 1 < c.count && !c[i + 1].isWhitespace {
+                    var j = i + 1
+                    while j < c.count && c[j] != "\n" {
+                        if c[j] == "$" && !c[j - 1].isWhitespace && c[j - 1] != "\\"
+                            && !(j + 1 < c.count && (c[j + 1].isNumber || c[j + 1] == "$")) { break }
+                        j += 1
+                    }
+                    if j < c.count && c[j] == "$" {
+                        add(i + 1, j, display: false)
+                        i = j + 1
+                        continue
+                    }
+                }
+            }
+            out.append(ch)
+            i += 1
+        }
+        return (out, math)
     }
 
     /// A node of the block tree while it's being rebuilt from the runs.
@@ -104,6 +223,7 @@ enum Markdown {
         boxes.flatMap { box -> [MarkdownBlock] in
             switch box.kind {
             case .paragraph?, nil:
+                if let index = soleDisplayMath(box.text) { return [.math(index)] }
                 return [.paragraph(box.text)]
             case .header(let level)?:
                 return [.heading(level: level, box.text)]
@@ -124,6 +244,13 @@ enum Markdown {
                 return blocks(box.children) + (box.text.characters.isEmpty ? [] : [.paragraph(box.text)])
             }
         }
+    }
+
+    /// The index of a paragraph that is nothing but one formula.
+    private static func soleDisplayMath(_ text: AttributedString) -> Int? {
+        let string = String(text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard string.first == mathOpen, string.last == mathClose else { return nil }
+        return Int(string.dropFirst().dropLast())
     }
 
     private static func item(_ box: Box) -> MarkdownListItem {
@@ -178,7 +305,9 @@ struct MarkdownView: View, Equatable {
     nonisolated static func == (a: Self, b: Self) -> Bool { a.text == b.text && a.size == b.size }
 
     var body: some View {
-        MarkdownBlocks(blocks: Markdown.blocks(text), size: size)
+        let document = Markdown.document(text)
+        MarkdownBlocks(blocks: document.blocks, size: size)
+            .environment(\.markdownMath, document.math)
             .foregroundStyle(palette.ink)
             .tint(palette.accent)
             .textSelection(.enabled)
@@ -202,17 +331,18 @@ private struct MarkdownBlockView: View {
     let block: MarkdownBlock
     let size: CGFloat
     @Environment(\.palette) private var palette
+    @Environment(\.markdownMath) private var math
 
     var body: some View {
         switch block {
         case .paragraph(let text):
-            Text(inline(text))
+            inline(text, size: size)
                 .font(Typeface.serif(size))
                 .lineSpacing(size / 3)
                 .fixedSize(horizontal: false, vertical: true)
 
         case .heading(let level, let text):
-            Text(inline(text))
+            inline(text, size: headingSize(level))
                 .font(Typeface.serif(headingSize(level)).weight(level <= 2 ? .semibold : .bold))
                 .lineSpacing(2)
                 .padding(.top, level <= 2 ? size * 0.5 : size * 0.2)
@@ -242,6 +372,9 @@ private struct MarkdownBlockView: View {
 
         case .table(let table):
             MarkdownTableView(table: table, size: size)
+
+        case .math(let index):
+            DisplayMath(math: index < math.count ? math[index] : nil, size: size)
 
         case .rule:
             Rectangle()
@@ -283,12 +416,35 @@ private struct MarkdownBlockView: View {
         }
     }
 
-    private func inline(_ text: AttributedString) -> AttributedString {
-        Markdown.styleInline(text, size: size, palette: palette)
+    private func inline(_ text: AttributedString, size: CGFloat) -> Text {
+        Markdown.text(text, size: size, palette: palette, math: math)
     }
 }
 
 extension Markdown {
+    /// Inline text with its formulas drawn in place, sitting on the baseline.
+    static func text(_ text: AttributedString, size: CGFloat, palette: Palette, math: [MarkdownMath]) -> Text {
+        let styled = styleInline(text, size: size, palette: palette)
+        guard !math.isEmpty, styled.characters.contains(mathOpen) else { return Text(styled) }
+        var result = Text("")
+        var cursor = styled.startIndex
+        while let open = styled.characters[cursor...].firstIndex(of: mathOpen),
+              let close = styled.characters[open...].firstIndex(of: mathClose) {
+            result = result + Text(AttributedString(styled[cursor..<open]))
+            let label = String(styled.characters[styled.characters.index(after: open)..<close])
+            if let index = Int(label), index < math.count {
+                let formula = math[index]
+                if let rendered = MathRenderer.shared.render(formula.tex, display: formula.display, size: size, color: palette.ink) {
+                    result = result + Text(Image(nsImage: rendered.image)).baselineOffset(-rendered.depth)
+                } else {
+                    result = result + Text(formula.tex).font(Typeface.mono(size * Typeface.monoScale))
+                }
+            }
+            cursor = styled.characters.index(after: close)
+        }
+        return result + Text(AttributedString(styled[cursor...]))
+    }
+
     /// Inline code in the mono face, smaller, on a faint wash.
     static func styleInline(_ text: AttributedString, size: CGFloat, palette: Palette) -> AttributedString {
         var text = text
@@ -304,6 +460,7 @@ private struct MarkdownTableView: View {
     let table: MarkdownTable
     let size: CGFloat
     @Environment(\.palette) private var palette
+    @Environment(\.markdownMath) private var math
 
     var body: some View {
         ScrollView(.horizontal) {
@@ -328,11 +485,33 @@ private struct MarkdownTableView: View {
     }
 
     private func cellView(_ text: AttributedString, column: Int, bold: Bool) -> some View {
-        Text(Markdown.styleInline(text, size: size * 0.93, palette: palette))
+        Markdown.text(text, size: size * 0.93, palette: palette, math: math)
             .font(Typeface.serif(size * 0.93).weight(bold ? .semibold : .regular))
             .lineSpacing(3)
             .padding(.vertical, 6)
             .padding(.trailing, 22)
             .gridColumnAlignment(column < table.alignments.count ? table.alignments[column] : .leading)
+    }
+}
+
+/// A formula on its own line, centred; wide ones scroll sideways.
+private struct DisplayMath: View {
+    let math: MarkdownMath?
+    let size: CGFloat
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        if let math, let rendered = MathRenderer.shared.render(math.tex, display: true, size: size, color: palette.ink) {
+            let image = Image(nsImage: rendered.image).padding(.vertical, 2)
+            ViewThatFits(in: .horizontal) {
+                image.frame(maxWidth: .infinity)
+                ScrollView(.horizontal) { image }.scrollIndicators(.automatic)
+            }
+        } else if let math {
+            Text(math.tex)
+                .font(Typeface.mono(size * Typeface.monoScale))
+                .foregroundStyle(palette.secondary)
+                .textSelection(.enabled)
+        }
     }
 }

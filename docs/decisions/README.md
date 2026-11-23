@@ -24,3 +24,4 @@ To change one, write a new record that supersedes it, and mark the old one *Supe
 | [0016](0016-retry-replaces-the-answer.md) | Retry replaces the answer (amends 0003) |
 | [0017](0017-markdown-on-foundation.md) | Markdown on Foundation's parser, with our own highlighter |
 | [0018](0018-literata.md) | Literata replaces Publico Text (amends 0015) |
+| [0019](0019-latex-with-mathjax.md) | LaTeX with MathJax in JavaScriptCore |

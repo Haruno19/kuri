@@ -135,6 +135,7 @@ None of this includes a model's weights. A local model runs in its own process (
 | [modelcontextprotocol/swift-sdk](https://github.com/modelcontextprotocol/swift-sdk) | MCP client | Now |
 | [apple/swift-log](https://github.com/apple/swift-log) | The SDK's logging API, which a custom transport has to implement | Now |
 | [apple/containerization](https://github.com/apple/containerization) | Sandbox (pinned to an exact version: its API moves between minor versions) | Now |
+| [MathJax](https://github.com/mathjax/MathJax) 3.2.2 | Typesetting LaTeX in replies, run in JavaScriptCore and bundled in `App/MathJax` (Apache 2.0; [decision 0019](docs/decisions/0019-latex-with-mathjax.md)) | Now |
 | [Literata](https://github.com/googlefonts/literata), [DM Sans](https://github.com/googlefonts/dm-fonts), [iA Writer Mono](https://github.com/iaolo/iA-Fonts) | The reply, interface and code faces, bundled under the SIL Open Font License (licences in `App/Fonts`; decisions [0015](docs/decisions/0015-typography.md), [0018](docs/decisions/0018-literata.md)) | Now |
 
 The MCP SDK brings in, transitively, `apple/swift-system`, `apple/swift-log` and `mattt/eventsource` (SSE parsing for its HTTP transport); those are what end up linked into Kuri. SwiftPM also fetches `apple/swift-nio` and friends, used only by the SDK's own sample executables.
