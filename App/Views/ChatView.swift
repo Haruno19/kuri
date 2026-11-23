@@ -105,7 +105,10 @@ private struct Transcript<C: View>: View {
         let footers = answerFooters
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
+                // Lazy: only what's near the visible area is built. Eager, a
+                // long conversation kept every message's text layers alive
+                // (about 5 MB per Markdown-heavy answer).
+                LazyVStack(alignment: .leading, spacing: 22) {
                     ForEach(rows[..<split]) { row in
                         TranscriptRowView(row: row, isLive: false, footer: footers[row.id])
                     }
