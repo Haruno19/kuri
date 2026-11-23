@@ -50,6 +50,10 @@ struct Palette {
     var iconBottom: Color { Color(red: 0.733, green: 0.58, blue: 0.341) }
     var iconGradient: LinearGradient { LinearGradient(colors: [iconTop, iconBottom], startPoint: .top, endPoint: .bottom) }
 
+    /// The native sidebar as it renders over this palette (sampled), for
+    /// controls in it that must hide what scrolls beneath.
+    var sidebar: Color { dark ? hex(0x313030) : hex(0xF4F3F0) }
+
     /// User cards and other panels resting on the surface.
     var card: Color { dark ? hex(0x2F2B26) : hex(0xFFFDF8) }
     var shadow: Color { dark ? .black : hex(0x3A3226) }
@@ -214,6 +218,8 @@ struct SecondaryButton: ButtonStyle {
             configuration.label
                 .foregroundStyle(palette.ink)
                 .background(shape.fill(palette.wash).opacity(hovering ? 1 : 0))
+                // Solid underneath, so nothing scrolling behind shows through.
+                .background(shape.fill(palette.sidebar))
                 .overlay(shape.strokeBorder(palette.faint.opacity(0.45), lineWidth: 1))
                 .contentShape(shape)
                 .scaleEffect(configuration.isPressed ? 0.97 : 1)

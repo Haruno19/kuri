@@ -68,7 +68,7 @@ private struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
-        .safeAreaInset(edge: .top, spacing: 8) {
+        .safeAreaInset(edge: .top, spacing: 16) {
             VStack(spacing: 6) {
                 Button { model.selection = nil } label: {
                     SidebarButtonLabel(glyph: .compose, title: "New chat", color: .white)
