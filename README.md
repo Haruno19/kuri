@@ -9,11 +9,9 @@ A lightweight, macOS native, human-designed & Claude-coded app for working with 
 Kuri is a single app that contains both the engine and the interface. It runs offline with local models, talks to any hosted provider when you want it to, discovers MCP servers at runtime, and runs the model's commands inside a lightweight Linux VM. 
 
 <p align="center">
-  <img height="320" alt="Main window" src="https://github.com/user-attachments/assets/3efaba4b-4ccf-4e34-80c1-b92904513b5a" />
+  <img height="320" alt="Main window" src="https://github.com/user-attachments/assets/2302a54d-b12b-43dd-b739-55daa7098e68" />
   <img height="320" alt="Mini window" src="https://github.com/user-attachments/assets/4bc4e9ae-7db8-4331-b376-8bc11239ca6e" />
 </p>
-
----
 
 ## Principles
 
@@ -23,6 +21,19 @@ Kuri is a single app that contains both the engine and the interface. It runs of
 - **Hackable.** Providers, models and MCP servers live in plain JSON5 files you can edit by hand. The database is a plain SQLite file with a small, readable schema.
 - **Provider-agnostic.** Every major wire format is a first-class adapter. Switching model mid-conversation just works.
 - **One mode.** There is no "chat mode" or "code mode". Every conversation has the same tools; attaching a folder lets the model work on your files.
+
+## Gallery
+<p align="center">
+  <img width="48%" alt="Light theme welcome page" src="https://github.com/user-attachments/assets/c51e280a-d43f-4c15-b31a-41fa198fcb6d" />
+  <img width="48%" alt="Dark theme welcome page and inspector" src="https://github.com/user-attachments/assets/289988b0-9c2c-4eb0-b908-949454487e34" />
+  
+  <img width="48%" alt="Dark theme chat and inspector" src="https://github.com/user-attachments/assets/2b7e1e98-b754-42ff-a7ee-904c06262fce" />
+  <img width="48%" alt="Light theme chat with latex and inspector" src="https://github.com/user-attachments/assets/54bed49e-9490-4835-8edf-31953a16122e" />
+  
+  <img width="48%" alt="Light theme chat with both sidebars" src="https://github.com/user-attachments/assets/ff5dcae9-2dc7-473b-abc8-e19602f0bf5a" />
+  <img width="48%" alt="Dark theme chat with a codeblock and sidebar" src="https://github.com/user-attachments/assets/1cc6304e-fdd8-44a7-8531-26f542478780" />
+
+</p>
 
 ## Architecture
 
