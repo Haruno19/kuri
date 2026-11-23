@@ -165,6 +165,11 @@ private struct MiniChatList: View {
 private struct MiniTranscript: View {
     @Environment(AppModel.self) private var model
 
+    /// How far text fades in below the title bar. The window is glass, so
+    /// the main window's frost would show as a band: the text fades out
+    /// instead, and nothing reaches the traffic lights.
+    static let fade: CGFloat = 26
+
     var body: some View {
         let rows = TranscriptRow.rows(from: model.items)
         ScrollView {
@@ -175,12 +180,20 @@ private struct MiniTranscript: View {
                 LiveTail(room: 300)
             }
             .padding(.horizontal, 12)
-            .padding(.top, 4)
+            .padding(.top, 10)
             .padding(.bottom, 12)
         }
         .defaultScrollAnchor(.bottom)
         .defaultScrollAnchor(.bottom, for: .sizeChanges)
-        .scrollEdgeEffectStyle(.soft, for: .vertical)
+        .scrollEdgeEffectHidden(true, for: .top)
+        // Outside the mask nothing draws, which also keeps scrolled text
+        // from reaching up under the title bar.
+        .mask {
+            VStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: Self.fade)
+                Color.black
+            }
+        }
     }
 }
 
