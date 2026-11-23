@@ -94,6 +94,8 @@ private struct Transcript<C: View>: View {
 
     /// From the window's top edge to where a pinned message starts.
     static var topMargin: CGFloat { 56 }
+    /// How far the bottom frost rises above the composer.
+    static var bottomRise: CGFloat { 32 }
 
     var body: some View {
         // The latest exchange (the last user message and what follows) is at
@@ -123,7 +125,8 @@ private struct Transcript<C: View>: View {
                 }
                 .frame(maxWidth: 740)
                 .padding(.horizontal, 48)
-                .padding(.bottom, 12)
+                // At rest, the last line clears the frost above the composer.
+                .padding(.bottom, Self.bottomRise)
                 .frame(maxWidth: .infinity)
             }
             .defaultScrollAnchor(.bottom)
@@ -154,9 +157,16 @@ private struct Transcript<C: View>: View {
                 .frame(maxWidth: 740)
                 .padding(.horizontal, 48)
                 .padding(.bottom, 18)
+                .frame(maxWidth: .infinity)
+                // The same frost as the top edge, behind the composer and
+                // rising a little above it.
+                .background {
+                    EdgeFade(edge: .bottom, fade: Self.bottomRise + 12)
+                        .padding(.top, -Self.bottomRise)
+                }
             }
             .overlay(alignment: .top) {
-                TopFade().frame(height: Self.topMargin)
+                EdgeFade(edge: .top).frame(height: Self.topMargin)
             }
         }
     }
@@ -509,16 +519,23 @@ private struct LiveReasoning: View {
     }
 }
 
-private struct TopFade: View {
+/// Frosts the transcript where it meets a window edge: solid at the edge,
+/// clearing over the last `fade` points.
+private struct EdgeFade: View {
+    let edge: VerticalEdge
+    var fade: CGFloat = 36
     @Environment(\.palette) private var palette
 
     var body: some View {
-        ZStack {
-            Rectangle().fill(.ultraThinMaterial)
-            palette.background.opacity(0.75)
+        GeometryReader { geometry in
+            let solid = max(0, 1 - fade / max(geometry.size.height, 1))
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                palette.background.opacity(0.75)
+            }
+            .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: solid), .init(color: .clear, location: 1)],
+                                 startPoint: edge == .top ? .top : .bottom, endPoint: edge == .top ? .bottom : .top))
         }
-        .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.35), .init(color: .clear, location: 1)],
-                             startPoint: .top, endPoint: .bottom))
         .allowsHitTesting(false)
     }
 }

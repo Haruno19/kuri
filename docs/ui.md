@@ -34,7 +34,7 @@ The brief for the redesign. Every app change is checked against it. Directions a
 - **Working state**: while the model thinks or runs tools, an animated indicator (the logo, or dots moving in 3D) next to shimmering text saying what's happening.
 - **User messages**: full width, aligned left, in rich, heavy, 3D-feeling cards (layered fill, top highlight, darker lower edge, contact and ambient shadows).
 - **Model replies**: serif, directly on the surface, no bubble.
-- **Composer**: glass, slightly tinted, with a shadow so it sits above the surface. The model selector and the other controls blend into the composer surface (no boxes of their own); only send/stop is a distinct button.
+- **Composer**: glass, slightly tinted, with a shadow so it sits above the surface. The transcript frosts and fades where it meets the window's top edge and again behind the composer, rising a little above it. The model selector and the other controls blend into the composer surface (no boxes of their own); only send/stop is a distinct button.
 
 ## UI roadmap
 
