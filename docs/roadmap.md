@@ -20,7 +20,8 @@ Then the engine: everything below is done.
 3. Menu bar extra.
 4. Settings window, including editing providers and MCP servers.
 5. Floating window with a global hotkey.
-6. A right-hand sidebar previewing the sandbox while the model uses it.
+6. A right-hand sidebar, the conversation's inspector: its steps (shell commands first), the task list (editable), the context, git status for repository folders, and a sandbox preview while the model uses it.
+7. Playing with the main window for a polished, slightly retro feel: a background pattern, the logo's size, pixel animations around the composer.
 
 ## iOS client
 

@@ -44,4 +44,10 @@ The brief for the redesign. Every app change is checked against it. Directions a
 3. Menu bar extra (dropdown).
 4. Settings window (compact, retro, dense).
 5. Floating window (mini panel with a global hotkey).
-6. **Sandbox preview**: a sidebar on the right, shown while the model uses the sandbox, previewing what happens in it.
+6. **Right sidebar**: an inspector for the conversation, in sections:
+   - **Steps**: every tool call of the conversation, with the shell commands in the foreground.
+   - **Tasks**: the model's task list, when it made one, editable by the user.
+   - **Context**: what fills the context window.
+   - **Git**: when the working folder is a repository, its branch and changes.
+   - **Sandbox preview**: shown while the model uses the sandbox, previewing what happens in it.
+7. **Playing with the window** (after Markdown, Settings and the menu bar): give it a polished, slightly retro taste. Ideas to try: a background pattern (a faint grid) instead of the solid colour, a resized logo, small pixel animations on the composer's top-right edge.
