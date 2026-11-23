@@ -374,30 +374,14 @@ private struct ItemView: View {
     }
 }
 
-/// A model reply: serif, straight on the surface, inline code in the mono
-/// face at a smaller size.
+/// A model reply: Markdown, serif, straight on the surface.
 private struct ReplyText: View {
     let text: String
-    @Environment(\.palette) private var palette
-    private let size: CGFloat = 15
 
     var body: some View {
-        Text(attributed)
-            .font(Typeface.serif(size))
-            .lineSpacing(5)
-            .foregroundStyle(palette.ink)
-            .textSelection(.enabled)
+        MarkdownView(text: text)
             .padding(.horizontal, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var attributed: AttributedString {
-        var string = (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-            ?? AttributedString(text)
-        for run in string.runs where run.inlinePresentationIntent?.contains(.code) == true {
-            string[run.range].font = Typeface.mono(size * Typeface.monoScale)
-        }
-        return string
     }
 }
 

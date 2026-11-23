@@ -202,6 +202,7 @@ memories             (id, content, source, status, supersedes_id, origin_convers
 - **Menu bar** (`MenuBarExtra`): quick access and a compact chat; the app keeps running in the background with no windows open.
 - **Mini panel** *(planned)*: a floating, non-activating `NSPanel` summoned with a global hotkey.
 - **Settings**: *General* shows where the config lives; *Models* registers models per provider (with discovery) and sets the default; *Tools* lists built-in tools and MCP servers with their state and policies; *Memory* views and edits what Kuri remembers. Providers and MCP servers are still edited in their files.
+- **Replies** are Markdown, parsed by Foundation and drawn block by block (`App/Views/Markdown.swift`); fenced code is coloured in Everforest Higure or Yoake by `App/Style/Highlighter.swift`, with a copy button ([decision 0017](decisions/0017-markdown-on-foundation.md)).
 - **Styling**: `App/Style/Style.swift` holds the palette (read from the environment), timings, faces, controls and pencil icons, so the look lives in one place. `Sketches/Autumn.swift` is where directions are tried first.
 
 ## Distribution and security

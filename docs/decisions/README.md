@@ -22,3 +22,4 @@ To change one, write a new record that supersedes it, and mark the old one *Supe
 | [0014](0014-anthropic-thinking-replay.md) | Anthropic thinking is replayed only within the current exchange |
 | [0015](0015-typography.md) | Typography: Publico Text, DM Sans, iA Writer Mono |
 | [0016](0016-retry-replaces-the-answer.md) | Retry replaces the answer (amends 0003) |
+| [0017](0017-markdown-on-foundation.md) | Markdown on Foundation's parser, with our own highlighter |

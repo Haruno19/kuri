@@ -62,7 +62,6 @@ Kuri is a single app that contains both the engine and the interface. It runs of
 | `KuriAgent` | `Engine` facade, `TurnRunner` (the agent loop), `InteractionBroker` (clarify/approval), event broadcasting | all of the above |
 | `KuriMCP` | MCP connections on the official Swift SDK: config diffing, discovery, process transport, MCP tools as `Tool`s | Core, Config, Tools |
 | `KuriSandbox` | Linux containers on Apple's Containerization: setup, one VM per conversation, mounts; the `shell` tool | Core, Config, Tools |
-| `KuriMarkdown` *(planned)* | Streaming Markdown → SwiftUI renderer on `swift-markdown` | — |
 
 Dependencies point one way: down towards `KuriCore`. Nothing in the package imports SwiftUI.
 
@@ -136,7 +135,6 @@ None of this includes a model's weights. A local model runs in its own process (
 | [modelcontextprotocol/swift-sdk](https://github.com/modelcontextprotocol/swift-sdk) | MCP client | Now |
 | [apple/swift-log](https://github.com/apple/swift-log) | The SDK's logging API, which a custom transport has to implement | Now |
 | [apple/containerization](https://github.com/apple/containerization) | Sandbox (pinned to an exact version: its API moves between minor versions) | Now |
-| [swiftlang/swift-markdown](https://github.com/swiftlang/swift-markdown) | Markdown parsing | With `KuriMarkdown` |
 | [DM Sans](https://github.com/googlefonts/dm-fonts), [iA Writer Mono](https://github.com/iaolo/iA-Fonts) | The interface and code faces, bundled under the SIL Open Font License (licences in `App/Fonts`); the serif, Publico Text, is an Apple font macOS downloads on request ([decision 0015](docs/decisions/0015-typography.md)) | Now |
 
 The MCP SDK brings in, transitively, `apple/swift-system`, `apple/swift-log` and `mattt/eventsource` (SSE parsing for its HTTP transport); those are what end up linked into Kuri. SwiftPM also fetches `apple/swift-nio` and friends, used only by the SDK's own sample executables.

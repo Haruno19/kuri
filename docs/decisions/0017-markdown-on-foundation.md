@@ -1,0 +1,7 @@
+# 0017. Markdown on Foundation's parser, with our own highlighter
+
+**Decided.** Replies are parsed with Foundation's `AttributedString(markdown:)` in its full syntax (CommonMark plus GitHub's tables and strikethrough). Each run carries its block structure as a `PresentationIntent`; the app rebuilds the block tree from it and draws it with SwiftUI (`App/Views/Markdown.swift`). Code blocks are coloured by a small highlighter of our own (`App/Style/Highlighter.swift`) in the author's Everforest themes: Higure in dark mode, Yoake in light mode. A single newline in a reply is shown as a line break. The `KuriMarkdown` module on `swift-markdown`, planned earlier, is dropped.
+
+**Why.** Foundation already ships the parser, so the rule of Apple frameworks first applies before any package, even an official one. There is no Apple syntax highlighter, and the libraries that exist are personal projects, which the dependency rule excludes; a forgiving one-pass tokenizer (comments, strings, numbers, keywords, calls, types, keys) looks right for what models write, and its colours map straight onto the theme's scopes. Models write for a chat, not for reflowing, so a lone newline means one.
+
+**Cost.** No task-list syntax from the parser (`- [ ]` is recognised by hand), no footnotes, and selection stops at block boundaries because each block is its own `Text`. The highlighter guesses: unusual code can be coloured wrongly, never broken. The renderer lives in the app; an iOS client would move it into the package. LaTeX isn't covered and needs its own decision.
