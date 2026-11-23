@@ -430,23 +430,25 @@ extension Markdown {
     static func text(_ text: AttributedString, size: CGFloat, palette: Palette, math: [MarkdownMath]) -> Text {
         let styled = styleInline(text, size: size, palette: palette)
         guard !math.isEmpty, styled.characters.contains(mathOpen) else { return Text(styled) }
-        var result = Text("")
+        var pieces: [Text] = []
         var cursor = styled.startIndex
         while let open = styled.characters[cursor...].firstIndex(of: mathOpen),
               let close = styled.characters[open...].firstIndex(of: mathClose) {
-            result = result + Text(AttributedString(styled[cursor..<open]))
+            pieces.append(Text(AttributedString(styled[cursor..<open])))
             let label = String(styled.characters[styled.characters.index(after: open)..<close])
             if let index = Int(label), index < math.count {
                 let formula = math[index]
                 if let rendered = MathRenderer.shared.render(formula.tex, display: formula.display, size: size, color: palette.ink) {
-                    result = result + Text(Image(nsImage: rendered.image)).baselineOffset(-rendered.depth)
+                    pieces.append(Text(Image(nsImage: rendered.image)).baselineOffset(-rendered.depth))
                 } else {
-                    result = result + Text(formula.tex).font(Typeface.mono(size * Typeface.monoScale))
+                    pieces.append(Text(formula.tex).font(Typeface.mono(size * Typeface.monoScale)))
                 }
             }
             cursor = styled.characters.index(after: close)
         }
-        return result + Text(AttributedString(styled[cursor...]))
+        pieces.append(Text(AttributedString(styled[cursor...])))
+        // Joined by interpolation: `Text + Text` is deprecated.
+        return pieces.dropFirst().reduce(pieces[0]) { Text("\($0)\($1)") }
     }
 
     /// Inline code in the mono face, smaller, on a faint wash.
