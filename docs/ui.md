@@ -31,6 +31,7 @@ The brief for the redesign. Every app change is checked against it. Directions a
 - **Sidebar starts collapsed**: the app opens on the chat alone. At its top, *New chat* is the primary button (filled in the accent, like send) and *Settings* a secondary one (outlined) below it.
 - **New chat**: content centred vertically; Kuri's logo and a welcome line side by side on one row, aligned left, above the composer.
 - **Logo**: made of the glassy material, coloured with the icon's chestnut gradient. Always alive in a subtle way: idle motion, reacting to hover and clicks (a tilt toward the pointer, a squish and bounce on click). Not anthropomorphic, but with the same friendly, human feel.
+- **Scrolling**: a chat opens at its end, the last reply just above the composer. A message you send rises to just under the top frost, and the reply grows below it.
 - **Reasoning while it streams**: a window of its latest lines, at most ten or about 30% of the room between the pinned message and the composer, older lines fading out at the top. Finished reasoning folds into *Thought*.
 - **Working state**: while the model thinks or runs tools, an animated indicator (the logo, or dots moving in 3D) next to shimmering text saying what's happening.
 - **User messages**: full width, aligned left, in rich, heavy, 3D-feeling cards (layered fill, top highlight, darker lower edge, contact and ambient shadows).
