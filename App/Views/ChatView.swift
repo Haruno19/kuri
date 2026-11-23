@@ -216,19 +216,8 @@ private struct Transcript<C: View>: View {
         }
     }
 
-    /// The working indicator's words: the tool in progress, or thinking.
-    private var status: String {
-        if let last = TranscriptRow.rows(from: model.items).last, case .tool(_, let call, nil) = last {
-            switch call.name {
-            case "shell": return "Running a command"
-            case "conversation_search": return "Searching past conversations"
-            case "memory": return "Updating memory"
-            case "clarify": return "Waiting for your answer"
-            default: return "Using \(call.name.replacingOccurrences(of: "__", with: " › "))"
-            }
-        }
-        return "Thinking"
-    }
+    private var status: String { TranscriptRow.workingStatus(model.items) }
+
 }
 
 /// What the transcript shows: items, except that a tool result is folded
@@ -248,6 +237,20 @@ enum TranscriptRow: Identifiable {
         if case .item(let item) = self, case .message(let message) = item.payload { message.role == .user } else { false }
     }
 
+    /// The working indicator's words: the tool in progress, or thinking.
+    static func workingStatus(_ items: [Item]) -> String {
+        if let last = rows(from: items).last, case .tool(_, let call, nil) = last {
+            switch call.name {
+            case "shell": return "Running a command"
+            case "conversation_search": return "Searching past conversations"
+            case "memory": return "Updating memory"
+            case "clarify": return "Waiting for your answer"
+            default: return "Using \(call.name.replacingOccurrences(of: "__", with: " › "))"
+            }
+        }
+        return "Thinking"
+    }
+
     static func rows(from items: [Item]) -> [TranscriptRow] {
         var results: [String: ToolResult] = [:]
         for item in items {
@@ -263,7 +266,7 @@ enum TranscriptRow: Identifiable {
     }
 }
 
-private struct TranscriptRowView: View {
+struct TranscriptRowView: View {
     let row: TranscriptRow
     let isLive: Bool
     var footer: AnswerFooter?
@@ -284,7 +287,7 @@ private struct TranscriptRowView: View {
 
 /// Under a finished answer: when it ended and what it cost, dim and small
 /// like the context meter; the latest answer can be retried.
-private struct AnswerFooter: View {
+struct AnswerFooter: View {
     let turn: Turn
     let canRetry: Bool
     @Environment(AppModel.self) private var model
@@ -335,21 +338,22 @@ private struct AnswerFooter: View {
     private static func count(_ tokens: Int) -> String { tokens.formatted(.number) }
 }
 
-private struct ItemView: View {
+struct ItemView: View {
     let payload: Item.Payload
     @Environment(\.palette) private var palette
+    @Environment(\.chatScale) private var scale
 
     var body: some View {
         switch payload {
         case .message(let message) where message.role == .user:
             Text(message.text)
-                .font(Typeface.sans(15.5))
-                .lineSpacing(3)
+                .font(Typeface.sans(15.5 * scale))
+                .lineSpacing(3 * scale)
                 .foregroundStyle(palette.ink)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.horizontal, 16 * scale)
+                .padding(.vertical, 12 * scale)
                 .modifier(Pane())
                 .transition(.asymmetric(
                     insertion: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity).combined(with: .offset(y: 16)),
@@ -361,7 +365,7 @@ private struct ItemView: View {
         case .reasoning(let reasoning) where !reasoning.text.isEmpty:
             Folded(title: "Thought") {
                 Text(reasoning.text)
-                    .font(Typeface.sans(13))
+                    .font(Typeface.sans(13 * scale))
                     .foregroundStyle(palette.secondary)
                     .lineSpacing(2)
                     .textSelection(.enabled)
@@ -371,7 +375,7 @@ private struct ItemView: View {
         case .compaction(let compaction):
             Folded(title: "Earlier messages summarized") {
                 Text(compaction.summary)
-                    .font(Typeface.sans(13))
+                    .font(Typeface.sans(13 * scale))
                     .foregroundStyle(palette.secondary)
                     .lineSpacing(2)
                     .textSelection(.enabled)
@@ -385,21 +389,23 @@ private struct ItemView: View {
 }
 
 /// A model reply: Markdown, serif, straight on the surface.
-private struct ReplyText: View {
+struct ReplyText: View {
     let text: String
+    @Environment(\.chatScale) private var scale
 
     var body: some View {
-        MarkdownView(text: text)
+        MarkdownView(text: text, size: 15 * scale)
             .padding(.horizontal, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 /// A quiet line that opens to show more: reasoning, summaries.
-private struct Folded<Content: View>: View {
+struct Folded<Content: View>: View {
     let title: String
     @ViewBuilder let content: Content
     @Environment(\.palette) private var palette
+    @Environment(\.chatScale) private var scale
     @State private var open = false
 
     var body: some View {
@@ -408,8 +414,8 @@ private struct Folded<Content: View>: View {
                 withAnimation(Tune.move) { open.toggle() }
             } label: {
                 HStack(spacing: 5) {
-                    Text(title).font(Typeface.sans(13))
-                    PencilIcon(glyph: .chevron, size: 11, color: palette.faint)
+                    Text(title).font(Typeface.sans(13 * scale))
+                    PencilIcon(glyph: .chevron, size: 11 * scale, color: palette.faint)
                         .rotationEffect(.degrees(open ? 0 : -90))
                 }
                 .foregroundStyle(palette.faint)
@@ -425,18 +431,19 @@ private struct Folded<Content: View>: View {
 
 /// What the model is doing: three dots circling in depth, and the status
 /// with light slowly crossing it.
-private struct Working: View {
+struct Working: View {
     let status: String
     @Environment(\.palette) private var palette
+    @Environment(\.chatScale) private var scale
 
     var body: some View {
-        HStack(spacing: 12) {
-            OrbitingDots()
+        HStack(spacing: 12 * scale) {
+            OrbitingDots().scaleEffect(scale)
             TimelineView(.animation) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
                 let p = t.truncatingRemainder(dividingBy: Tune.shimmer) / Tune.shimmer * 1.8 - 0.4
                 Text(status)
-                    .font(Typeface.sans(15))
+                    .font(Typeface.sans(15 * scale))
                     .foregroundStyle(LinearGradient(stops: [
                         .init(color: palette.faint, location: 0),
                         .init(color: palette.faint, location: clamp(p - 0.25)),
@@ -454,7 +461,7 @@ private struct Working: View {
     private func clamp(_ x: Double) -> Double { min(1, max(0, x)) }
 }
 
-private struct OrbitingDots: View {
+struct OrbitingDots: View {
     @Environment(\.palette) private var palette
 
     var body: some View {
@@ -485,11 +492,12 @@ private struct OrbitingDots: View {
 /// Reasoning as it streams: a window of its latest lines, at most ten or
 /// about a third of the room between the pinned message and the composer;
 /// older lines fade out at the top.
-private struct LiveReasoning: View {
+struct LiveReasoning: View {
     let text: String
     /// The visible height of the transcript.
     let room: CGFloat
     @Environment(\.palette) private var palette
+    @Environment(\.chatScale) private var scale
     @State private var height: CGFloat = 0
 
     private static let lineHeight: CGFloat = 19
@@ -498,10 +506,11 @@ private struct LiveReasoning: View {
     private static let roomShare: CGFloat = 0.3
 
     var body: some View {
-        let cap = min(Self.maxLines * Self.lineHeight, max(Self.minLines * Self.lineHeight, room * Self.roomShare))
+        let line = Self.lineHeight * scale
+        let cap = min(Self.maxLines * line, max(Self.minLines * line, room * Self.roomShare))
         let overflows = height > cap + 0.5
         Text(text)
-            .font(Typeface.sans(13))
+            .font(Typeface.sans(13 * scale))
             .foregroundStyle(palette.faint)
             .lineSpacing(2)
             .fixedSize(horizontal: false, vertical: true)
@@ -521,7 +530,7 @@ private struct LiveReasoning: View {
 
 /// Frosts the transcript where it meets a window edge: solid at the edge,
 /// clearing over the last `fade` points.
-private struct EdgeFade: View {
+struct EdgeFade: View {
     let edge: VerticalEdge
     var fade: CGFloat = 36
     @Environment(\.palette) private var palette
@@ -629,9 +638,10 @@ private struct ModelPicker: View {
 
 /// Send, or stop while a turn runs and there's nothing to queue. The
 /// coloured layer fades in over a flat disabled base.
-private struct SendButton: View {
+struct SendButton: View {
     let draft: String
     let send: () -> Void
+    var size: CGFloat = 30
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
 
@@ -639,31 +649,32 @@ private struct SendButton: View {
         let hasText = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let stops = model.isSelectedBusy && !hasText
         let ready = hasText || stops
+        let k = size / 30
         Button {
             if stops { Task { await model.cancel() } } else { send() }
         } label: {
             ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous).fill(palette.faint.opacity(0.28))
+                RoundedRectangle(cornerRadius: 8 * k, style: .continuous).fill(palette.faint.opacity(0.28))
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous).fill(palette.accentFill)
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: 8 * k, style: .continuous).fill(palette.accentFill)
+                    RoundedRectangle(cornerRadius: 8 * k, style: .continuous)
                         .strokeBorder(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center), lineWidth: 1)
                 }
                 .shadow(color: palette.shadow.opacity(palette.dark ? 0.4 : 0.12), radius: 2, y: 1)
                 .opacity(ready ? 1 : 0)
                 ZStack {
                     if stops {
-                        RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        RoundedRectangle(cornerRadius: 2.5 * k, style: .continuous)
                             .fill(.white)
-                            .frame(width: 10, height: 10)
+                            .frame(width: 10 * k, height: 10 * k)
                             .transition(.scale(scale: 0.5).combined(with: .opacity))
                     } else {
-                        PencilIcon(glyph: .arrowUp, size: 16, color: ready ? .white : palette.background.opacity(0.9), weight: 1.7)
+                        PencilIcon(glyph: .arrowUp, size: 16 * k, color: ready ? .white : palette.background.opacity(0.9), weight: 1.7)
                             .transition(.scale(scale: 0.5).combined(with: .opacity))
                     }
                 }
             }
-            .frame(width: 30, height: 30)
+            .frame(width: size, height: size)
             .animation(Tune.move, value: stops)
             .animation(Tune.enable, value: ready)
         }
@@ -783,9 +794,10 @@ private struct FolderBar: View {
 }
 
 /// After a turn that didn't complete: what happened, and a way to go on.
-private struct TurnEndBar: View {
+struct TurnEndBar: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
+    @Environment(\.chatScale) private var scale
     let turn: Turn
 
     var body: some View {
@@ -802,8 +814,8 @@ private struct TurnEndBar: View {
                     .modifier(HoverWash())
                     .help("Let the model pick up where this turn left off")
             }
-            .font(Typeface.sans(13))
-            .padding(.horizontal, 12).padding(.vertical, 8)
+            .font(Typeface.sans(13 * scale))
+            .padding(.horizontal, 12 * scale).padding(.vertical, 8 * scale)
             .modifier(Pane())
         }
     }
@@ -854,10 +866,11 @@ private struct TaskListPanel: View {
     }
 }
 
-private struct InputRequestView: View {
+struct InputRequestView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     let request: InputRequest
+    @Environment(\.chatScale) private var scale
     @State private var answers: [String: String] = [:]
 
     var body: some View {
@@ -866,7 +879,7 @@ private struct InputRequestView: View {
             case .clarify(let clarify):
                 ForEach(clarify.questions, id: \.id) { question in
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(question.question).font(Typeface.serif(15)).foregroundStyle(palette.ink)
+                        Text(question.question).font(Typeface.serif(15 * scale)).foregroundStyle(palette.ink)
                         if let options = question.options, !options.isEmpty {
                             HStack {
                                 ForEach(options, id: \.self) { option in
@@ -880,7 +893,7 @@ private struct InputRequestView: View {
                             get: { answers[question.id] ?? "" },
                             set: { answers[question.id] = $0 }))
                             .textFieldStyle(.plain)
-                            .font(Typeface.sans(14))
+                            .font(Typeface.sans(14 * scale))
                     }
                 }
                 Button("Send Answers") {
@@ -889,8 +902,8 @@ private struct InputRequestView: View {
                 .keyboardShortcut(.defaultAction)
 
             case .approval(let approval):
-                Text("Allow **\(approval.tool)** to run?").font(Typeface.serif(15)).foregroundStyle(palette.ink)
-                Text(approval.arguments).font(Typeface.mono(11.5)).foregroundStyle(palette.secondary).lineLimit(6)
+                Text("Allow **\(approval.tool)** to run?").font(Typeface.serif(15 * scale)).foregroundStyle(palette.ink)
+                Text(approval.arguments).font(Typeface.mono(11.5 * scale)).foregroundStyle(palette.secondary).lineLimit(6)
                 HStack {
                     Button("Deny") { Task { await model.respond(to: request, with: .approved(false)) } }
                     Button("Allow") { Task { await model.respond(to: request, with: .approved(true)) } }
@@ -898,8 +911,8 @@ private struct InputRequestView: View {
                 }
             }
         }
-        .font(Typeface.sans(13))
-        .padding(14)
+        .font(Typeface.sans(13 * scale))
+        .padding(14 * scale)
         .frame(maxWidth: .infinity, alignment: .leading)
         .modifier(Pane())
     }

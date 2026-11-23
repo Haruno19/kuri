@@ -42,9 +42,9 @@ The brief for the redesign. Every app change is checked against it. Directions a
 2. Layout and styling of the main window, from the Autumn sketch, with conversation management: rename *(done)*, archive, delete; maybe projects / groups, or grouping by root folder.
    - **Running chats** show a status indicator in the sidebar: a single orb in the accent colour, with the same 3D feel as the working dots.
    - **Sidebar snaps shut**: dragging its edge past a threshold collapses it, if SwiftUI allows it.
-3. Menu bar extra (dropdown).
+3. **Menu bar icon and mini window** *(done)*: left click opens a small chat in Liquid Glass that floats like picture in picture; right click a native menu (Open Kuri, Settings, Quit). This also covers the floating window, item 5.
 4. Settings window (compact, retro, dense).
-5. Floating window (mini panel with a global hotkey).
+5. Floating window: the mini window above; a global hotkey for it is still to do.
 6. **Right sidebar**: an inspector for the conversation, in sections:
    - **Steps**: every tool call of the conversation, with the shell commands in the foreground.
    - **Tasks**: the model's task list, when it made one, editable by the user.

@@ -11,6 +11,7 @@ struct ToolCallView: View {
 
     @State private var expanded = false
     @Environment(\.palette) private var palette
+    @Environment(\.chatScale) private var scale
 
     var body: some View {
         let presentation = ToolPresentation(call: call, result: result)
@@ -35,7 +36,7 @@ struct ToolCallView: View {
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .font(Typeface.sans(13))
+            .font(Typeface.sans(13 * scale))
             .foregroundStyle(palette.secondary)
 
             if expanded {

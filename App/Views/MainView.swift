@@ -7,6 +7,8 @@ import SwiftUI
 struct MainView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @State private var columns: NavigationSplitViewVisibility = .detailOnly
 
     var body: some View {
@@ -33,6 +35,10 @@ struct MainView: View {
             // Only the top: the content stays beside the sidebar, so the chat
             // shifts right when it opens instead of sliding under it.
             .ignoresSafeArea(edges: .top)
+        }
+        .onAppear {
+            WindowActions.openWindow = openWindow
+            WindowActions.openSettings = openSettings
         }
         .toolbar(removing: .title)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)

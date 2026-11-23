@@ -34,6 +34,8 @@ struct MarkdownDocument {
 
 extension EnvironmentValues {
     @Entry var markdownMath: [MarkdownMath] = []
+    /// Off in the mini window: `$` stays text there.
+    @Entry var allowsMath = true
 }
 
 struct MarkdownListItem {
@@ -63,11 +65,12 @@ enum Markdown {
         init(_ document: MarkdownDocument) { self.document = document }
     }
 
-    static func document(_ text: String) -> MarkdownDocument {
-        if let hit = cache.object(forKey: text as NSString) { return hit.document }
-        let (markdown, math) = extractMath(text)
+    static func document(_ text: String, math allowsMath: Bool = true) -> MarkdownDocument {
+        let key = ((allowsMath ? "1" : "0") + text) as NSString
+        if let hit = cache.object(forKey: key) { return hit.document }
+        let (markdown, math) = allowsMath ? extractMath(text) : (text, [])
         let document = MarkdownDocument(blocks: parse(markdown), math: math)
-        cache.setObject(Parsed(document), forKey: text as NSString)
+        cache.setObject(Parsed(document), forKey: key)
         return document
     }
 
@@ -301,11 +304,12 @@ struct MarkdownView: View, Equatable {
     let text: String
     var size: CGFloat = 15
     @Environment(\.palette) private var palette
+    @Environment(\.allowsMath) private var allowsMath
 
     nonisolated static func == (a: Self, b: Self) -> Bool { a.text == b.text && a.size == b.size }
 
     var body: some View {
-        let document = Markdown.document(text)
+        let document = Markdown.document(text, math: allowsMath)
         MarkdownBlocks(blocks: document.blocks, size: size)
             .environment(\.markdownMath, document.math)
             .foregroundStyle(palette.ink)

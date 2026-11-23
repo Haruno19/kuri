@@ -230,14 +230,32 @@ struct SecondaryButton: ButtonStyle {
     }
 }
 
+extension EnvironmentValues {
+    /// Sizes in the chat, multiplied: the mini window sets everything a
+    /// size down.
+    @Entry var chatScale: CGFloat = 1
+    /// Panels as glass alone, no warm fill: for the mini window, which is
+    /// glass all through.
+    @Entry var glassOnly = false
+}
+
 /// A panel resting on the surface: a warm fill inside Liquid Glass, which
 /// gives the edge light and depth; no drawn shadows.
 struct Pane: ViewModifier {
     var radius: CGFloat = 9
     @Environment(\.palette) private var palette
+    @Environment(\.glassOnly) private var glassOnly
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        if glassOnly {
+            content.glassEffect(.regular, in: shape)
+        } else {
+            filled(content, shape)
+        }
+    }
+
+    private func filled(_ content: Content, _ shape: RoundedRectangle) -> some View {
         content
             // The glass alone turns grey on a light surface: the fill sets
             // the colour.

@@ -28,7 +28,7 @@ Kuri is a single app that contains both the engine and the interface. It runs of
 ```
 +------------------------------------- Kuri.app -------------------------------------+
 |                                                                                    |
-|  App (SwiftUI)   main window, menu bar, settings                                   |
+|  App (SwiftUI)   main window, mini window (menu bar), settings                     |
 |        |  observes EngineEvents, calls Engine methods                              |
 |        v                                                                           |
 |  KuriAgent       Engine (actor), TurnRunner, InteractionBroker                     |

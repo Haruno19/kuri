@@ -3,11 +3,13 @@ import SwiftUI
 
 @main
 struct KuriApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model: AppModel
 
     init() {
         let model = AppModel()
         _model = State(initialValue: model)
+        MiniController.shared.main = model
         FontLibrary.prepare()
         // Read now, before the first window draws; the engine's copy of the
         // config, loaded asynchronously, takes over from there.
@@ -43,15 +45,19 @@ struct KuriApp: App {
         .windowToolbarStyle(.unified)
         .defaultSize(width: 1040, height: 760)
 
-        MenuBarExtra("Kuri", image: "MenuBarIcon") {
-            MenuBarView()
-                .environment(model)
-        }
-        .menuBarExtraStyle(.window)
-
         Settings {
             SettingsView()
                 .environment(model)
         }
     }
+}
+
+/// The menu bar icon goes in once AppKit has finished launching; closing
+/// every window leaves Kuri running there.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        MiniController.shared.install()
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }

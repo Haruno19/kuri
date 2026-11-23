@@ -84,23 +84,41 @@ final class AppModel {
         guard engine == nil else { return }
         do {
             let engine = try await Engine.open()
-            self.engine = engine
-            conversations = try await engine.store.conversations()
-            models = await engine.models
-            config = await engine.config
-            tools = await engine.toolCatalog()
-            memories = try await engine.memories()
-            mcpServers = await engine.mcpServers()
-            sandboxStatus = await engine.sandbox.status
-            phase = .ready
-            // Subscribe before resuming, so re-asked questions aren't missed.
-            let events = engine.events()
-            Task {
-                for await event in events { handle(event) }
-            }
+            try await attach(to: engine)
             await engine.resumePendingTurns()
         } catch {
             phase = .failed(error.localizedDescription)
+        }
+    }
+
+    /// A second model on an engine that's already running, with a
+    /// selection of its own: the mini window's. It picks up what's in
+    /// flight (running turns, open questions) and then follows events.
+    func start(sharing engine: Engine) async {
+        guard self.engine == nil else { return }
+        do {
+            try await attach(to: engine)
+            running = await engine.runningConversations
+            inputRequests = await engine.openInputRequests()
+        } catch {
+            phase = .failed(error.localizedDescription)
+        }
+    }
+
+    private func attach(to engine: Engine) async throws {
+        self.engine = engine
+        conversations = try await engine.store.conversations()
+        models = await engine.models
+        config = await engine.config
+        tools = await engine.toolCatalog()
+        memories = try await engine.memories()
+        mcpServers = await engine.mcpServers()
+        sandboxStatus = await engine.sandbox.status
+        phase = .ready
+        // Subscribe before resuming, so re-asked questions aren't missed.
+        let events = engine.events()
+        Task {
+            for await event in events { handle(event) }
         }
     }
 
