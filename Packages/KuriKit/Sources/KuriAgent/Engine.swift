@@ -173,6 +173,25 @@ public actor Engine {
         await reloadConfig()
     }
 
+    /// Keeps a provider's API key in the Keychain and points its `apiKey`
+    /// at it, as `keychain:<provider>` (or the Keychain name it already
+    /// uses). `nil` removes the reference, and the Keychain item unless
+    /// another provider shares it.
+    public func setAPIKey(_ key: String?, provider name: String) async throws {
+        guard let providerConfig = config.providers[name] else { throw KuriError.unknownProvider(name) }
+        let item = if case .keychain(let existing)? = providerConfig.apiKey { existing } else { name }
+        if let key {
+            try Secrets.storeKeychain(item, value: key)
+            try ConfigEditor(home: home).setAPIKey(.keychain(item), provider: name)
+        } else {
+            let shared = config.providers.contains { $0.key != name && $0.value.apiKey == .keychain(item) }
+            if case .keychain? = providerConfig.apiKey, !shared { try Secrets.deleteKeychain(item) }
+            try ConfigEditor(home: home).setAPIKey(nil, provider: name)
+        }
+        // Even when config.json didn't change: the cached provider holds the old key.
+        await reloadConfig()
+    }
+
     public func setDefaultModel(_ ref: ModelRef?) async throws {
         try ConfigEditor(home: home).setDefaultModel(ref)
         await reloadConfig()

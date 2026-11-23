@@ -372,6 +372,14 @@ final class AppModel {
         }
     }
 
+    func setAPIKey(_ key: String?, provider: String) async {
+        do {
+            try await engine?.setAPIKey(key, provider: provider)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func setGenerateTitles(_ enabled: Bool) async {
         do {
             try await engine?.setGenerateTitles(enabled)

@@ -27,7 +27,7 @@ Anywhere a secret is accepted (`apiKey`, `headers`, an MCP server's `env`), the 
 
 | Value | Meaning |
 |---|---|
-| `"keychain:<name>"` | The generic password Kuri stored in the Keychain under that name (service `Kuri`) |
+| `"keychain:<name>"` | The generic password stored in the Keychain under that name (service `Kuri`). Settings › Models › API key saves one, named after the provider, and writes this reference. |
 | `"env:<VAR>"` | The environment variable `VAR` |
 | anything else | The literal value. It works, but it then sits in a plain file. |
 

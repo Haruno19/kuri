@@ -236,3 +236,19 @@ import Testing
         #expect(Config(compactAt: 120).compactionThreshold == 0.95)
     }
 }
+
+@Suite struct APIKeySettingTests {
+    @Test func pointsTheProviderAtTheKeychainAndBack() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-apikey-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let home = KuriHome(root: root)
+        try home.prepare()
+        try Data(#"{ providers: { anthropic: { format: "anthropic-messages", apiKey: "sk-plain" } } }"#.utf8)
+            .write(to: home.configFile)
+        try ConfigEditor(home: home).setAPIKey(.keychain("anthropic"), provider: "anthropic")
+        #expect(try ConfigLoader(home: home).loadConfig().providers["anthropic"]?.apiKey == .keychain("anthropic"))
+        try ConfigEditor(home: home).setAPIKey(nil, provider: "anthropic")
+        #expect(try ConfigLoader(home: home).loadConfig().providers["anthropic"]?.apiKey == nil)
+        #expect(throws: (any Error).self) { try ConfigEditor(home: home).setAPIKey(nil, provider: "missing") }
+    }
+}

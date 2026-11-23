@@ -167,6 +167,9 @@ private struct ProviderModelsSection: View {
 
     var body: some View {
         Section {
+            if provider.format != .appleFoundationModels {
+                APIKeyRow(provider: name, apiKey: provider.apiKey)
+            }
             ForEach(registered, id: \.id) { entry in
                 RegisteredModelRow(provider: name, entry: entry)
             }
@@ -246,6 +249,71 @@ private struct ProviderModelsSection: View {
         draft = ""
         contextWindow = ""
         Task { await model.register(entry, provider: name) }
+    }
+}
+
+/// A provider's API key: typed here, kept in the Keychain, and referenced
+/// from config.json as `keychain:<name>`. Once saved it isn't shown again.
+private struct APIKeyRow: View {
+    @Environment(AppModel.self) private var model
+    let provider: String
+    let apiKey: SecretRef?
+    @State private var key = ""
+    @State private var inKeychain = false
+    @State private var confirmingRemoval = false
+
+    var body: some View {
+        LabeledContent("API key") {
+            HStack {
+                SecureField("API key", text: $key, prompt: Text(status))
+                    .labelsHidden()
+                    .onSubmit(save)
+                Button("Save", action: save)
+                    .disabled(trimmed.isEmpty)
+                if apiKey != nil {
+                    Button("Remove", role: .destructive) { confirmingRemoval = true }
+                }
+            }
+        }
+        .task(id: apiKey) { refresh() }
+        .confirmationDialog("Remove the API key for \(provider)?", isPresented: $confirmingRemoval) {
+            Button("Remove", role: .destructive) {
+                Task {
+                    await model.setAPIKey(nil, provider: provider)
+                    refresh()
+                }
+            }
+        } message: {
+            Text(apiKey.map { if case .keychain = $0 { true } else { false } } == true
+                 ? "It's deleted from the Keychain, and config.json stops using it."
+                 : "config.json stops using it.")
+        }
+    }
+
+    private var trimmed: String { key.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// What's there now, as the empty field's prompt.
+    private var status: String {
+        switch apiKey {
+        case nil: "None: local servers don't need one"
+        case .keychain: inKeychain ? "Saved in the Keychain" : "Not in the Keychain yet"
+        case .environment(let variable): "From $\(variable); saving moves it to the Keychain"
+        case .literal: "Plain text in config.json; saving moves it to the Keychain"
+        }
+    }
+
+    private func refresh() {
+        if case .keychain(let name)? = apiKey { inKeychain = Secrets.hasKeychainItem(name) } else { inKeychain = false }
+    }
+
+    private func save() {
+        let value = trimmed
+        guard !value.isEmpty else { return }
+        key = ""
+        Task {
+            await model.setAPIKey(value, provider: provider)
+            refresh()
+        }
     }
 }
 

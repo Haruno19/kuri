@@ -112,6 +112,17 @@ public struct ConfigEditor: Sendable {
         }
     }
 
+    // MARK: Providers
+
+    /// Points a provider's `apiKey` at a secret, or removes it.
+    public func setAPIKey(_ ref: SecretRef?, provider name: String) throws {
+        try edit { tree in
+            var provider = try Self.provider(name, in: tree)
+            provider["apiKey"] = ref.map { .string($0.reference) }
+            try Self.setProvider(provider, named: name, in: &tree)
+        }
+    }
+
     // MARK: Tree helpers
 
     private static func provider(_ name: String, in tree: JSONValue) throws -> [String: JSONValue] {
@@ -131,6 +142,10 @@ public struct ConfigEditor: Sendable {
     private static func setModels(_ models: [JSONValue], of name: String, in tree: inout JSONValue) throws {
         var provider = try provider(name, in: tree)
         provider["models"] = .array(models)
+        try setProvider(provider, named: name, in: &tree)
+    }
+
+    private static func setProvider(_ provider: [String: JSONValue], named name: String, in tree: inout JSONValue) throws {
         guard case .object(var root) = tree, case .object(var providers) = root["providers"] ?? .null else { return }
         providers[name] = .object(provider)
         root["providers"] = .object(providers)

@@ -22,6 +22,16 @@ public enum SecretRef: Sendable, Hashable, Codable, CustomStringConvertible {
         }
     }
 
+    /// How it's written in a config file.
+    public var reference: String {
+        switch self {
+        case .keychain(let name): "keychain:\(name)"
+        case .environment(let name): "env:\(name)"
+        case .literal(let value): value
+        }
+    }
+
+    /// Like `reference`, without a literal's value: safe for messages.
     public var description: String {
         switch self {
         case .keychain(let name): "keychain:\(name)"
@@ -36,11 +46,7 @@ public enum SecretRef: Sendable, Hashable, Codable, CustomStringConvertible {
 
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
-        switch self {
-        case .keychain(let name): try container.encode("keychain:\(name)")
-        case .environment(let name): try container.encode("env:\(name)")
-        case .literal(let value): try container.encode(value)
-        }
+        try container.encode(reference)
     }
 }
 
@@ -82,6 +88,16 @@ public struct Secrets: Sendable {
         return String(data: data, encoding: .utf8)
     }
 
+    /// Whether a secret is stored under `name`, without reading it.
+    public static func hasKeychainItem(_ name: String) -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: name,
+        ]
+        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
+    }
+
     /// Creates or replaces the secret stored under `name`.
     public static func storeKeychain(_ name: String, value: String) throws {
         let base: [String: Any] = [
@@ -95,6 +111,19 @@ public struct Secrets: Sendable {
         let status = SecItemAdd(attributes as CFDictionary, nil)
         guard status == errSecSuccess else {
             throw KuriError.provider("Keychain write failed (\(status)).")
+        }
+    }
+
+    /// Deletes the secret stored under `name`, if there is one.
+    public static func deleteKeychain(_ name: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: name,
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KuriError.provider("Keychain delete failed (\(status)).")
         }
     }
 }

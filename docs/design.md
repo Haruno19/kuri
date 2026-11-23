@@ -173,7 +173,7 @@ Every key is documented in [config.md](config.md). Both config files are **JSON5
 
 When the app changes `config.json`, `ConfigEditor` edits it as a generic JSON tree, so keys Kuri doesn't know survive. It checks that the result still loads, then writes it back as tidy JSON5 with a stable key order. Hand-written comments and formatting are not kept; the file's header says so.
 
-**Secrets** are references, never values: `keychain:<name>` reads the generic password stored by Kuri under that name, `env:<VAR>` reads an environment variable. A literal string also works, but it then sits in a plain file.
+**Secrets** are references, never values: `keychain:<name>` reads the generic password stored under that name (Settings › Models saves a provider's API key there and writes the reference; the key is never shown again), `env:<VAR>` reads an environment variable. A literal string also works, but it then sits in a plain file.
 
 UI preferences (theme, window state, hotkey) are not configuration in this sense; they live in `UserDefaults` like any Mac app's.
 
