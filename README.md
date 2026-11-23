@@ -100,18 +100,22 @@ Policies (`allow`, `ask`, `deny`) can be set per tool in `config.json` and per M
 
 ## Footprint
 
-Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026, as the memory figure Activity Monitor shows (physical footprint).
+Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows for conversations and LaTeX on the 23rd), as the memory figure Activity Monitor shows (physical footprint).
 
 | | Kuri |
 |---|---|
-| On disk | 65 MB, plus ≈ 0.8 GB for the sandbox once it's set up |
+| On disk | 67 MB (Apple silicon), plus ≈ 0.8 GB for the sandbox once it's set up |
 | Running, idle | ≈ 40 MB |
 | Running, during an agent turn | ≈ 40–65 MB (1) |
+| A conversation open | + ≈ 30 MB for the transcript, however long it is (3) |
+| Once a reply has LaTeX | + ≈ 25 MB for MathJax, kept until quit (4) |
 | Sandbox VM, booted or doing light shell work | + ≈ 300 MB |
 | Sandbox VM after a 300 MB workload | + ≈ 600 MB until the container stops (2) |
 
 1. The app idle (≈ 40 MB) plus the engine alone during a turn that ran shell commands (24 MB at its peak).
 2. The Linux guest doesn't hand freed memory back to macOS, so a VM holds its peak until it stops: after `idleMinutes` (10 by default), on Stop, or on quit. `sandbox.memoryMiB` (2 GB by default) caps it.
+3. Measured by rendering the app's own reply views in an offscreen window, with 40 and with 120 Markdown-heavy answers (text, a list, a code block and a table each): both ≈ 32 MB. The transcript only builds the messages near the visible area; built in full, the same answers took ≈ 217 MB and ≈ 611 MB.
+4. MathJax loads the first time a formula appears; with 40 answers holding formulas the transcript came to ≈ 56 MB.
 
 None of this includes a model's weights. A local model runs in its own process (`qwen3.5:2b` takes about 3 GB in Ollama); a hosted one costs nothing locally.
 
