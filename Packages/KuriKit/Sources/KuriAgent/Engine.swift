@@ -278,6 +278,19 @@ public actor Engine {
         broadcaster.emit(.conversationUpdated(conversation))
     }
 
+    /// The user's title wins: a title still being generated is dropped.
+    /// Renaming isn't activity, so `updatedAt` (and the order) stays.
+    public func rename(_ conversationID: UUID, to title: String) async throws {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, var conversation = try await store.conversation(conversationID),
+              conversation.title != title else { return }
+        titling[conversationID]?.cancel()
+        titling[conversationID] = nil
+        conversation.title = title
+        try await store.updateConversation(conversation)
+        broadcaster.emit(.conversationUpdated(conversation))
+    }
+
     public func delete(_ conversationID: UUID) async throws {
         cancel(conversationID)
         await sandbox.stop(conversationID)

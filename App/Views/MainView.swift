@@ -51,6 +51,8 @@ struct MainView: View {
 private struct Sidebar: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
+    /// The conversation whose title is being edited in place.
+    @State private var renaming: UUID?
 
     var body: some View {
         @Bindable var model = model
@@ -58,9 +60,14 @@ private struct Sidebar: View {
             ForEach(model.conversations) { conversation in
                 ConversationRow(conversation: conversation,
                                 isRunning: model.running.contains(conversation.id),
-                                isAwaitingInput: model.isAwaitingInput(conversation.id))
+                                isAwaitingInput: model.isAwaitingInput(conversation.id),
+                                renaming: Binding(
+                                    get: { renaming == conversation.id },
+                                    set: { if !$0, renaming == conversation.id { renaming = nil } }))
                     .tag(conversation.id)
+                    .simultaneousGesture(TapGesture(count: 2).onEnded { renaming = conversation.id })
                     .contextMenu {
+                        Button("Rename") { renaming = conversation.id }
                         Button("Delete", role: .destructive) {
                             Task { await model.delete(conversation.id) }
                         }
@@ -68,6 +75,12 @@ private struct Sidebar: View {
             }
         }
         .listStyle(.sidebar)
+        // Return renames the selected chat, as in Finder.
+        .onKeyPress(.return) {
+            guard renaming == nil, let id = model.selection else { return .ignored }
+            renaming = id
+            return .handled
+        }
         .safeAreaInset(edge: .top, spacing: 16) {
             VStack(spacing: 6) {
                 Button { model.selection = nil } label: {
@@ -104,16 +117,37 @@ private struct SidebarButtonLabel: View {
 }
 
 private struct ConversationRow: View {
+    @Environment(AppModel.self) private var model
     let conversation: Conversation
     let isRunning: Bool
     let isAwaitingInput: Bool
+    @Binding var renaming: Bool
     @Environment(\.palette) private var palette
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    private var title: String { conversation.title.isEmpty ? "New chat" : conversation.title }
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(conversation.title.isEmpty ? "New chat" : conversation.title)
-                .font(Typeface.sans(13))
-                .lineLimit(1)
+            if renaming {
+                // Return or clicking away saves; Escape keeps the old title.
+                TextField("Title", text: $draft)
+                    .textFieldStyle(.plain)
+                    .font(Typeface.sans(13))
+                    .focused($focused)
+                    .onSubmit(commit)
+                    .onExitCommand { renaming = false }
+                    .onAppear {
+                        draft = title
+                        focused = true
+                    }
+                    .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
+            } else {
+                Text(title)
+                    .font(Typeface.sans(13))
+                    .lineLimit(1)
+            }
             Spacer(minLength: 0)
             if isAwaitingInput {
                 Circle().strokeBorder(palette.accent, lineWidth: 1.5)
@@ -123,5 +157,14 @@ private struct ConversationRow: View {
                 Orb().help("Working")
             }
         }
+    }
+}
+
+private extension ConversationRow {
+    func commit() {
+        guard renaming else { return }
+        renaming = false
+        let id = conversation.id, text = draft
+        Task { await model.rename(id, to: text) }
     }
 }

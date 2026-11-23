@@ -194,6 +194,14 @@ final class AppModel {
         selection.map { running.contains($0) || compacting.contains($0) } ?? false
     }
 
+    func rename(_ id: UUID, to title: String) async {
+        do {
+            try await engine?.rename(id, to: title)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func delete(_ id: UUID) async {
         try? await engine?.delete(id)
     }
@@ -352,6 +360,13 @@ final class AppModel {
     private func handle(_ event: EngineEvent) {
         switch event {
         case .conversationUpdated(let conversation):
+            // Same updatedAt (give or take the database's rounding): an edit
+            // like a rename, which keeps its place.
+            if let index = conversations.firstIndex(where: { $0.id == conversation.id }),
+               abs(conversations[index].updatedAt.timeIntervalSince(conversation.updatedAt)) < 0.001 {
+                conversations[index] = conversation
+                break
+            }
             conversations.removeAll { $0.id == conversation.id }
             conversations.insert(conversation, at: conversations.firstIndex { !$0.pinned || conversation.pinned } ?? 0)
 
