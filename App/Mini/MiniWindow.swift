@@ -9,17 +9,48 @@ enum WindowActions {
     static var openSettings: OpenSettingsAction?
 
     static func openMain() {
+        Dock.show()
         openWindow?(id: "main")
         NSApplication.shared.activate()
     }
 
     static func showSettings() {
+        Dock.show()
         if let openSettings {
             openSettings()
         } else {
             NSApplication.shared.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         }
         NSApplication.shared.activate()
+    }
+}
+
+/// Kuri is in the Dock (and ⌘-Tab) only while the main window or Settings
+/// is open; otherwise it lives in the menu bar, like a menu bar app, and
+/// the mini window and its folder picker don't bring the icon up.
+enum Dock {
+    static func show() {
+        NSApplication.shared.setActivationPolicy(.regular)
+    }
+
+    /// After a window closes: the icon goes if no regular window is left.
+    static func update() {
+        let open = NSApplication.shared.windows.contains { window in
+            window.isVisible && !(window is NSPanel) && window.level == .normal && window.canBecomeMain
+        }
+        NSApplication.shared.setActivationPolicy(open ? .regular : .accessory)
+    }
+
+    /// Watches regular windows opening and closing.
+    static func follow() {
+        let center = NotificationCenter.default
+        center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { _ in
+            // Once the window is gone from the list.
+            DispatchQueue.main.async { MainActor.assumeIsolated { update() } }
+        }
+        center.addObserver(forName: NSWindow.didBecomeMainNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { update() }
+        }
     }
 }
 
@@ -41,6 +72,7 @@ final class MiniController: NSObject, NSWindowDelegate {
     static let maxSize = NSSize(width: 560, height: 820)
 
     func install() {
+        Dock.follow()
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
             let image = NSImage(named: "MenuBarIcon")
@@ -76,6 +108,9 @@ final class MiniController: NSObject, NSWindowDelegate {
     }
 
     @objc private func openMain() { WindowActions.openMain() }
+
+    /// The mini window's chat in the main window.
+    func openInMain() { expand() }
     @objc private func openSettings() { WindowActions.showSettings() }
 
     func toggle() {
@@ -124,9 +159,10 @@ final class MiniController: NSObject, NSWindowDelegate {
             zoom.toolTip = "Open in the main window"
         }
 
+        // No corner radius of its own: the window's mask rounds it, so it
+        // follows the system's radius (and any override of it).
         let glass = NSGlassEffectView()
         glass.style = .regular
-        glass.cornerRadius = 18
         let host = NSHostingView(rootView: MiniChat().environment(mini).modifier(Themed()))
         host.sizingOptions = []
         glass.contentView = host

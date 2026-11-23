@@ -18,7 +18,6 @@ struct MiniChat: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            MiniTitleBar()
             if showsTranscript {
                 MiniTranscript()
                     .id(model.selection)
@@ -38,12 +37,20 @@ struct MiniChat: View {
                         .onTapGesture { model.errorMessage = nil }
                         .help("Click to dismiss")
                 }
-                MiniFolderButton(choosingFolder: $choosingFolder)
+                HStack(spacing: 2) {
+                    MiniFolderButton(choosingFolder: $choosingFolder)
+                    MiniModelPicker()
+                    Spacer(minLength: 0)
+                }
                 MiniComposer(draft: $draft)
             }
             .padding(.horizontal, 10)
             .padding(.bottom, 10)
         }
+        .padding(.top, Self.titleBar)
+        // Over the transcript, not above it in the stack: scroll views reach
+        // under the title bar and would take its clicks.
+        .overlay(alignment: .top) { MiniTitleBar().zIndex(1) }
         .animation(Tune.move, value: showsTranscript)
         .environment(\.chatScale, Self.scale)
         .environment(\.glassOnly, true)
@@ -93,6 +100,9 @@ private struct MiniTitleBar: View {
         .padding(.trailing, 8)
         .frame(height: MiniChat.titleBar)
         .background(Color.clear.contentShape(.rect).gesture(WindowDragGesture()))
+        .contextMenu {
+            Button("Open Kuri") { MiniController.shared.openInMain() }
+        }
     }
 
     private var title: String {
@@ -246,6 +256,35 @@ private struct MiniFolderButton: View {
     }
 }
 
+/// The model for this chat, small and dim beside the folder button.
+private struct MiniModelPicker: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        Menu {
+            ForEach(model.models, id: \.self) { ref in
+                Button(ref.description) { Task { await model.setModel(ref) } }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(model.composerModel?.model ?? "No model").lineLimit(1)
+                PencilIcon(glyph: .chevron, size: 9, color: palette.faint)
+            }
+            .font(Typeface.sans(11.5))
+            .foregroundStyle(palette.faint)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 3)
+            .modifier(HoverWash(shape: RoundedRectangle(cornerRadius: 6, style: .continuous)))
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(model.composerModel?.description ?? "Choose a model")
+    }
+}
+
 /// One line, two at most (then it scrolls), and send/stop.
 private struct MiniComposer: View {
     @Binding var draft: String
@@ -266,8 +305,12 @@ private struct MiniComposer: View {
             SendButton(draft: draft, send: send, size: 24)
         }
         .padding(.leading, 12)
-        .padding(.trailing, 5)
+        .padding(.trailing, 8)
         .padding(.vertical, 5)
+        // A step darker than the window's glass, as the main composer is
+        // darker than its surface: a translucent shade over the glass (a
+        // glass tint alone barely darkens it).
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.black.opacity(palette.dark ? 0.38 : 0.1)))
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onAppear { focused = true }
     }

@@ -4,4 +4,6 @@
 
 **Why.** `MenuBarExtra` can't tell a right click from a left one, and its window style is a popover tied to the icon, not a window that can be moved, resized and left floating. A non-activating panel takes typing without pulling Kuri in front of what the user is doing, which is the point of a picture-in-picture chat. A model of its own lets the mini window hold a different chat from the main window without either switching the other; the engine was already built for several subscribers (decision 0001), so the second model is a few hundred bytes of state and one more event stream. It picks up turns already running and open questions from the engine, so nothing in flight is missed.
 
+Kuri is in the Dock only while the main window or Settings is open: with just the menu bar icon and the mini window, it's an accessory app, so using the mini window (its folder picker included) never brings a Dock icon up.
+
 **Cost.** Two models mean two copies of the conversation list and config in memory, kept in step by the same events. Opening the main window and Settings from AppKit uses SwiftUI's `openWindow` and `openSettings` actions captured from the main window when it appears. Maximize hands the mini window's chat to the main window rather than resizing the panel.
