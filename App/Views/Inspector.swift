@@ -900,9 +900,15 @@ private struct SandboxPane: View {
         let lines = terminal
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
+                // The orb only while a command runs: hidden, its timeline
+                // would still redraw every frame, and SwiftUI keeps the
+                // inspector's views alive after it closes.
                 ZStack {
-                    Circle().fill(palette.faint.opacity(0.6)).frame(width: 5, height: 5).opacity(isRunning(state) ? 0 : 1)
-                    Orb(size: 6).opacity(isRunning(state) ? 1 : 0)
+                    if isRunning(state) {
+                        Orb(size: 6).transition(.opacity)
+                    } else {
+                        Circle().fill(palette.faint.opacity(0.6)).frame(width: 5, height: 5).transition(.opacity)
+                    }
                 }
                 .frame(width: 8)
                 Text(status(state, settings))
