@@ -70,7 +70,7 @@ private struct ToolPresentation {
             detail = AnyView(TaskListRows(entries: entries))
 
         case "memory":
-            symbol = "brain"
+            symbol = "bookmark"
             title = result == nil ? "Updating memory" : "Updated memory"
             detail = AnyView(OutputText(text: output ?? ""))
 
