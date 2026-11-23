@@ -186,7 +186,7 @@ Containerization is the heavy one: it brings gRPC (`grpc/grpc-swift-2` and frien
 
 ## Contributing
 
-Kuri's scope is closed: bug fixes, performance and usability improvements to what already exists are welcome; new features and UI additions aren't, and forks are encouraged. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Kuri means to stay small: bug fixes, performance and usability improvements to what already exists, and specialised sandbox images are welcome; ideas for new features or UI are open to discussion, and forks are encouraged. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

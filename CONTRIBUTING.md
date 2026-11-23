@@ -2,25 +2,30 @@
 
 Kuri's first principle is to be **essential**: few features, done well. That shapes what this repository accepts more than anything else, so please read this before opening a pull request.
 
-## Kuri's scope is closed
+## Kuri's scope
 
-Kuri does what it does today, plus the few items still planned in [docs/roadmap.md](docs/roadmap.md), which the author builds. It won't grow beyond that. Pull requests that add something new won't be merged, however good the idea is.
+Kuri does what it does today, plus the few items still planned in [docs/roadmap.md](docs/roadmap.md). Growing beyond that, one feature at a time, isn't what this project is for.
 
 **Welcome:**
 
 - **Bug fixes.** Something that doesn't work as described, crashes, loses data or misbehaves with a provider or MCP server it should support.
 - **Performance.** Less memory, less CPU, faster launch, lower energy use. Kuri's footprint is part of its point.
 - **Usability of what already exists.** Accessibility, keyboard navigation, clearer wording, closer adherence to macOS conventions, rough edges in an existing flow.
+- **Sandbox images.** The sandbox has no network, so its image decides what the model can do. Images specialised for a kind of work (data science, typesetting, a language's toolchain…) extend Kuri without adding a feature to the app. Follow the shape of [`Sandbox/Dockerfile`](Sandbox/Dockerfile): an official base image, packages from the distribution and the language's official registry, built for arm64. Open an issue first, so we can agree on where it lives and how it's published.
 - **Documentation.** Corrections and clarifications.
 
-**Not accepted:**
+**Usually declined:**
 
 - New features, tools, providers, settings or configuration keys.
-- New UI: screens, panels, buttons, menus, themes or redesigns. A UI change has to fix something, not add or restyle it.
+- New UI: screens, panels, buttons, menus, themes or redesigns. A UI change should fix or improve something, not just add or restyle it.
 - New dependencies.
 - Refactors, renames or style changes that don't fix a problem.
 
-A quick test: *does the change make something Kuri already does work better, faster or more clearly?* If yes, it's welcome. If it makes Kuri do something new, it belongs in a fork.
+A quick test: *does the change make something Kuri already does work better, faster or more clearly?* If yes, it's welcome.
+
+## Ideas are still welcome
+
+This is still open source, and ingenuity is welcome. If you have a feature that you believe would substantially improve Kuri or how well models work in it, or a UI change that would make a workflow better, open an issue and let's talk about it. Some of these will make it in. What Kuri won't do is grow for the sake of growing: a feature has to earn its place, and most ideas, however good, will fit better in a fork.
 
 ## Forks are encouraged
 
@@ -41,5 +46,3 @@ Contributions are licensed under Apache 2.0, the same as the rest of Kuri (secti
 ## Reporting bugs
 
 Open an issue with your macOS version and Mac, the provider and model you were using, the steps that lead to the problem, and what you expected instead. Remove API keys and other secrets from anything you paste.
-
-Ideas are welcome in issues too, but expect most of them to be declined. That's the principle at work, not a judgement on the idea.
