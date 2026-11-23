@@ -18,7 +18,7 @@ Then the engine: everything below is done.
 1. Full Markdown, including LaTeX; code blocks in the Everforest colours (Higure dark, Yoake light). *(done)*
 2. Layout and styling of the main window, with conversation management (rename, archive, delete; maybe projects or grouping by root folder). Running chats get a single-orb status indicator in the sidebar; the sidebar snaps shut when dragged past a threshold.
 3. Menu bar icon and mini window: a small glass chat floating above other windows, with its own chat and a native right-click menu. *(done)*
-4. Settings window, including editing providers and MCP servers. *(theme, context windows, compaction and sandbox options done)*
+4. Settings window, including editing providers and MCP servers. *(theme, context windows, compaction, API keys and sandbox options done)*
 5. A global hotkey for the mini window.
 6. A right-hand sidebar, the conversation's inspector: its steps (shell commands first), the task list (editable), the context, git status for repository folders, and a sandbox preview while the model uses it. *(done)*
 7. Playing with the main window for a polished, slightly retro feel: a background pattern, the logo's size, pixel animations around the composer.

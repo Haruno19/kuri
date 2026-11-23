@@ -55,8 +55,8 @@ Kuri is a single app that contains both the engine and the interface. It runs of
 
 | Module | Responsibility | Depends on |
 |---|---|---|
-| `KuriCore` | `Item`, `ContentPart`, `ToolCall`, `ToolSpec`, `InferenceEvent`, `Usage`, `ModelRef`, `JSONValue` | — |
-| `KuriConfig` | Resolves `~/.config/kuri`, loads and watches `config.json` / `mcp.json`, edits `config.json` for the UI, resolves secrets from Keychain or environment | Core |
+| `KuriCore` | `Item`, `Message`, `ToolCall`, `ToolSpec`, `InferenceEvent`, `Usage`, `ModelRef`, `JSONValue` | — |
+| `KuriConfig` | Resolves `~/.config/kuri`, loads and watches `config.json` / `mcp.json`, edits `config.json` for the UI, resolves secrets from the Keychain or the environment and keeps API keys in the Keychain | Core |
 | `KuriStore` | SQLite wrapper, migrations, conversations, turns, items, full-text search, memories | Core |
 | `KuriInference` | `InferenceProvider` protocol, SSE parser, one adapter per wire format, model discovery | Core, Config |
 | `KuriTools` | `Tool` protocol, `ToolRegistry`, permission policy, built-in tools | Core, Store |
@@ -99,6 +99,21 @@ Policies (`allow`, `ask`, `deny`) can be set per tool in `config.json` and per M
 | `anthropic-messages` | Anthropic's API, and servers that copy it (Ollama among them) |
 | `apple-foundation-models` | Apple's on-device model (FoundationModels): offline and free, text only, a natural utility model |
 
+## Setting up a provider
+
+Providers are declared in `~/.config/kuri/config.json`; their API keys live in the Keychain. Starting from a Claude API key:
+
+1. **Declare the provider.** Settings › General › Open config.json, and add it under `providers` (Kuri reloads the file when you save it):
+
+   ```json5
+   anthropic: { format: "anthropic-messages" },
+   ```
+
+2. **Save the key.** Settings › Models › anthropic › API key: paste it and press Return. Kuri stores it in the Keychain (service `Kuri`, named `anthropic`) and writes `apiKey: "keychain:anthropic"` into the provider; the key itself never touches a file.
+3. **Add a model.** In the same section, pick one from the Model id suggestions (the models your key can use), give it a context window (1,000,000 for current Claude models, for automatic compaction) and Add. Its menu has Use for New Conversations.
+
+Any other provider works the same way with its own `format` and, if it isn't the format's default, `baseURL`; local servers like Ollama need no key. Every option is in [docs/config.md](docs/config.md).
+
 ## Footprint
 
 Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows for conversations, LaTeX, the mini window and the inspector on the 23rd), as the memory figure Activity Monitor shows (physical footprint).
@@ -111,7 +126,7 @@ Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows
 | A conversation open | + ≈ 30 MB for the transcript, however long it is (3) |
 | Once a reply has LaTeX | + ≈ 25 MB for MathJax, kept until quit (4) |
 | Mini window open | + ≈ 18 MB, and ≈ 10 MB more with a chat in it, however long (5) |
-| Inspector open | + ≈ 2–4 MB, with a short chat and with 200 commands (6) |
+| Inspector open | + ≈ 2–4 MB, from a short chat to 200 commands and 150 changed files (6) |
 | Sandbox VM, booted or doing light shell work | + ≈ 300 MB |
 | Sandbox VM after a 300 MB workload | + ≈ 600 MB until the container stops (2) |
 
@@ -120,7 +135,7 @@ Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows
 3. Measured by rendering the app's own reply views in an offscreen window, with 40 and with 120 Markdown-heavy answers (text, a list, a code block and a table each): both ≈ 32 MB. The transcript only builds the messages near the visible area; built in full, the same answers took ≈ 217 MB and ≈ 611 MB.
 4. MathJax loads the first time a formula appears; with 40 answers holding formulas the transcript came to ≈ 56 MB.
 5. Measured like (3), with the app's own mini window views in an off-screen panel: its second model on the engine adds under 1 MB, the empty glass window ≈ 18 MB, and a chat of 40 or of 120 Markdown-heavy answers ≈ 10 MB more (its transcript is lazy too). It has no LaTeX, so MathJax never loads for it.
-6. Measured like (3), with the app's own main window in an off-screen window, opening the inspector on a chat of 4 commands and on one of 204 commands with output: + 2.4 MB and + 3.5 MB. Steps shows the latest few and lists the rest lazily on Show all (built in full, the 204 took ≈ 12 MB). Git status runs `git` in separate, short-lived processes.
+6. Measured like (3), with the app's own main window in an off-screen window, opening the inspector on a chat of 8 commands, on one of 204 commands with output, and on the same with a repository of 150 changed files: + 2.4, + 2.8 and + 3.8 MB. Steps shows the latest few and lists the rest lazily on Show all (built in full, the 204 took ≈ 12 MB), and Git the first 12 changes of each repository (all 150 took ≈ 18 MB). Git status runs `git` in separate, short-lived processes. At rest, open or closed, the inspector takes no CPU.
 7. Measured with `python:3-slim` (a 45 MB download). Kuri's image is a 254 MB download; its total is estimated from the layer sizes, not yet measured.
 
 None of this includes a model's weights. A local model runs in its own process (`qwen3.5:2b` takes about 3 GB in Ollama); a hosted one costs nothing locally.
