@@ -89,8 +89,8 @@ extension EnvironmentValues {
 @MainActor @Observable final class Fonts {
     static let shared = Fonts()
 
-    // Chosen: Publico Text, DM Sans and iA Writer Mono (decision 0015).
-    static let serifs = ["Publico Text", "Iowan Old Style"]
+    // Chosen: Literata, DM Sans and iA Writer Mono (decisions 0015, 0018).
+    static let serifs = ["Literata"]
     static let sanses = ["DM Sans", "Satoshi", "Figtree", "SF Pro Rounded", "Galvji", "SF Pro", "Avenir Next", "Lucida Grande", "Instrument Sans"]
     static let monos = ["iA Writer Mono S"]
 
@@ -106,12 +106,13 @@ extension EnvironmentValues {
         ["SF Pro", "SF Pro Rounded", "SF Mono"].contains(family) || NSFontManager.shared.availableMembers(ofFontFamily: family) != nil
     }
 
-    /// Fonts dropped in Sketches/Fonts are loaded for this process only, the
-    /// way the app would load fonts it bundles. The folder is gitignored:
-    /// some licences (Satoshi's) forbid redistributing the files.
+    /// The app's bundled fonts (App/Fonts) and any dropped in Sketches/Fonts
+    /// are loaded for this process only. Sketches/Fonts is gitignored: some
+    /// licences (Satoshi's) forbid redistributing the files.
     private static func registerBundled() {
-        let folder = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "Fonts")
-        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        let here = URL(filePath: #filePath).deletingLastPathComponent()
+        let folders = [here.appending(path: "../App/Fonts"), here.appending(path: "Fonts")]
+        let files = folders.flatMap { (try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)) ?? [] }
         for file in files where ["ttf", "otf"].contains(file.pathExtension.lowercased()) {
             CTFontManagerRegisterFontsForURL(file as CFURL, .process, nil)
         }
