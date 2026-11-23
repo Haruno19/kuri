@@ -262,6 +262,22 @@ final class AppModel {
         }
     }
 
+    func setAppearance(_ appearance: Appearance) async {
+        do {
+            try await engine?.setAppearance(appearance)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func setSandbox(image: String?, cpus: Int?, memoryMiB: Int?, idleMinutes: Int?) async {
+        do {
+            try await engine?.setSandbox(image: image, cpus: cpus, memoryMiB: memoryMiB, idleMinutes: idleMinutes)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func setDefaultModel(_ ref: ModelRef?) async {
         do {
             try await engine?.setDefaultModel(ref)

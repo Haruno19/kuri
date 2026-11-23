@@ -13,7 +13,7 @@ struct SettingsView: View {
             Tab("Models", systemImage: "cpu") { ModelsSettings() }
             Tab("Tools", systemImage: "wrench.and.screwdriver") { ToolsSettings() }
             Tab("Sandbox", systemImage: "shippingbox") { SandboxSettingsView() }
-            Tab("Memory", systemImage: "brain") { MemorySettings() }
+            Tab("Memory", systemImage: "bookmark") { MemorySettings() }
         }
         .frame(width: 560, height: 460)
     }
@@ -26,6 +26,17 @@ private struct GeneralSettings: View {
 
     var body: some View {
         Form {
+            Section("Appearance") {
+                Picker("Theme", selection: Binding(
+                    get: { model.config.appearance ?? .system },
+                    set: { appearance in Task { await model.setAppearance(appearance) } })
+                ) {
+                    Text("System").tag(Appearance.system)
+                    Text("Light").tag(Appearance.light)
+                    Text("Dark").tag(Appearance.dark)
+                }
+                .pickerStyle(.segmented)
+            }
             Section("Conversations") {
                 Toggle("Generate titles", isOn: Binding(
                     get: { model.config.generateTitles ?? true },
@@ -123,27 +134,7 @@ private struct ProviderModelsSection: View {
     var body: some View {
         Section {
             ForEach(registered, id: \.id) { entry in
-                let ref = ModelRef(provider: name, model: entry.id)
-                HStack {
-                    Text(entry.id).font(.body.monospaced())
-                    if let window = entry.contextWindow {
-                        Text("\(window.formatted()) tokens").font(.caption).foregroundStyle(.secondary)
-                    }
-                    if model.config.defaultModel == ref {
-                        Text("default").font(.caption.weight(.medium)).foregroundStyle(.tint)
-                    }
-                    Spacer()
-                    Menu {
-                        Button("Use for New Conversations") { Task { await model.setDefaultModel(ref) } }
-                        Button("Remove", role: .destructive) {
-                            Task { await model.unregister(model: entry.id, provider: name) }
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
-                }
+                RegisteredModelRow(provider: name, entry: entry)
             }
             if provider.discoverModels == true {
                 Text("Every model this server lists is also available, without adding it (discoverModels).")
@@ -151,7 +142,7 @@ private struct ProviderModelsSection: View {
             }
 
             HStack {
-                TextField("Model id", text: $draft, prompt: Text(available.isEmpty ? "Model id" : "Model id — start typing or pick one"))
+                TextField("Model id", text: $draft, prompt: Text("Model id"))
                     .textInputSuggestions {
                         ForEach(suggestions, id: \.self) { id in
                             Text(id).textInputCompletion(id)
@@ -224,6 +215,60 @@ private struct ProviderModelsSection: View {
     }
 }
 
+/// A registered model: its context window can be edited in place (empty
+/// means unknown); Return or leaving the field saves it.
+private struct RegisteredModelRow: View {
+    @Environment(AppModel.self) private var model
+    let provider: String
+    let entry: ModelConfig
+    @State private var context = ""
+    @FocusState private var editing: Bool
+
+    var body: some View {
+        let ref = ModelRef(provider: provider, model: entry.id)
+        HStack {
+            Text(entry.id).font(.body.monospaced())
+            if model.config.defaultModel == ref {
+                Text("default").font(.caption.weight(.medium)).foregroundStyle(.tint)
+            }
+            Spacer()
+            TextField("Context", text: $context, prompt: Text("Context"))
+                .labelsHidden()
+                .multilineTextAlignment(.trailing)
+                .frame(width: 80)
+                .focused($editing)
+                .onSubmit(save)
+                .help("Context window in tokens")
+            Text("tokens").font(.caption).foregroundStyle(.secondary)
+            Menu {
+                Button("Use for New Conversations") { Task { await model.setDefaultModel(ref) } }
+                Button("Remove", role: .destructive) {
+                    Task { await model.unregister(model: entry.id, provider: provider) }
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+        }
+        .onAppear { context = Self.text(entry.contextWindow) }
+        .onChange(of: entry.contextWindow) { _, window in if !editing { context = Self.text(window) } }
+        .onChange(of: editing) { _, focused in if !focused { save() } }
+    }
+
+    private static func text(_ window: Int?) -> String { window.map(String.init) ?? "" }
+
+    private func save() {
+        let digits = context.filter(\.isNumber)
+        let window = Int(digits).flatMap { $0 > 0 ? $0 : nil }
+        context = Self.text(window)
+        guard window != entry.contextWindow else { return }
+        var updated = entry
+        updated.contextWindow = window
+        Task { await model.register(updated, provider: provider) }
+    }
+}
+
 // MARK: - Sandbox
 
 private struct SandboxSettingsView: View {
@@ -270,20 +315,86 @@ private struct SandboxSettingsView: View {
                 .foregroundStyle(.secondary)
             }
 
-            Section("Settings") {
-                let settings = SandboxSettings(model.config.sandbox)
-                LabeledContent("Image", value: settings.image)
-                LabeledContent("CPUs", value: "\(settings.cpus)")
-                LabeledContent("Memory", value: "\(settings.memoryMiB) MB")
-                LabeledContent("Stops after", value: "\(settings.idleMinutes) min idle")
-                if let home = model.engine?.home {
-                    LabeledContent("Change in") {
-                        Button("Open config.json") { NSWorkspace.shared.open(home.configFile) }
-                    }
-                }
-            }
+            SandboxOptions()
         }
         .formStyle(.grouped)
+    }
+}
+
+/// The sandbox keys of config.json, edited in place. A value equal to its
+/// default is written as no key at all.
+private struct SandboxOptions: View {
+    @Environment(AppModel.self) private var model
+    @State private var image = ""
+    @FocusState private var editingImage: Bool
+
+    private var settings: SandboxSettings { SandboxSettings(model.config.sandbox) }
+    private static let cpuChoices = Array(Set([1, 2, 4, 6, 8, 12, 16].filter { $0 <= ProcessInfo.processInfo.activeProcessorCount } + [4])).sorted()
+    private static let memoryChoices = [512, 1024, 2048, 4096, 8192, 16384]
+        .filter { UInt64($0) * 1_048_576 <= ProcessInfo.processInfo.physicalMemory / 2 || $0 == 2048 }
+    private static let idleChoices = [2, 5, 10, 15, 30, 60]
+
+    var body: some View {
+        Section {
+            LabeledContent("Image") {
+                TextField("Image", text: $image, prompt: Text(SandboxSettings.defaultImage))
+                    .labelsHidden()
+                    .font(.body.monospaced())
+                    .focused($editingImage)
+                    .onSubmit(saveImage)
+            }
+            Picker("CPUs", selection: binding(\.cpus) { settings, value in settings.cpus = value }) {
+                ForEach(Self.choices(Self.cpuChoices, current: settings.cpus), id: \.self) { Text("\($0)").tag($0) }
+            }
+            Picker("Memory", selection: binding(\.memoryMiB) { settings, value in settings.memoryMiB = value }) {
+                ForEach(Self.choices(Self.memoryChoices, current: settings.memoryMiB), id: \.self) { Text(Self.memory($0)).tag($0) }
+            }
+            Picker("Stops after", selection: binding(\.idleMinutes) { settings, value in settings.idleMinutes = value }) {
+                ForEach(Self.choices(Self.idleChoices, current: settings.idleMinutes), id: \.self) { Text("\($0) min idle").tag($0) }
+            }
+        } header: {
+            Text("Settings")
+        } footer: {
+            Text("Changing the image, CPUs or memory stops running sandboxes; a new image needs setup again. Saved to config.json.")
+                .foregroundStyle(.secondary)
+        }
+        .onAppear { image = model.config.sandbox?.image ?? "" }
+        .onChange(of: model.config.sandbox?.image) { _, value in if !editingImage { image = value ?? "" } }
+        .onChange(of: editingImage) { _, focused in if !focused { saveImage() } }
+    }
+
+    /// The values as config.json should hold them: defaults left out.
+    private func save(_ change: (inout SandboxSettings) -> Void) {
+        var next = settings
+        change(&next)
+        Task {
+            await model.setSandbox(
+                image: next.image == SandboxSettings.defaultImage ? nil : next.image,
+                cpus: next.cpus == 4 ? nil : next.cpus,
+                memoryMiB: next.memoryMiB == 2048 ? nil : next.memoryMiB,
+                idleMinutes: next.idleMinutes == 10 ? nil : next.idleMinutes)
+        }
+    }
+
+    private func binding(_ key: KeyPath<SandboxSettings, Int>,
+                         _ set: @escaping (inout SandboxSettings, Int) -> Void) -> Binding<Int> {
+        Binding(get: { settings[keyPath: key] }, set: { value in save { set(&$0, value) } })
+    }
+
+    private func saveImage() {
+        let value = image.trimmingCharacters(in: .whitespaces)
+        let next = value.isEmpty ? SandboxSettings.defaultImage : value
+        guard next != settings.image else { return }
+        save { $0.image = next }
+    }
+
+    /// The usual choices, plus whatever the file says if it's something else.
+    private static func choices(_ list: [Int], current: Int) -> [Int] {
+        list.contains(current) ? list : (list + [current]).sorted()
+    }
+
+    private static func memory(_ mib: Int) -> String {
+        mib < 1024 ? "\(mib) MB" : "\(mib / 1024) GB"
     }
 }
 
@@ -469,7 +580,9 @@ private struct MemorySettings: View {
 
             Section("Add") {
                 HStack {
-                    TextField("A fact about you, e.g. “I use zsh and Helix”", text: $draft)
+                    TextField("Memory", text: $draft, prompt: Text(""))
+                        .labelsHidden()
+                        .multilineTextAlignment(.leading)
                         .onSubmit(add)
                     Button("Add", action: add)
                         .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)

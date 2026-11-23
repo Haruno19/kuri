@@ -490,6 +490,18 @@ public actor Engine {
         await reloadConfig()
     }
 
+    public func setAppearance(_ appearance: Appearance) async throws {
+        try ConfigEditor(home: home).setAppearance(appearance)
+        await reloadConfig()
+    }
+
+    /// `nil` values fall back to their defaults. Changing the image, CPUs
+    /// or memory stops running containers when the config reloads.
+    public func setSandbox(image: String?, cpus: Int?, memoryMiB: Int?, idleMinutes: Int?) async throws {
+        try ConfigEditor(home: home).setSandbox(image: image, cpus: cpus, memoryMiB: memoryMiB, idleMinutes: idleMinutes)
+        await reloadConfig()
+    }
+
     /// After the first completed turn, replaces the provisional title (the
     /// first line of the first message) with a generated one. In the
     /// background; a failure just leaves the provisional title.

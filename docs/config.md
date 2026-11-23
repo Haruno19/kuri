@@ -57,7 +57,7 @@ Anywhere a secret is accepted (`apiKey`, `headers`, an MCP server's `env`), the 
 | `defaultModel` | `"<provider>/<model>"` | none | The model new conversations start with. Everything after the first slash is the model id. |
 | `utilityModel` | `"<provider>/<model>"` | none | A small, fast model for background jobs: compaction summaries and titles. Without it, the conversation's own model does them. |
 | `generateTitles` | bool | `true` | Name a conversation after its first exchange. Settings › General toggles it (rewriting this file). |
-| `appearance` | `"system"`, `"light"` or `"dark"` | `"system"` | The app's colour scheme: following macOS, or always light or dark. Applies as soon as the file is saved. |
+| `appearance` | `"system"`, `"light"` or `"dark"` | `"system"` | The app's colour scheme: following macOS, or always light or dark. Applies as soon as the file is saved. Settings › General sets it. |
 | `providers` | object | `{}` | Providers by name; the name is the part before the slash in model references. |
 | `tools` | object | `{}` | Tool policies, see below. |
 | `sandbox` | object | defaults below | The Linux sandbox. |
@@ -129,7 +129,7 @@ Defaults when no rule matches: built-in tools and `shell` allow; MCP tools allow
 | `kernel` | path | none | A Linux kernel (`vmlinux`) already on disk, used instead of downloading one. |
 | `kernelURL` | URL | Kata Containers 4.3.1 arm64 tarball | Where setup downloads the kernel tarball from. |
 
-Changing `image`, `cpus`, `memoryMiB` or the kernel stops running containers; a new image needs setup again.
+Settings › Sandbox edits `image`, `cpus`, `memoryMiB` and `idleMinutes` (a value equal to its default is written as no key). Changing `image`, `cpus`, `memoryMiB` or the kernel stops running containers; a new image needs setup again.
 
 ## mcp.json
 

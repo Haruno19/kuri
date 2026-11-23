@@ -63,6 +63,21 @@ public struct ConfigEditor: Sendable {
         }
     }
 
+    /// Writes the sandbox keys Settings edits; `nil` removes a key (its
+    /// default applies). `kernel` and `kernelURL` are left as they are.
+    public func setSandbox(image: String?, cpus: Int?, memoryMiB: Int?, idleMinutes: Int?) throws {
+        try edit { tree in
+            guard case .object(var root) = tree else { return }
+            var sandbox: [String: JSONValue] = if case .object(let existing)? = root["sandbox"] { existing } else { [:] }
+            sandbox["image"] = image.map { .string($0) }
+            sandbox["cpus"] = cpus.map { .number(Double($0)) }
+            sandbox["memoryMiB"] = memoryMiB.map { .number(Double($0)) }
+            sandbox["idleMinutes"] = idleMinutes.map { .number(Double($0)) }
+            root["sandbox"] = sandbox.isEmpty ? nil : .object(sandbox)
+            tree = .object(root)
+        }
+    }
+
     public func setAppearance(_ appearance: Appearance) throws {
         try edit { tree in
             guard case .object(var root) = tree else { return }

@@ -175,6 +175,21 @@ import Testing
     }
 }
 
+@Suite struct SandboxSettingTests {
+    @Test func writesTheEditableKeysAndKeepsTheKernel() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-sandbox-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let home = KuriHome(root: root)
+        try home.prepare()
+        try Data(#"{ providers: {}, sandbox: { kernel: "/tmp/vmlinux", cpus: 2 } }"#.utf8).write(to: home.configFile)
+        try ConfigEditor(home: home).setSandbox(image: "docker.io/library/alpine:3", cpus: nil, memoryMiB: 4096, idleMinutes: 5)
+        let sandbox = try ConfigLoader(home: home).loadConfig().sandbox
+        #expect(sandbox == SandboxConfig(image: "docker.io/library/alpine:3", cpus: nil, memoryMiB: 4096, idleMinutes: 5, kernel: "/tmp/vmlinux"))
+        try ConfigEditor(home: home).setSandbox(image: nil, cpus: nil, memoryMiB: nil, idleMinutes: nil)
+        #expect(try ConfigLoader(home: home).loadConfig().sandbox == SandboxConfig(kernel: "/tmp/vmlinux"))
+    }
+}
+
 @Suite struct GenerateTitlesSettingTests {
     @Test func editorWritesTheToggle() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "kuri-titles-\(UUID().uuidString)")
