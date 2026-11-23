@@ -13,9 +13,13 @@ public struct TurnLimits: Sendable {
     /// Characters of tool output passed back to the model.
     public var maxToolOutputCharacters = 30_000
     /// Compact when a request would fill this share of the context window.
+    /// Each turn takes it from `config.json`'s `compactAt`.
     public var compactionThreshold = 0.75
-    /// After compacting, what's kept verbatim should fit in this share.
-    public var compactionKeepShare = 0.5
+    /// After compacting, what's kept verbatim should fit in this share:
+    /// two thirds of the threshold (half the window at 75%), so the summary
+    /// and the instructions fit under it and the next request doesn't
+    /// compact again.
+    public var compactionKeepShare: Double { compactionThreshold * 2 / 3 }
 
     public init() {}
 }

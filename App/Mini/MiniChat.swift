@@ -40,7 +40,7 @@ struct MiniChat: View {
                 HStack(spacing: 2) {
                     MiniFolderButton(choosingFolder: $choosingFolder)
                     Spacer(minLength: 8)
-                    MiniModelPicker()
+                    ModelPicker(small: true)
                 }
                 MiniComposer(draft: $draft)
             }
@@ -164,7 +164,6 @@ private struct MiniChatList: View {
 
 private struct MiniTranscript: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.palette) private var palette
 
     var body: some View {
         let rows = TranscriptRow.rows(from: model.items)
@@ -236,35 +235,6 @@ private struct MiniFolderButton: View {
     }
 }
 
-/// The model for this chat, small and dim, over the composer's right end.
-private struct MiniModelPicker: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.palette) private var palette
-
-    var body: some View {
-        Menu {
-            ForEach(model.models, id: \.self) { ref in
-                Button(ref.description) { Task { await model.setModel(ref) } }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Text(model.composerModel?.model ?? "No model").lineLimit(1)
-                PencilIcon(glyph: .chevron, size: 9, color: palette.faint)
-            }
-            .font(Typeface.sans(11.5))
-            .foregroundStyle(palette.faint)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 3)
-            .modifier(HoverWash(shape: RoundedRectangle(cornerRadius: 6, style: .continuous)))
-        }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help(model.composerModel?.description ?? "Choose a model")
-    }
-}
-
 /// One line, two at most (then it scrolls), and send/stop.
 private struct MiniComposer: View {
     @Binding var draft: String
@@ -295,10 +265,5 @@ private struct MiniComposer: View {
         .onAppear { focused = true }
     }
 
-    private func send() {
-        let text = draft
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        draft = ""
-        Task { await model.send(text) }
-    }
+    private func send() { model.submit(&draft) }
 }

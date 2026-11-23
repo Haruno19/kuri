@@ -67,11 +67,8 @@ public struct OpenResponsesProvider: InferenceProvider {
         switch payload {
         case .message(let message):
             let partType = message.role == .user ? "input_text" : "output_text"
-            // TODO: attachments (input_image / input_file) once blobs are wired up.
-            let parts: [JSONValue] = message.content.compactMap {
-                if case .text(let text) = $0 { ["type": .string(partType), "text": .string(text)] } else { nil }
-            }
-            return ["type": "message", "role": .string(message.role.rawValue), "content": .array(parts)]
+            let part: JSONValue = ["type": .string(partType), "text": .string(message.text)]
+            return ["type": "message", "role": .string(message.role.rawValue), "content": [part]]
         case .reasoning(let reasoning):
             // Only worth sending back when there's opaque state to resume
             // from, and only to the provider that produced it.

@@ -6,17 +6,17 @@ import SwiftUI
 struct CodeTheme {
     let dark: Bool
 
-    var background: Color { dark ? hex(0x131313) : hex(0xFFFAEE) }
-    var border: Color { dark ? hex(0x272E33) : hex(0xEFE6CF) }
-    var text: Color { dark ? hex(0xD3C6AA) : hex(0x5C6A72) }
-    var comment: Color { hex(0x859289) }
-    var red: Color { dark ? hex(0xE67E80) : hex(0xF85552) }
-    var orange: Color { dark ? hex(0xE69875) : hex(0xF57D26) }
-    var yellow: Color { dark ? hex(0xDBBC7F) : hex(0xDFA000) }
-    var green: Color { dark ? hex(0xA7C080) : hex(0x8DA101) }
-    var aqua: Color { dark ? hex(0x83C092) : hex(0x35A77C) }
-    var blue: Color { dark ? hex(0x7FBBB3) : hex(0x3A94C5) }
-    var purple: Color { dark ? hex(0xD699B6) : hex(0xDF69BA) }
+    var background: Color { dark ? Color(hex: 0x131313) : Color(hex: 0xFFFAEE) }
+    var border: Color { dark ? Color(hex: 0x272E33) : Color(hex: 0xEFE6CF) }
+    var text: Color { dark ? Color(hex: 0xD3C6AA) : Color(hex: 0x5C6A72) }
+    var comment: Color { Color(hex: 0x859289) }
+    var red: Color { dark ? Color(hex: 0xE67E80) : Color(hex: 0xF85552) }
+    var orange: Color { dark ? Color(hex: 0xE69875) : Color(hex: 0xF57D26) }
+    var yellow: Color { dark ? Color(hex: 0xDBBC7F) : Color(hex: 0xDFA000) }
+    var green: Color { dark ? Color(hex: 0xA7C080) : Color(hex: 0x8DA101) }
+    var aqua: Color { dark ? Color(hex: 0x83C092) : Color(hex: 0x35A77C) }
+    var blue: Color { dark ? Color(hex: 0x7FBBB3) : Color(hex: 0x3A94C5) }
+    var purple: Color { dark ? Color(hex: 0xD699B6) : Color(hex: 0xDF69BA) }
 
     /// The scopes the themes colour, mapped from the highlighter's tokens.
     func color(_ token: CodeToken) -> Color {
@@ -34,10 +34,6 @@ struct CodeTheme {
         case .deleted: red
         case .section: purple
         }
-    }
-
-    private func hex(_ v: UInt32) -> Color {
-        Color(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
     }
 }
 

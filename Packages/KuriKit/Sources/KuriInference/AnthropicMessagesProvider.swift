@@ -135,7 +135,6 @@ public struct AnthropicMessagesProvider: InferenceProvider {
     {
         switch payload {
         case .message(let message):
-            // TODO: attachments (image / document blocks) once blobs are wired up.
             let text = message.text
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
             return (message.role == .user ? "user" : "assistant", ["type": "text", "text": .string(text)])

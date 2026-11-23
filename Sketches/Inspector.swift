@@ -9,9 +9,8 @@
 // preview, the plan moves, the context grows, git picks up the edit), ⇧⌘R
 // starts over, ⌥⌘I shows or hides the inspector. Click a step to see its
 // output; tick, double-click, add or remove tasks. The sliders menu (top
-// right) switches the theme and the layout: stacked sections, or tabs.
+// right) switches the theme.
 // Environment overrides for screenshots: INSPECTOR_SCHEME=light|dark,
-// INSPECTOR_LAYOUT=sections|tabs, INSPECTOR_TAB=steps|tasks|context|git|sandbox,
 // INSPECTOR_RUN=<n> (runs n steps at launch), INSPECTOR_OFFSCREEN=1 (opens
 // the window off-screen without activating, and prints its number for
 // `screencapture -l`).
@@ -101,11 +100,6 @@ enum Theme: String, CaseIterable {
     }
 }
 
-/// The two arrangements to compare.
-enum Layout: String, CaseIterable {
-    case sections = "Stacked sections", tabs = "Tabs"
-}
-
 enum Pane5: String, CaseIterable, Identifiable {
     case steps = "Steps", tasks = "Tasks", context = "Context", git = "Git", sandbox = "Sandbox"
     var id: String { rawValue }
@@ -127,8 +121,6 @@ struct Root: View {
     @State private var columns: NavigationSplitViewVisibility = .detailOnly
     @State private var inspecting = true
     @State private var theme: Theme = .system
-    @State private var layout: Layout = .sections
-    @State private var tab: Pane5 = .steps
 
     var body: some View {
         let palette = Palette(scheme: scheme)
@@ -139,7 +131,7 @@ struct Root: View {
             Chat()
                 .ignoresSafeArea(edges: .top)
                 .inspector(isPresented: $inspecting) {
-                    Inspector(layout: layout, tab: $tab)
+                    Inspector()
                         .inspectorColumnWidth(min: 270, ideal: 320, max: 460)
                 }
                 .toolbar {
@@ -148,9 +140,6 @@ struct Root: View {
                         Menu {
                             Picker("Theme", selection: $theme) {
                                 ForEach(Theme.allCases, id: \.self) { Text($0.rawValue) }
-                            }
-                            Picker("Layout", selection: $layout) {
-                                ForEach(Layout.allCases, id: \.self) { Text($0.rawValue) }
                             }
                             Divider()
                             Button("Run the Next Step") { Task { await sim.run(steps: 1) } }
@@ -182,8 +171,6 @@ struct Root: View {
             let env = ProcessInfo.processInfo.environment
             theme = Theme(rawValue: (env["INSPECTOR_SCHEME"] ?? "").capitalized) ?? .system
             NSApp.appearance = theme.appearance
-            if env["INSPECTOR_LAYOUT"] == "tabs" { layout = .tabs }
-            if let name = env["INSPECTOR_TAB"], let pane = Pane5.allCases.first(where: { $0.rawValue.lowercased() == name }) { tab = pane }
             if let runs = Int(env["INSPECTOR_RUN"] ?? "") {
                 Task { await sim.run(steps: runs) }
             }
@@ -442,63 +429,34 @@ enum Script {
 // MARK: - Inspector
 
 struct Inspector: View {
-    let layout: Layout
-    @Binding var tab: Pane5
     @Environment(Sim.self) private var sim
     @Environment(\.palette) private var palette
 
     var body: some View {
-        switch layout {
-        case .sections:
-            ScrollView {
-                VStack(spacing: 8) {
-                    ForEach(Pane5.allCases.filter { $0 != .sandbox }) { pane in
-                        InspectorSection(pane: pane) { PaneBody(pane: pane, compact: true) }
-                    }
+        ScrollView {
+            VStack(spacing: 8) {
+                ForEach(Pane5.allCases.filter { $0 != .sandbox }) { pane in
+                    InspectorSection(pane: pane) { PaneBody(pane: pane) }
                 }
-                .padding(.horizontal, 10)
-                .padding(.top, 4)
-                .padding(.bottom, 16)
             }
-            .scrollEdgeEffectStyle(.soft, for: .top)
-            // The sandbox stays in view at the bottom, as the composer does
-            // in the chat: it's what moves while the model works.
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                InspectorSection(pane: .sandbox) { PaneBody(pane: .sandbox, compact: true) }
-                    .padding(.horizontal, 10)
-                    .padding(.top, 14)
-                    .padding(.bottom, 10)
-                    .background {
-                        LinearGradient(stops: [.init(color: surface.opacity(0), location: 0), .init(color: surface, location: 0.3)],
-                                       startPoint: .top, endPoint: .bottom)
-                    }
-            }
-            .background(surface.ignoresSafeArea())
-        case .tabs:
-            VStack(spacing: 0) {
-                TabStrip(selection: $tab)
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 8)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(tab.rawValue).font(Typeface.serif(17))
-                            Spacer()
-                            Accessory(pane: tab)
-                        }
-                        PaneBody(pane: tab, compact: false)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 6)
-                    .padding(.bottom, 16)
-                    .id(tab)
-                    .transition(.opacity.combined(with: .offset(y: 6)))
-                }
-                .scrollEdgeEffectStyle(.soft, for: .top)
-            }
-            .animation(Tune.move, value: tab)
-            .background(surface.ignoresSafeArea())
+            .padding(.horizontal, 10)
+            .padding(.top, 4)
+            .padding(.bottom, 16)
         }
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        // The sandbox stays in view at the bottom, as the composer does
+        // in the chat: it's what moves while the model works.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            InspectorSection(pane: .sandbox) { PaneBody(pane: .sandbox) }
+                .padding(.horizontal, 10)
+                .padding(.top, 14)
+                .padding(.bottom, 10)
+                .background {
+                    LinearGradient(stops: [.init(color: surface.opacity(0), location: 0), .init(color: surface, location: 0.3)],
+                                   startPoint: .top, endPoint: .bottom)
+                }
+        }
+        .background(surface.ignoresSafeArea())
     }
 
     /// Warm like the chat, a step off it: the native inspector is a cool grey.
@@ -587,49 +545,16 @@ struct Accessory: View {
     }
 }
 
-/// Tabs: one pencil icon each, the chosen one washed.
-struct TabStrip: View {
-    @Binding var selection: Pane5
-    @Environment(\.palette) private var palette
-    @Namespace private var space
-
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(Pane5.allCases) { pane in
-                Button { selection = pane } label: {
-                    MarkIcon(mark: pane.mark, size: 16, color: selection == pane ? palette.accent : palette.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .background {
-                            if selection == pane {
-                                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    .fill(palette.wash)
-                                    .matchedGeometryEffect(id: "tab", in: space)
-                            }
-                        }
-                        .modifier(HoverWash())
-                }
-                .buttonStyle(Squish())
-                .help(pane.rawValue)
-            }
-        }
-        .padding(3)
-        .modifier(Box())
-    }
-}
-
 struct PaneBody: View {
     let pane: Pane5
-    /// Stacked, sections show less (the latest steps, a shorter terminal).
-    let compact: Bool
 
     var body: some View {
         switch pane {
-        case .steps: StepsPane(limit: compact ? 6 : nil)
+        case .steps: StepsPane()
         case .tasks: TasksPane()
-        case .context: ContextPane(compact: compact)
+        case .context: ContextPane()
         case .git: GitPane()
-        case .sandbox: SandboxPane(height: compact ? 140 : 320, alwaysOpen: !compact)
+        case .sandbox: SandboxPane()
         }
     }
 }
@@ -638,7 +563,8 @@ struct PaneBody: View {
 
 /// Every tool call, turn by turn; commands up front, the rest quieter.
 struct StepsPane: View {
-    let limit: Int?
+    /// How many of the latest steps show until Show all.
+    static let latest = 6
     @Environment(Sim.self) private var sim
     @Environment(\.palette) private var palette
     @State private var commandsOnly = false
@@ -646,7 +572,7 @@ struct StepsPane: View {
 
     var body: some View {
         let visible = sim.steps.filter { !commandsOnly || $0.kind == .shell }
-        let shown = limit.map { showAll ? visible : Array(visible.suffix($0)) } ?? visible
+        let shown = showAll ? visible : Array(visible.suffix(Self.latest))
         VStack(alignment: .leading, spacing: 1) {
             HStack(spacing: 2) {
                 Pill(title: "All", on: !commandsOnly) { commandsOnly = false }
@@ -941,9 +867,8 @@ struct Check: View {
 
 // MARK: - Context
 
-/// What fills the window: one bar, its parts, and the biggest results.
+/// What fills the window: one bar and its parts.
 struct ContextPane: View {
-    let compact: Bool
     @Environment(Sim.self) private var sim
     @Environment(\.palette) private var palette
 
@@ -980,16 +905,6 @@ struct ContextPane: View {
                 }
             }
             .animation(Tune.status, value: sim.used)
-            if !compact { VStack(alignment: .leading, spacing: 3) {
-                Text("Largest results").font(Typeface.sans(11)).foregroundStyle(palette.faint)
-                ForEach(sim.steps.sorted { $0.tokens > $1.tokens }.prefix(3)) { step in
-                    HStack(spacing: 7) {
-                        Text(step.title).font(step.kind == .shell ? Typeface.mono(11) : Typeface.sans(11.5)).foregroundStyle(palette.secondary).lineLimit(1)
-                        Spacer(minLength: 6)
-                        Text(short(step.tokens)).font(Typeface.sans(11.5).monospacedDigit()).foregroundStyle(palette.faint)
-                    }
-                }
-            } }
             HStack {
                 Text("Compacts at 75%")
                     .font(Typeface.sans(10.5))
@@ -1109,10 +1024,8 @@ struct GitPane: View {
 // MARK: - Sandbox
 
 /// The VM at a glance, and a live tail of what runs in it.
+/// The terminal shows only while the model works.
 struct SandboxPane: View {
-    let height: CGFloat
-    /// Stacked, the terminal shows only while the model works.
-    let alwaysOpen: Bool
     @Environment(Sim.self) private var sim
     @Environment(\.palette) private var palette
 
@@ -1131,9 +1044,9 @@ struct SandboxPane: View {
                 Spacer(minLength: 6)
                 Text("4 CPUs · 4 GB").font(Typeface.sans(11)).foregroundStyle(palette.faint)
             }
-            if alwaysOpen || sim.working {
+            if sim.working {
                 TerminalText(lines: sim.terminal, cursor: sim.current != nil)
-                    .frame(height: height)
+                    .frame(height: 140)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
                 Text("/work  ←  ~/Code/kuri-notes")
                     .font(Typeface.mono(10.5))

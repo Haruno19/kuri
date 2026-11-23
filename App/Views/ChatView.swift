@@ -6,9 +6,6 @@ import KuriTools
 import SwiftUI
 
 /// The new-chat page or the selected conversation, with the composer.
-///
-/// Messages render with Foundation's inline Markdown for now; block-level
-/// Markdown (code blocks, lists, tables) is the first item of the UI roadmap.
 struct ChatView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
@@ -88,7 +85,6 @@ private struct Welcome<C: View>: View {
 private struct Transcript<C: View>: View {
     let composer: C
     @Environment(AppModel.self) private var model
-    @Environment(\.palette) private var palette
     /// The height between the top margin and the composer.
     @State private var visible: CGFloat = 0
 
@@ -488,8 +484,6 @@ struct OrbitingDots: View {
     }
 }
 
-/// Text scrolling up past the pinned message blurs and fades into the
-/// background instead of being cut at the window's edge.
 /// Reasoning as it streams: a window of its latest lines, at most ten or
 /// about a third of the room between the pinned message and the composer;
 /// older lines fade out at the top.
@@ -530,7 +524,8 @@ struct LiveReasoning: View {
 }
 
 /// Frosts the transcript where it meets a window edge: solid at the edge,
-/// clearing over the last `fade` points.
+/// clearing over the last `fade` points, so text scrolling past the pinned
+/// message fades into the background instead of being cut.
 struct EdgeFade: View {
     let edge: VerticalEdge
     var fade: CGFloat = 36
@@ -600,16 +595,13 @@ private struct Composer: View {
         .onAppear { focused = true }
     }
 
-    /// While a turn runs, sending queues the message for its next step.
-    private func send() {
-        let text = draft
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        draft = ""
-        Task { await model.send(text) }
-    }
+    private func send() { model.submit(&draft) }
 }
 
-private struct ModelPicker: View {
+/// The conversation's model, or on the new-chat page the one it will
+/// start with. Small and dim in the mini window, over its composer.
+struct ModelPicker: View {
+    var small = false
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
 
@@ -619,15 +611,16 @@ private struct ModelPicker: View {
                 Button(ref.description) { Task { await model.setModel(ref) } }
             }
         } label: {
-            HStack(spacing: 5) {
+            HStack(spacing: small ? 4 : 5) {
                 Text(model.composerModel?.model ?? "No model")
-                    .foregroundStyle(palette.ink.opacity(0.85))
-                PencilIcon(glyph: .chevron, size: 11, color: palette.secondary)
+                    .lineLimit(1)
+                    .foregroundStyle(small ? palette.faint : palette.ink.opacity(0.85))
+                PencilIcon(glyph: .chevron, size: small ? 9 : 11, color: small ? palette.faint : palette.secondary)
             }
-            .font(Typeface.sans(13))
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .modifier(HoverWash())
+            .font(Typeface.sans(small ? 11.5 : 13))
+            .padding(.horizontal, small ? 5 : 9)
+            .padding(.vertical, small ? 3 : 5)
+            .modifier(HoverWash(shape: RoundedRectangle(cornerRadius: small ? 6 : 7, style: .continuous)))
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -696,7 +689,7 @@ private struct ContextMeter: View {
                 Button("Compact Conversation") { Task { await model.compactSelected() } }
                     .disabled(model.isSelectedBusy)
             } label: {
-                Text(usage.window.map { "\(Self.short(usage.tokens)) / \(Self.short($0))" } ?? "≈ \(Self.short(usage.tokens))")
+                Text(usage.window.map { "\(TokenCount.short(usage.tokens)) / \(TokenCount.short($0))" } ?? "≈ \(TokenCount.short(usage.tokens))")
                     .font(Typeface.sans(12).monospacedDigit())
                     .foregroundStyle(palette.faint)
                     .padding(.horizontal, 8)
@@ -709,10 +702,13 @@ private struct ContextMeter: View {
             .fixedSize()
             .help(usage.window == nil
                 ? "Estimated context size. Set contextWindow for this model in config.json to compact automatically."
-                : "Estimated context size. Kuri summarizes earlier messages at 75%.")
+                : "Estimated context size. Kuri summarizes earlier messages at \(Int(model.config.compactionThreshold * 100))%.")
         }
     }
+}
 
+/// Token counts the way the composer and the inspector show them.
+enum TokenCount {
     static func short(_ tokens: Int) -> String {
         tokens < 1_000 ? "\(tokens)" : String(format: "%.1fk", Double(tokens) / 1_000)
     }
@@ -921,8 +917,4 @@ struct InputRequestView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .modifier(Pane())
     }
-}
-
-extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

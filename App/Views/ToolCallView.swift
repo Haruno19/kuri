@@ -10,20 +10,21 @@ struct ToolCallView: View {
     let isLive: Bool
 
     @State private var expanded = false
+    @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     @Environment(\.chatScale) private var scale
 
     var body: some View {
-        let presentation = ToolPresentation(call: call, result: result)
+        let summary = model.summary(of: call)
         VStack(alignment: .leading, spacing: 6) {
             Button {
                 withAnimation(.snappy) { expanded.toggle() }
             } label: {
                 HStack(spacing: 8) {
-                    PencilIcon(glyph: presentation.glyph, size: 14 * scale,
+                    PencilIcon(glyph: summary.glyph, size: 14 * scale,
                                color: result?.isError == true ? palette.accent : palette.faint, weight: 1.3)
                         .frame(width: 16 * scale)
-                    Text(presentation.title)
+                    Text(summary.title(finished: result != nil))
                         .lineLimit(1)
                     if result == nil && isLive {
                         Orb(size: 6)
@@ -39,7 +40,7 @@ struct ToolCallView: View {
             .foregroundStyle(palette.secondary)
 
             if expanded {
-                presentation.detail
+                ToolDetail(call: call, summary: summary, output: result?.output ?? "")
                     .padding(.leading, 24)
                     .transition(.opacity.combined(with: .offset(y: -4)))
             }
@@ -47,58 +48,29 @@ struct ToolCallView: View {
     }
 }
 
-/// How each tool reads in the transcript. Built-ins get their own wording;
-/// MCP tools show as "server › tool".
-private struct ToolPresentation {
-    let glyph: Glyph
-    let title: String
-    let detail: AnyView
+/// What a call opens to: the command and its output, the plan, or the
+/// result (with the arguments, for MCP tools).
+private struct ToolDetail: View {
+    let call: ToolCall
+    let summary: ToolSummary
+    let output: String
 
-    init(call: ToolCall, result: ToolResult?) {
-        let output = result?.output
-        switch call.name {
-        case "clarify":
-            glyph = .question
-            title = result == nil ? "Waiting for your answer" : "Asked you"
-            detail = AnyView(OutputText(text: output ?? ""))
-
-        case "tasklist":
-            let entries = TaskListTool.entries(fromArguments: call.arguments) ?? []
-            let done = entries.filter { $0.status == .completed }.count
-            glyph = .checklist
-            title = TaskListTool.isUserEdit(call) ? "You edited the plan · \(done)/\(entries.count) done"
-                                                  : "Updated the plan · \(done)/\(entries.count) done"
-            detail = AnyView(TaskListRows(entries: entries))
-
-        case "memory":
-            glyph = .bookmark
-            title = result == nil ? "Updating memory" : "Updated memory"
-            detail = AnyView(OutputText(text: output ?? ""))
-
-        case "shell":
-            let command = (try? JSONDecoder().decode([String: JSONValue].self, from: Data(call.arguments.utf8)))?["command"]?.stringValue ?? ""
-            let firstLine = command.split(whereSeparator: \.isNewline).first.map(String.init) ?? command
-            glyph = .terminal
-            title = firstLine.count > 70 ? String(firstLine.prefix(67)) + "…" : firstLine
-            detail = AnyView(VStack(alignment: .leading, spacing: 6) {
-                if firstLine != command { OutputText(text: command) }
-                OutputText(text: output ?? "")
-            })
-
-        case "conversation_search":
-            let query = (try? JSONDecoder().decode([String: JSONValue].self, from: Data(call.arguments.utf8)))?["query"]?.stringValue
-            glyph = .search
-            title = "Searched past conversations" + (query.map { " for “\($0)”" } ?? "")
-            detail = AnyView(OutputText(text: output ?? ""))
-
-        default:
-            let parts = call.name.components(separatedBy: "__")
-            glyph = .puzzle
-            title = parts.count > 1 ? "\(parts[0]) › \(parts.dropFirst().joined(separator: "__"))" : call.name
-            detail = AnyView(VStack(alignment: .leading, spacing: 8) {
+    var body: some View {
+        switch summary.kind {
+        case .shell:
+            VStack(alignment: .leading, spacing: 6) {
+                if let command = summary.command, command != summary.commandLine { OutputText(text: command) }
+                OutputText(text: output)
+            }
+        case .tasklist:
+            TaskListRows(entries: summary.tasks)
+        case .other:
+            VStack(alignment: .leading, spacing: 8) {
                 OutputText(text: call.arguments)
-                if let output { OutputText(text: output) }
-            })
+                OutputText(text: output)
+            }
+        default:
+            OutputText(text: output)
         }
     }
 }
@@ -117,32 +89,49 @@ private struct OutputText: View {
     }
 }
 
-/// The rows of a task list, shared by the transcript and the plan panel.
+/// The rows of a task list, read-only: in the transcript and the plan
+/// panel above the composer. The inspector's are editable, in the same
+/// pencil style.
 struct TaskListRows: View {
     let entries: [TaskListTool.Entry]
+    @Environment(\.palette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: Self.symbol(for: entry.status))
-                        .font(.system(size: 11))
-                        .foregroundStyle(entry.status == .completed ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                HStack(alignment: .top, spacing: 8) {
+                    TaskCheck(status: entry.status)
+                        .padding(.top, 1.5)
                     Text(entry.content)
-                        .strikethrough(entry.status == .completed, color: .secondary)
-                        .foregroundStyle(entry.status == .completed ? .secondary : .primary)
+                        .strikethrough(entry.status == .completed, color: palette.faint)
+                        .foregroundStyle(entry.status == .completed ? palette.faint : palette.ink)
                         .fontWeight(entry.status == .inProgress ? .medium : .regular)
                 }
             }
         }
         .font(Typeface.sans(13))
     }
+}
 
-    static func symbol(for status: TaskListTool.Entry.Status) -> String {
-        switch status {
-        case .pending: "circle"
-        case .inProgress: "circle.dotted.circle"
-        case .completed: "checkmark.circle.fill"
+/// Empty, in progress (a dot in the accent), or done (filled and ticked).
+struct TaskCheck: View {
+    let status: TaskListTool.Entry.Status
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        ZStack {
+            switch status {
+            case .pending:
+                Circle().strokeBorder(palette.faint.opacity(0.9), lineWidth: 1.2)
+            case .inProgress:
+                Circle().strokeBorder(palette.accent, lineWidth: 1.3)
+                Circle().fill(palette.accentFill).padding(3.5)
+            case .completed:
+                Circle().fill(palette.accentFill)
+                PencilIcon(glyph: .check, size: 10, color: .white, weight: 1.7)
+            }
         }
+        .frame(width: 14, height: 14)
+        .contentShape(Circle())
     }
 }

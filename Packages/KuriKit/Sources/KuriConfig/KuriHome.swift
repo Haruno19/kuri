@@ -25,7 +25,6 @@ public struct KuriHome: Sendable {
     public var configFile: URL { root.appending(path: "config.json") }
     public var mcpFile: URL { root.appending(path: "mcp.json") }
     public var database: URL { root.appending(path: "kuri.sqlite") }
-    public var blobs: URL { root.appending(path: "blobs", directoryHint: .isDirectory) }
     public var scratch: URL { root.appending(path: "scratch", directoryHint: .isDirectory) }
 
     public func scratchFolder(for conversationID: UUID) -> URL {
@@ -35,7 +34,7 @@ public struct KuriHome: Sendable {
     /// Creates the folder structure if it doesn't exist yet.
     public func prepare() throws {
         let fm = FileManager.default
-        for dir in [root, blobs, scratch] {
+        for dir in [root, scratch] {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
     }

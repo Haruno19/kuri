@@ -217,6 +217,6 @@ extension EngineTests {
         #expect(compaction.summary == "Summary.")
         #expect(compaction.throughItemID == a1.id)
         #expect(before.window == nil)
-        #expect(await engine.isRunning(conversation.id) == false)
+        #expect(await engine.runningConversations.contains(conversation.id) == false)
     }
 }

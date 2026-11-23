@@ -9,7 +9,7 @@ public struct Item: Identifiable, Sendable, Hashable {
     public var id: UUID
     public var conversationID: UUID
     /// The turn that produced this item. `nil` only for items created
-    /// outside a turn (imports, manual edits).
+    /// outside a turn: the user's plan edits, summaries made on request.
     public var turnID: UUID?
     public var createdAt: Date
     public var payload: Payload
@@ -43,42 +43,13 @@ public enum Role: String, Codable, Sendable, Hashable {
     case assistant
 }
 
-public struct Message: Codable, Sendable, Hashable {
+public struct Message: Sendable, Hashable {
     public var role: Role
-    public var content: [ContentPart]
-
-    public init(role: Role, content: [ContentPart]) {
-        self.role = role
-        self.content = content
-    }
+    public var text: String
 
     public init(role: Role, text: String) {
-        self.init(role: role, content: [.text(text)])
-    }
-
-    /// The text parts joined together, ignoring attachments.
-    public var text: String {
-        content.compactMap { if case .text(let text) = $0 { text } else { nil } }.joined()
-    }
-}
-
-public enum ContentPart: Sendable, Hashable {
-    case text(String)
-    case attachment(Attachment)
-}
-
-/// A file stored in `~/.config/kuri/blobs/`, addressed by its SHA-256.
-public struct Attachment: Codable, Sendable, Hashable {
-    public var sha256: String
-    public var mimeType: String
-    public var filename: String?
-    public var size: Int
-
-    public init(sha256: String, mimeType: String, filename: String? = nil, size: Int) {
-        self.sha256 = sha256
-        self.mimeType = mimeType
-        self.filename = filename
-        self.size = size
+        self.role = role
+        self.text = text
     }
 }
 
@@ -144,29 +115,26 @@ public struct Compaction: Codable, Sendable, Hashable {
 
 // MARK: - Codable
 
-extension ContentPart: Codable {
-    private enum CodingKeys: String, CodingKey { case type, text, attachment }
+/// Stored the Open Responses way, as a list of content parts, which is how
+/// messages have always been stored: text parts are all there is.
+extension Message: Codable {
+    private enum CodingKeys: String, CodingKey { case role, content }
+
+    private struct Part: Codable {
+        var type = "text"
+        var text: String?
+    }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        switch try container.decode(String.self, forKey: .type) {
-        case "attachment":
-            self = .attachment(try container.decode(Attachment.self, forKey: .attachment))
-        default:
-            self = .text(try container.decode(String.self, forKey: .text))
-        }
+        role = try container.decode(Role.self, forKey: .role)
+        text = try container.decode([Part].self, forKey: .content).compactMap(\.text).joined()
     }
 
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case .text(let text):
-            try container.encode("text", forKey: .type)
-            try container.encode(text, forKey: .text)
-        case .attachment(let attachment):
-            try container.encode("attachment", forKey: .type)
-            try container.encode(attachment, forKey: .attachment)
-        }
+        try container.encode(role, forKey: .role)
+        try container.encode([Part(text: text)], forKey: .content)
     }
 }
 

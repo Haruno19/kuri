@@ -19,10 +19,7 @@ import Testing
 @Suite struct ItemTests {
     @Test func payloadRoundTripsThroughKindAndBody() throws {
         let payloads: [Item.Payload] = [
-            .message(Message(role: .user, content: [
-                .text("Look at this"),
-                .attachment(Attachment(sha256: "abc", mimeType: "image/png", size: 12)),
-            ])),
+            .message(Message(role: .user, text: "Look at this")),
             .reasoning(Reasoning(text: "thinking", opaque: "xyz", provider: "openai")),
             .toolCall(ToolCall(id: "call_1", name: "tasklist", arguments: #"{"tasks":[]}"#)),
             .toolResult(ToolResult(callID: "call_1", output: "ok", isError: false)),
@@ -34,11 +31,11 @@ import Testing
         }
     }
 
-    @Test func messageTextIgnoresAttachments() {
-        let message = Message(role: .user, content: [
-            .text("a"), .attachment(Attachment(sha256: "x", mimeType: "image/png", size: 1)), .text("b"),
-        ])
-        #expect(message.text == "ab")
+    @Test func messageIsStoredAsContentParts() throws {
+        let body = try Item.Payload.message(Message(role: .user, text: "hi")).encodedBody()
+        #expect(String(decoding: body, as: UTF8.self) == #"{"content":[{"text":"hi","type":"text"}],"role":"user"}"#)
+        let stored = #"{"content":[{"text":"a","type":"text"},{"text":"b","type":"text"}],"role":"assistant"}"#
+        #expect(try Item.Payload(kind: "message", body: Data(stored.utf8)) == .message(Message(role: .assistant, text: "ab")))
     }
 }
 

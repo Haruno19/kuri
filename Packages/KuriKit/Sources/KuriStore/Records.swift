@@ -67,7 +67,7 @@ public struct Turn: Identifiable, Sendable, Hashable {
 }
 
 public struct Memory: Identifiable, Sendable, Hashable {
-    public enum Source: String, Sendable { case user, agent, review }
+    public enum Source: String, Sendable { case user, agent }
     public enum Status: String, Sendable { case active, archived }
 
     /// Short, human- and model-friendly handle (the row number), shown as

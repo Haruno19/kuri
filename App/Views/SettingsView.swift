@@ -60,6 +60,12 @@ private struct GeneralSettings: View {
                     set: { enabled in Task { await model.setGenerateTitles(enabled) } }))
                 Text("After the first answer, the utility model (or the conversation's model) names the conversation.")
                     .font(.caption).foregroundStyle(.secondary)
+                Stepper("Compact at \(compactAt)%", value: Binding(
+                    get: { compactAt },
+                    set: { percent in Task { await model.setCompactAt(percent) } }),
+                    in: Config.compactAtRange, step: 5)
+                Text("When a request would fill this much of the model's context window, earlier messages are summarized. Needs the model's context window, set in Models.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             if let home = model.engine?.home {
                 Section("Configuration") {
@@ -76,6 +82,8 @@ private struct GeneralSettings: View {
         }
         .formStyle(.grouped)
     }
+
+    private var compactAt: Int { model.config.compactAt ?? Config.defaultCompactAt }
 
     private func setOpenAtLogin(_ enabled: Bool) {
         do {

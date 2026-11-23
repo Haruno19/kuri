@@ -143,7 +143,6 @@ struct Row {
     func isNull(_ column: Int32) -> Bool { sqlite3_column_type(statement.raw, column) == SQLITE_NULL }
 
     func int(_ column: Int32) -> Int { Int(sqlite3_column_int64(statement.raw, column)) }
-    func optionalInt(_ column: Int32) -> Int? { isNull(column) ? nil : int(column) }
 
     func double(_ column: Int32) -> Double { sqlite3_column_double(statement.raw, column) }
 

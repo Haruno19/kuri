@@ -303,10 +303,6 @@ public actor Engine {
         broadcaster.emit(.conversationDeleted(conversationID))
     }
 
-    public func isRunning(_ conversationID: UUID) -> Bool {
-        running[conversationID] != nil
-    }
-
     // MARK: Turns
 
     /// Adds the user's message and starts a turn. Returns once the turn is
@@ -327,10 +323,6 @@ public actor Engine {
         guard let index = queues[conversationID]?.firstIndex(where: { $0.id == messageID }) else { return }
         queues[conversationID]?.remove(at: index)
         broadcaster.emit(.queueChanged(conversationID: conversationID, queues[conversationID] ?? []))
-    }
-
-    public func queuedMessages(in conversationID: UUID) -> [QueuedMessage] {
-        queues[conversationID] ?? []
     }
 
     // MARK: Task list
@@ -481,6 +473,8 @@ public actor Engine {
             guard let fallbackProvider = try? self.provider(for: ref) else { continue }
             fallbacks.append(await choice(ref, fallbackProvider))
         }
+        var limits = limits
+        limits.compactionThreshold = config.compactionThreshold
         let runner = TurnRunner(
             conversationID: conversation.id,
             turn: turn,
@@ -539,6 +533,11 @@ public actor Engine {
 
     public func setStartInBackground(_ enabled: Bool) async throws {
         try ConfigEditor(home: home).setStartInBackground(enabled)
+        await reloadConfig()
+    }
+
+    public func setCompactAt(_ percent: Int) async throws {
+        try ConfigEditor(home: home).setCompactAt(percent)
         await reloadConfig()
     }
 

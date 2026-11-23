@@ -244,10 +244,10 @@ struct InspectorTurn: Identifiable, Equatable {
     var steps: [InspectorStep]
 
     /// The conversation's tool calls, grouped under the message before them.
-    /// Built when the items change, not on every render; `summaries` keeps
+    /// Built when the items change, not on every render; `summary` keeps
     /// each call's decoded arguments, so a new item doesn't decode them all
     /// again.
-    static func turns(from items: [Item], summaries: inout [String: ToolSummary]) -> [InspectorTurn] {
+    static func turns(from items: [Item], summary: (ToolCall) -> ToolSummary) -> [InspectorTurn] {
         var results: [String: (result: ToolResult, date: Date)] = [:]
         for item in items {
             if case .toolResult(let result) = item.payload { results[result.callID] = (result, item.createdAt) }
@@ -258,10 +258,8 @@ struct InspectorTurn: Identifiable, Equatable {
             case .message(let message) where message.role == .user:
                 turns.append(InspectorTurn(id: item.id, prompt: message.text, date: item.createdAt, steps: []))
             case .toolCall(let call):
-                let summary = summaries[call.id] ?? ToolSummary(call)
-                summaries[call.id] = summary
                 let found = results[call.id]
-                let step = InspectorStep(id: call.id, summary: summary, result: found?.result,
+                let step = InspectorStep(id: call.id, summary: summary(call), result: found?.result,
                                          seconds: found.map { $0.date.timeIntervalSince(item.createdAt) })
                 if turns.isEmpty { turns.append(InspectorTurn(id: item.id, prompt: nil, date: item.createdAt, steps: [])) }
                 turns[turns.count - 1].steps.append(step)
@@ -647,29 +645,6 @@ private struct TaskRow: View {
     }
 }
 
-/// Empty, in progress (a dot in the accent), or done (filled and ticked).
-private struct TaskCheck: View {
-    let status: TaskListTool.Entry.Status
-    @Environment(\.palette) private var palette
-
-    var body: some View {
-        ZStack {
-            switch status {
-            case .pending:
-                Circle().strokeBorder(palette.faint.opacity(0.9), lineWidth: 1.2)
-            case .inProgress:
-                Circle().strokeBorder(palette.accent, lineWidth: 1.3)
-                Circle().fill(palette.accentFill).padding(3.5)
-            case .completed:
-                Circle().fill(palette.accentFill)
-                PencilIcon(glyph: .check, size: 10, color: .white, weight: 1.7)
-            }
-        }
-        .frame(width: 14, height: 14)
-        .contentShape(Circle())
-    }
-}
-
 // MARK: - Context
 
 /// What fills the window: one bar and its parts.
@@ -699,7 +674,7 @@ private struct ContextPane: View {
                 Spacer()
             }
             if let window = usage.window, window > 0 {
-                ContextBar(parts: parts, window: window)
+                ContextBar(parts: parts, window: window, threshold: model.config.compactionThreshold)
             }
             Grid(horizontalSpacing: 14, verticalSpacing: 3) {
                 ForEach(0..<(parts.count + 1) / 2, id: \.self) { row in
@@ -720,7 +695,8 @@ private struct ContextPane: View {
                 }
             }
             HStack {
-                Text(usage.window == nil ? "Set contextWindow to compact automatically" : "Compacts at 75%")
+                Text(usage.window == nil ? "Set contextWindow to compact automatically"
+                                         : "Compacts at \(Int(model.config.compactionThreshold * 100))%")
                     .font(Typeface.sans(10.5))
                     .foregroundStyle(palette.faint)
                 Spacer()
@@ -753,9 +729,9 @@ private struct ContextPart: Identifiable {
 private struct ContextBar: View {
     let parts: [ContextPart]
     let window: Int
+    /// Where compaction starts, as a share of the window.
+    let threshold: Double
     @Environment(\.palette) private var palette
-    /// Where compaction starts (`TurnLimits.compactionThreshold`).
-    static let threshold = 0.75
 
     var body: some View {
         GeometryReader { geometry in
@@ -774,18 +750,11 @@ private struct ContextBar: View {
                 Rectangle()
                     .fill(palette.faint)
                     .frame(width: 1.5, height: 8)
-                    .offset(x: width * Self.threshold)
+                    .offset(x: width * threshold)
                     .help("Kuri summarizes earlier messages here")
             }
         }
         .frame(height: 4)
-    }
-}
-
-/// Token counts the way the composer shows them.
-enum TokenCount {
-    static func short(_ tokens: Int) -> String {
-        tokens < 1_000 ? "\(tokens)" : String(format: "%.1fk", Double(tokens) / 1_000)
     }
 }
 

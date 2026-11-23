@@ -120,8 +120,16 @@ final class AppModel {
         return inspectorTurns.last?.steps.last { $0.isShell && $0.result == nil }
     }
 
+    /// A call's summary, built once per call.
+    func summary(of call: ToolCall) -> ToolSummary {
+        if let summary = summaries[call.id] { return summary }
+        let summary = ToolSummary(call)
+        summaries[call.id] = summary
+        return summary
+    }
+
     private func deriveFromItems() {
-        inspectorTurns = InspectorTurn.turns(from: items, summaries: &summaries)
+        inspectorTurns = InspectorTurn.turns(from: items, summary: summary(of:))
         plan = TaskListTool.current(in: items)
     }
 
@@ -211,6 +219,15 @@ final class AppModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Sends a composer's draft and empties it; whitespace alone isn't sent.
+    /// While a turn runs, the message is queued for its next step.
+    func submit(_ draft: inout String) {
+        let text = draft
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        draft = ""
+        Task { await send(text) }
     }
 
     /// The model the composer shows: the conversation's, or on the new-chat
@@ -366,6 +383,14 @@ final class AppModel {
     func setStartInBackground(_ enabled: Bool) async {
         do {
             try await engine?.setStartInBackground(enabled)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func setCompactAt(_ percent: Int) async {
+        do {
+            try await engine?.setCompactAt(percent)
         } catch {
             errorMessage = error.localizedDescription
         }

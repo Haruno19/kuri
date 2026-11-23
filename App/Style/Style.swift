@@ -34,16 +34,16 @@ struct Palette {
     let scheme: ColorScheme
     var dark: Bool { scheme == .dark }
 
-    var background: Color { dark ? hex(0x1C1B1A) : hex(0xFAF9F5) }
+    var background: Color { dark ? Color(hex: 0x1C1B1A) : Color(hex: 0xFAF9F5) }
     /// The composer sits a step darker than the background in both themes.
-    var composer: Color { dark ? hex(0x141312) : hex(0xEFEDE6) }
+    var composer: Color { dark ? Color(hex: 0x141312) : Color(hex: 0xEFEDE6) }
 
-    var ink: Color { dark ? hex(0xECEBE5) : hex(0x1F1E1D) }
-    var secondary: Color { dark ? hex(0xA8A59C) : hex(0x6B6A64) }
-    var faint: Color { dark ? hex(0x78766F) : hex(0x9C9A92) }
+    var ink: Color { dark ? Color(hex: 0xECEBE5) : Color(hex: 0x1F1E1D) }
+    var secondary: Color { dark ? Color(hex: 0xA8A59C) : Color(hex: 0x6B6A64) }
+    var faint: Color { dark ? Color(hex: 0x78766F) : Color(hex: 0x9C9A92) }
 
-    var accent: Color { dark ? hex(0xC08452) : hex(0xA4693D) }
-    var accentLight: Color { dark ? hex(0xD6A06F) : hex(0xC18A5B) }
+    var accent: Color { dark ? Color(hex: 0xC08452) : Color(hex: 0xA4693D) }
+    var accentLight: Color { dark ? Color(hex: 0xD6A06F) : Color(hex: 0xC18A5B) }
     var accentFill: LinearGradient { LinearGradient(colors: [accentLight, accent], startPoint: .top, endPoint: .bottom) }
 
     var iconTop: Color { dark ? Color(.displayP3, red: 0.50, green: 0.31, blue: 0.14) : Color(.displayP3, red: 0.60, green: 0.345, blue: 0.165) }
@@ -52,20 +52,23 @@ struct Palette {
 
     /// The native sidebar as it renders over this palette (sampled), for
     /// controls in it that must hide what scrolls beneath.
-    var sidebar: Color { dark ? hex(0x313030) : hex(0xF4F3F0) }
+    var sidebar: Color { dark ? Color(hex: 0x313030) : Color(hex: 0xF4F3F0) }
 
     /// The inspector: warm, a step off the chat (the native one is a cool
     /// grey), and its boxes, solid so nothing shows through them.
-    var inspector: Color { dark ? hex(0x211F1D) : hex(0xF3F1EA) }
-    var inspectorBox: Color { dark ? hex(0x292724) : hex(0xFFFDF8) }
+    var inspector: Color { dark ? Color(hex: 0x211F1D) : Color(hex: 0xF3F1EA) }
+    var inspectorBox: Color { dark ? Color(hex: 0x292724) : Color(hex: 0xFFFDF8) }
 
     /// User cards and other panels resting on the surface.
-    var card: Color { dark ? hex(0x2F2B26) : hex(0xFFFDF8) }
-    var shadow: Color { dark ? .black : hex(0x3A3226) }
+    var card: Color { dark ? Color(hex: 0x2F2B26) : Color(hex: 0xFFFDF8) }
+    var shadow: Color { dark ? .black : Color(hex: 0x3A3226) }
     var wash: Color { ink.opacity(dark ? 0.08 : 0.06) }
+}
 
-    private func hex(_ v: UInt32) -> Color {
-        Color(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
+extension Color {
+    /// `0xRRGGBB`, in sRGB.
+    init(hex v: UInt32) {
+        self.init(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
     }
 }
 

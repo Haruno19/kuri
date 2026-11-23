@@ -68,6 +68,10 @@ public struct ConfigLoader: Sendable {
           // Launch with only the menu bar icon, no main window.
           startInBackground: false,
 
+          // Summarize earlier messages when a request would fill this much of the
+          // model's context window, in percent (50 to 95). Needs the model's contextWindow.
+          compactAt: 75,
+
           providers: {
             // Anything that speaks Open Responses: Ollama, LM Studio, vLLM, OpenAI…
             ollama: {

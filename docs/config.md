@@ -15,7 +15,6 @@ The home folder resolves in this order:
 ├─ config.json   providers, models, defaults, tool policies, sandbox
 ├─ mcp.json      MCP servers
 ├─ kuri.sqlite   conversations, turns, items, memories (not configuration)
-├─ blobs/        attachments
 ├─ scratch/      per-conversation working folders
 └─ sandbox/      kernel, images and snapshots for the sandbox
 ```
@@ -58,6 +57,7 @@ Anywhere a secret is accepted (`apiKey`, `headers`, an MCP server's `env`), the 
 | `utilityModel` | `"<provider>/<model>"` | none | A small, fast model for background jobs: compaction summaries and titles. Without it, the conversation's own model does them. |
 | `generateTitles` | bool | `true` | Name a conversation after its first exchange. Settings › General toggles it (rewriting this file). |
 | `startInBackground` | bool | `false` | Launch with only the menu bar icon: no main window, no Dock icon until one opens. Settings › General sets it. (Opening at login is a macOS login item, set in Settings › General, not here.) |
+| `compactAt` | integer, 50 to 95 | `75` | Summarize earlier messages when a request would fill this percentage of the model's context window (it needs the model's `contextWindow`); the latest exchange stays verbatim. Settings › General sets it. |
 | `appearance` | `"system"`, `"light"` or `"dark"` | `"system"` | The app's colour scheme: following macOS, or always light or dark. Applies as soon as the file is saved. Settings › General sets it. |
 | `providers` | object | `{}` | Providers by name; the name is the part before the slash in model references. |
 | `tools` | object | `{}` | Tool policies, see below. |
@@ -101,7 +101,7 @@ anthropic: { format: "anthropic-messages", apiKey: "keychain:anthropic", discove
 | Key | Type | Meaning |
 |---|---|---|
 | `id` | string | The provider's model id. Required. |
-| `contextWindow` | int | Tokens. Enables automatic compaction at 75%, and the context meter's maximum. Set it to what the runtime actually uses, which for local runtimes may be less than the model supports. |
+| `contextWindow` | int | Tokens. Enables automatic compaction (at `compactAt`, 75% by default), and the context meter's maximum. Set it to what the runtime actually uses, which for local runtimes may be less than the model supports. |
 | `maxOutputTokens` | int | Sent as `max_output_tokens` (`open-responses`) or `max_tokens` (`anthropic-messages`, default 32,000). |
 | `reasoningEffort` | string | Sent as `reasoning.effort` (`open-responses`) or `output_config.effort` (`anthropic-messages`), e.g. `low`, `medium`, `high`, for models that support it. |
 | `name` | string | A display name. Stored, not shown yet. |

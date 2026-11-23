@@ -10,7 +10,7 @@ public enum Appearance: String, Codable, Sendable, Hashable, CaseIterable {
 public struct Config: Codable, Sendable, Hashable {
     /// The model new conversations start with.
     public var defaultModel: ModelRef?
-    /// A small, fast model for background jobs: titles, summaries, memory review.
+    /// A small, fast model for background jobs: titles and summaries.
     public var utilityModel: ModelRef?
     public var providers: [String: ProviderConfig]
     /// Tool name or `*` glob → policy, for any tool by the name the model
@@ -23,6 +23,9 @@ public struct Config: Codable, Sendable, Hashable {
     public var appearance: Appearance?
     /// Launch with only the menu bar icon, no main window. Default `false`.
     public var startInBackground: Bool?
+    /// Summarize earlier messages when a request would fill this share of
+    /// the model's context window, in percent. Default 75.
+    public var compactAt: Int?
 
     public init(
         defaultModel: ModelRef? = nil,
@@ -32,7 +35,8 @@ public struct Config: Codable, Sendable, Hashable {
         sandbox: SandboxConfig? = nil,
         generateTitles: Bool? = nil,
         appearance: Appearance? = nil,
-        startInBackground: Bool? = nil
+        startInBackground: Bool? = nil,
+        compactAt: Int? = nil
     ) {
         self.defaultModel = defaultModel
         self.utilityModel = utilityModel
@@ -42,6 +46,7 @@ public struct Config: Codable, Sendable, Hashable {
         self.generateTitles = generateTitles
         self.appearance = appearance
         self.startInBackground = startInBackground
+        self.compactAt = compactAt
     }
 
     public init(from decoder: any Decoder) throws {
@@ -54,6 +59,17 @@ public struct Config: Codable, Sendable, Hashable {
         generateTitles = try container.decodeIfPresent(Bool.self, forKey: .generateTitles)
         appearance = try container.decodeIfPresent(Appearance.self, forKey: .appearance)
         startInBackground = try container.decodeIfPresent(Bool.self, forKey: .startInBackground)
+        compactAt = try container.decodeIfPresent(Int.self, forKey: .compactAt)
+    }
+
+    public static let defaultCompactAt = 75
+    /// `compactAt` can't go below half the window (the summary and what's
+    /// kept verbatim need room) or above 95% (the answer needs room too).
+    public static let compactAtRange = 50...95
+
+    /// `compactAt` as a share of the window, within its range.
+    public var compactionThreshold: Double {
+        Double((compactAt ?? Self.defaultCompactAt).clamped(to: Self.compactAtRange)) / 100
     }
 
     /// Every model declared in the file, in a stable order.
@@ -220,4 +236,8 @@ public struct MCPServerConfig: Codable, Sendable, Hashable {
         self.enabled = enabled
         self.tools = tools
     }
+}
+
+private extension Comparable {
+    func clamped(to range: ClosedRange<Self>) -> Self { min(max(self, range.lowerBound), range.upperBound) }
 }

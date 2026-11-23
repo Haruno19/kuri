@@ -216,3 +216,23 @@ import Testing
         #expect(try ConfigLoader(home: home).loadConfig().generateTitles == false)
     }
 }
+
+@Suite struct CompactAtSettingTests {
+    @Test func writesThePercentageAndLeavesTheDefaultOut() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-compact-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let home = KuriHome(root: root)
+        try home.prepare()
+        try Data(#"{ providers: {} }"#.utf8).write(to: home.configFile)
+        #expect(try ConfigLoader(home: home).loadConfig().compactionThreshold == 0.75)
+        try ConfigEditor(home: home).setCompactAt(60)
+        #expect(try ConfigLoader(home: home).loadConfig().compactionThreshold == 0.6)
+        try ConfigEditor(home: home).setCompactAt(Config.defaultCompactAt)
+        #expect(try ConfigLoader(home: home).loadConfig().compactAt == nil)
+    }
+
+    @Test func keepsTheThresholdInRange() {
+        #expect(Config(compactAt: 10).compactionThreshold == 0.5)
+        #expect(Config(compactAt: 120).compactionThreshold == 0.95)
+    }
+}

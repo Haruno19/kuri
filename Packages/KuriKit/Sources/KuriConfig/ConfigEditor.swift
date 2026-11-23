@@ -95,6 +95,15 @@ public struct ConfigEditor: Sendable {
         }
     }
 
+    /// The default leaves the key out.
+    public func setCompactAt(_ percent: Int) throws {
+        try edit { tree in
+            guard case .object(var root) = tree else { return }
+            root["compactAt"] = percent == Config.defaultCompactAt ? nil : .number(Double(percent))
+            tree = .object(root)
+        }
+    }
+
     public func setDefaultModel(_ ref: ModelRef?) throws {
         try edit { tree in
             guard case .object(var root) = tree else { return }

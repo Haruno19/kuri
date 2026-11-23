@@ -12,9 +12,9 @@ struct ToolSummary: Equatable {
     let command: String?
     /// The plan a `tasklist` call carries.
     let tasks: [TaskListTool.Entry]
-    private let kind: Kind
+    let kind: Kind
 
-    private enum Kind: Equatable {
+    enum Kind: Equatable {
         case shell, memory, clarify
         case tasklist(byUser: Bool)
         case search(query: String?)
