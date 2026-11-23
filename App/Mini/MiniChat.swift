@@ -20,7 +20,7 @@ struct MiniChat: View {
         VStack(spacing: 0) {
             if showsTranscript {
                 MiniTranscript()
-                    .id(model.selection)
+                    .id(model.loadedConversation)
                     .transition(.opacity)
             } else {
                 Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)

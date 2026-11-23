@@ -31,6 +31,10 @@ final class AppModel {
         didSet { if selection != oldValue { Task { await loadSelection() } } }
     }
 
+    /// The conversation `items` and the turns belong to. It changes only
+    /// once they're all loaded, so the transcript, rebuilt on it, never
+    /// opens on the previous chat's items and then sees them swapped.
+    private(set) var loadedConversation: UUID?
     /// Items of the selected conversation.
     private(set) var items: [Item] = [] {
         didSet { deriveFromItems() }
@@ -324,12 +328,23 @@ final class AppModel {
             turns = [:]
             contextUsage = nil
             folders = []
+            loadedConversation = nil
             return
         }
-        items = (try? await engine.store.items(of: id)) ?? []
-        folders = (try? await engine.folders(of: id)) ?? []
-        if await engine.isSandboxRunning(id) { sandboxUp.insert(id) } else { sandboxUp.remove(id) }
-        await refreshTurnState()
+        let loadedItems = (try? await engine.store.items(of: id)) ?? []
+        let loadedFolders = (try? await engine.folders(of: id)) ?? []
+        let sandboxRunning = await engine.isSandboxRunning(id)
+        let loadedTurns = (try? await engine.store.turns(of: id)) ?? []
+        // Picked another chat meanwhile: its own load takes over.
+        guard selection == id else { return }
+        // All at once, with no suspension in between: one update.
+        items = loadedItems
+        folders = loadedFolders
+        if sandboxRunning { sandboxUp.insert(id) } else { sandboxUp.remove(id) }
+        lastTurn = loadedTurns.last
+        turns = Dictionary(loadedTurns.map { ($0.id, $0) }, uniquingKeysWith: { $1 })
+        loadedConversation = id
+        contextUsage = try? await engine.contextUsage(id)
     }
 
     private func refreshTurnState() async {

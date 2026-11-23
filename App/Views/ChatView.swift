@@ -21,8 +21,9 @@ struct ChatView: View {
                     .transition(.opacity)
             } else {
                 Transcript(composer: composer)
-                    // A fresh scroll view per conversation, anchored at its end.
-                    .id(model.selection)
+                    // A fresh scroll view per conversation, anchored at its
+                    // end, made once its items have loaded.
+                    .id(model.loadedConversation)
                     .transition(.opacity)
             }
         }
@@ -87,6 +88,9 @@ private struct Transcript<C: View>: View {
     @Environment(AppModel.self) private var model
     /// The height between the top margin and the composer.
     @State private var visible: CGFloat = 0
+    /// When this conversation's transcript appeared: only a message sent
+    /// after it scrolls the view, so opening a chat never scrolls it up.
+    @State private var appeared = Date.now
 
     /// From the window's top edge to where a pinned message starts.
     static var topMargin: CGFloat { 56 }
@@ -143,7 +147,10 @@ private struct Transcript<C: View>: View {
                 visible = max(0, height)
             }
             .onChange(of: current.first?.id) { _, id in
-                guard let id, current.first?.isUserMessage == true else { return }
+                // A message sent now, below the end of the chat: scrolling
+                // to it only ever goes down.
+                guard let id, case .item(let message)? = current.first, current.first?.isUserMessage == true,
+                      message.createdAt >= appeared else { return }
                 // Next pass, once the new exchange (and its height) is laid out.
                 DispatchQueue.main.async {
                     withAnimation(Tune.scroll) { proxy.scrollTo(id, anchor: .top) }
