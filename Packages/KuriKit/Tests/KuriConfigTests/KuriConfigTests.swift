@@ -157,6 +157,24 @@ import Testing
     }
 }
 
+@Suite struct AppearanceSettingTests {
+    @Test func readsAndWritesTheAppearance() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-appearance-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let home = KuriHome(root: root)
+        try home.prepare()
+        try Data(#"{ appearance: "dark", providers: {} }"#.utf8).write(to: home.configFile)
+        #expect(try ConfigLoader(home: home).loadConfig().appearance == .dark)
+        try ConfigEditor(home: home).setAppearance(.light)
+        #expect(try ConfigLoader(home: home).loadConfig().appearance == .light)
+        // "system" is the default, so it leaves the key out.
+        try ConfigEditor(home: home).setAppearance(.system)
+        #expect(try ConfigLoader(home: home).loadConfig().appearance == nil)
+        try Data(#"{ appearance: "sepia", providers: {} }"#.utf8).write(to: home.configFile)
+        #expect(throws: (any Error).self) { try ConfigLoader(home: home).loadConfig() }
+    }
+}
+
 @Suite struct GenerateTitlesSettingTests {
     @Test func editorWritesTheToggle() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "kuri-titles-\(UUID().uuidString)")

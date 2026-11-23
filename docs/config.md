@@ -57,6 +57,7 @@ Anywhere a secret is accepted (`apiKey`, `headers`, an MCP server's `env`), the 
 | `defaultModel` | `"<provider>/<model>"` | none | The model new conversations start with. Everything after the first slash is the model id. |
 | `utilityModel` | `"<provider>/<model>"` | none | A small, fast model for background jobs: compaction summaries and titles. Without it, the conversation's own model does them. |
 | `generateTitles` | bool | `true` | Name a conversation after its first exchange. Settings › General toggles it (rewriting this file). |
+| `appearance` | `"system"`, `"light"` or `"dark"` | `"system"` | The app's colour scheme: following macOS, or always light or dark. Applies as soon as the file is saved. |
 | `providers` | object | `{}` | Providers by name; the name is the part before the slash in model references. |
 | `tools` | object | `{}` | Tool policies, see below. |
 | `sandbox` | object | defaults below | The Linux sandbox. |

@@ -62,6 +62,9 @@ public struct ConfigLoader: Sendable {
           // (otherwise the conversation's own model). Settings › General toggles it.
           generateTitles: true,
 
+          // "system" (the default), "light" or "dark".
+          appearance: "system",
+
           providers: {
             // Anything that speaks Open Responses: Ollama, LM Studio, vLLM, OpenAI…
             ollama: {

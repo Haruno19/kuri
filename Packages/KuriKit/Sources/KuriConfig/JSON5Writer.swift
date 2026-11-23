@@ -8,7 +8,7 @@ import KuriCore
 enum JSON5Writer {
     static let keyOrder = [
         // config.json
-        "defaultModel", "utilityModel", "generateTitles", "providers", "tools", "sandbox",
+        "defaultModel", "utilityModel", "generateTitles", "appearance", "providers", "tools", "sandbox",
         "format", "baseURL", "apiKey", "headers", "discoverModels", "models",
         "id", "name", "contextWindow", "maxOutputTokens", "reasoningEffort", "fallbacks",
         // mcp.json

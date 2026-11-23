@@ -63,6 +63,14 @@ public struct ConfigEditor: Sendable {
         }
     }
 
+    public func setAppearance(_ appearance: Appearance) throws {
+        try edit { tree in
+            guard case .object(var root) = tree else { return }
+            root["appearance"] = appearance == .system ? nil : .string(appearance.rawValue)
+            tree = .object(root)
+        }
+    }
+
     public func setDefaultModel(_ ref: ModelRef?) throws {
         try edit { tree in
             guard case .object(var root) = tree else { return }

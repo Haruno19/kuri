@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import KuriAgent
 import KuriConfig
@@ -47,7 +48,9 @@ final class AppModel {
     private(set) var contextUsage: (tokens: Int, window: Int?)?
     private(set) var inputRequests: [InputRequest] = []
     private(set) var models: [ModelRef] = []
-    private(set) var config = Config()
+    private(set) var config = Config() {
+        didSet { Self.apply(config.appearance) }
+    }
     private(set) var tools: [ToolInfo] = []
     private(set) var memories: [Memory] = []
     private(set) var mcpServers: [MCPServerStatus] = []
@@ -427,5 +430,20 @@ final class AppModel {
                 Task { await refreshTurnState() }
             }
         }
+    }
+}
+
+extension AppModel {
+    /// The whole app follows `appearance`: windows, Settings and the menu
+    /// bar panel. `nil` lets macOS decide.
+    static func apply(_ appearance: Appearance?) {
+        let name: NSAppearance.Name? = switch appearance ?? .system {
+        case .system: nil
+        case .light: .aqua
+        case .dark: .darkAqua
+        }
+        let target = name.flatMap(NSAppearance.init(named:))
+        let app = NSApplication.shared
+        if app.appearance?.name != target?.name { app.appearance = target }
     }
 }

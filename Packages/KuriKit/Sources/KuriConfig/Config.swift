@@ -1,6 +1,11 @@
 import Foundation
 import KuriCore
 
+/// The app's colour scheme.
+public enum Appearance: String, Codable, Sendable, Hashable, CaseIterable {
+    case system, light, dark
+}
+
 /// The contents of `config.json`.
 public struct Config: Codable, Sendable, Hashable {
     /// The model new conversations start with.
@@ -14,6 +19,8 @@ public struct Config: Codable, Sendable, Hashable {
     public var sandbox: SandboxConfig?
     /// Name conversations after their first exchange. Default `true`.
     public var generateTitles: Bool?
+    /// Light, dark, or following the system (the default).
+    public var appearance: Appearance?
 
     public init(
         defaultModel: ModelRef? = nil,
@@ -21,7 +28,8 @@ public struct Config: Codable, Sendable, Hashable {
         providers: [String: ProviderConfig] = [:],
         tools: [String: ToolPolicy]? = nil,
         sandbox: SandboxConfig? = nil,
-        generateTitles: Bool? = nil
+        generateTitles: Bool? = nil,
+        appearance: Appearance? = nil
     ) {
         self.defaultModel = defaultModel
         self.utilityModel = utilityModel
@@ -29,6 +37,7 @@ public struct Config: Codable, Sendable, Hashable {
         self.tools = tools
         self.sandbox = sandbox
         self.generateTitles = generateTitles
+        self.appearance = appearance
     }
 
     public init(from decoder: any Decoder) throws {
@@ -39,6 +48,7 @@ public struct Config: Codable, Sendable, Hashable {
         tools = try container.decodeIfPresent([String: ToolPolicy].self, forKey: .tools)
         sandbox = try container.decodeIfPresent(SandboxConfig.self, forKey: .sandbox)
         generateTitles = try container.decodeIfPresent(Bool.self, forKey: .generateTitles)
+        appearance = try container.decodeIfPresent(Appearance.self, forKey: .appearance)
     }
 
     /// Every model declared in the file, in a stable order.

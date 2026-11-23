@@ -1,3 +1,4 @@
+import KuriConfig
 import SwiftUI
 
 @main
@@ -8,6 +9,9 @@ struct KuriApp: App {
         let model = AppModel()
         _model = State(initialValue: model)
         FontLibrary.prepare()
+        // Read now, before the first window draws; the engine's copy of the
+        // config, loaded asynchronously, takes over from there.
+        AppModel.apply(try? ConfigLoader(home: KuriHome.resolve()).loadConfig().appearance)
         // The engine starts with the app, not with a window: Kuri keeps
         // running from the menu bar when every window is closed.
         Task { await model.start() }
