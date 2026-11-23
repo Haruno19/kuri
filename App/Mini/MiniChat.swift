@@ -264,6 +264,7 @@ private struct MiniComposer: View {
                 .lineLimit(1...2)
                 .focused($focused)
                 .onSubmit(send)
+                .modifier(ShiftReturnBreaksLine())
                 .padding(.vertical, 4)
             SendButton(draft: draft, send: send, size: 24)
         }

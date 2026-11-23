@@ -564,6 +564,18 @@ struct EdgeFade: View {
 
 // MARK: - Composer
 
+/// Return sends; Shift-Return breaks the line instead. The field editor
+/// inserts the newline at the cursor, as it does for Option-Return.
+struct ShiftReturnBreaksLine: ViewModifier {
+    func body(content: Content) -> some View {
+        content.onKeyPress(.return, phases: .down) { press in
+            guard press.modifiers.contains(.shift) else { return .ignored }
+            NSApp.sendAction(#selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)), to: nil, from: nil)
+            return .handled
+        }
+    }
+}
+
 /// Frosted, a step darker than the background, floating just above it.
 /// Controls blend into it; only send/stop stands out.
 private struct Composer: View {
@@ -583,6 +595,7 @@ private struct Composer: View {
                 .lineLimit(1...8)
                 .focused($focused)
                 .onSubmit(send)
+                .modifier(ShiftReturnBreaksLine())
                 .padding(.horizontal, 5)
             HStack(spacing: 0) {
                 QuietButton(glyph: .folder) { choosingFolder = true }
