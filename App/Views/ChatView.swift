@@ -87,10 +87,6 @@ private struct Transcript<C: View>: View {
     @Environment(AppModel.self) private var model
     /// The height between the top margin and the composer.
     @State private var visible: CGFloat = 0
-    /// The exchange held under the top frost while its reply grows below
-    /// it: one sent while the chat is open. A chat opened at rest pins
-    /// nothing and shows its end.
-    @State private var pinned: UUID?
 
     /// From the window's top edge to where a pinned message starts.
     static var topMargin: CGFloat { 56 }
@@ -101,7 +97,7 @@ private struct Transcript<C: View>: View {
     static var pinGap: CGFloat { 10 }
 
     var body: some View {
-        // A pinned exchange (the last user message and what follows) is at
+        // The latest exchange (the last user message and what follows) is at
         // least as tall as the visible area, so a sent message can scroll to
         // the top and the reply grows below it.
         let rows = TranscriptRow.rows(from: model.items)
@@ -125,8 +121,7 @@ private struct Transcript<C: View>: View {
                     }
                     // The room left once the bottom padding is counted, so at
                     // rest the message sits just under the top frost.
-                    .frame(minHeight: pinned != nil && pinned == current.first?.id
-                           ? max(0, visible - Self.bottomRise - Self.pinGap) : 0, alignment: .top)
+                    .frame(minHeight: max(0, visible - Self.bottomRise - Self.pinGap), alignment: .top)
                     // Scrolled to, the message lands the same way: the
                     // target reaches `pinGap` above it.
                     .padding(.top, Self.pinGap)
@@ -147,14 +142,8 @@ private struct Transcript<C: View>: View {
             } action: { _, height in
                 visible = max(0, height)
             }
-            // A new chat's first message has no answer yet when the
-            // transcript appears: it's being sent, not reopened.
-            .onAppear {
-                if current.count == 1, current.first?.isUserMessage == true { pinned = current.first?.id }
-            }
             .onChange(of: current.first?.id) { _, id in
                 guard let id, current.first?.isUserMessage == true else { return }
-                pinned = id
                 // Next pass, once the new exchange (and its height) is laid out.
                 DispatchQueue.main.async {
                     withAnimation(Tune.scroll) { proxy.scrollTo(id, anchor: .top) }
