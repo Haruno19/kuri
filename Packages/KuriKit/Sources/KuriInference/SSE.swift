@@ -74,6 +74,9 @@ enum HTTP {
     ) -> AsyncThrowingStream<SSEEvent, any Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
+                // Whether the server answered: a failure after that is the
+                // provider going away mid-reply.
+                var started = false
                 do {
                     var request = URLRequest(url: url)
                     request.httpMethod = "POST"
@@ -92,6 +95,7 @@ enum HTTP {
 
                     let (bytes, response) = try await session.bytes(for: request)
                     try await check(response, bytes: bytes)
+                    started = true
 
                     var parser = SSEParser()
                     for try await byte in bytes {
@@ -100,7 +104,7 @@ enum HTTP {
                     if let event = parser.finish() { continuation.yield(event) }
                     continuation.finish()
                 } catch {
-                    continuation.finish(throwing: error)
+                    continuation.finish(throwing: translate(error, url: url, midway: started))
                 }
             }
             continuation.onTermination = { _ in task.cancel() }
@@ -110,7 +114,12 @@ enum HTTP {
     static func getJSON(session: URLSession, url: URL, headers: [String: String]) async throws -> Data {
         var request = URLRequest(url: url)
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
-        let (data, response) = try await session.data(for: request)
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw translate(error, url: url, midway: false)
+        }
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw KuriError.http(status: http.statusCode, body: describe(Array(data.prefix(4000))))
         }
@@ -126,6 +135,23 @@ enum HTTP {
         }
         if let message = (try? JSONDecoder().decode(Envelope.self, from: Data(body)))?.error?.message { return message }
         return String(decoding: body.prefix(2000), as: UTF8.self)
+    }
+
+    /// Connection failures come from URLSession worded for networks ("The
+    /// network connection was lost"), though the provider is often a local
+    /// server; say which provider stopped answering instead.
+    static func translate(_ error: any Error, url: URL, midway: Bool) -> any Error {
+        guard let error = error as? URLError else { return error }
+        let endpoint = url.host().map { host in url.port.map { "\(host):\($0)" } ?? host } ?? url.absoluteString
+        switch error.code {
+        case .timedOut:
+            return KuriError.providerTimedOut(endpoint: endpoint)
+        case .cannotConnectToHost, .cannotFindHost, .networkConnectionLost, .dnsLookupFailed,
+             .notConnectedToInternet, .resourceUnavailable, .badServerResponse, .secureConnectionFailed:
+            return KuriError.providerUnreachable(endpoint: endpoint, midway: midway)
+        default:
+            return error
+        }
     }
 
     private static func check(_ response: URLResponse, bytes: URLSession.AsyncBytes) async throws {

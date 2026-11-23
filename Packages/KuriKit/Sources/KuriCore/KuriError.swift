@@ -7,6 +7,11 @@ public enum KuriError: Error, LocalizedError, Sendable {
     case missingSecret(String)
     case invalidConfig(file: String, reason: String)
     case http(status: Int, body: String)
+    /// The provider's server couldn't be reached, or went away mid-reply
+    /// (`midway`): usually a local server that isn't running or was stopped.
+    case providerUnreachable(endpoint: String, midway: Bool)
+    /// The provider stayed silent for longer than a request may wait.
+    case providerTimedOut(endpoint: String)
     case provider(String)
     case database(String)
     case toolNotFound(String)
@@ -22,6 +27,12 @@ public enum KuriError: Error, LocalizedError, Sendable {
         case .missingSecret(let ref): "Secret “\(ref)” not found."
         case .invalidConfig(let file, let reason): "\(file): \(reason)"
         case .http(let status, let body): "HTTP \(status): \(body)"
+        case .providerUnreachable(let endpoint, false):
+            "Couldn't reach the provider at \(endpoint). Make sure it's running."
+        case .providerUnreachable(let endpoint, true):
+            "The provider at \(endpoint) stopped partway through the reply. Make sure it's still running, then continue."
+        case .providerTimedOut(let endpoint):
+            "The provider at \(endpoint) stopped answering."
         case .provider(let message): message
         case .database(let message): "Database error: \(message)"
         case .toolNotFound(let name): "No tool named “\(name)”."
