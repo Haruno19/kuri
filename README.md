@@ -184,6 +184,10 @@ The MCP SDK brings in, transitively, `apple/swift-system`, `apple/swift-log` and
 
 Containerization is the heavy one: it brings gRPC (`grpc/grpc-swift-2` and friends, to talk to the VM's init process), SwiftNIO, swift-crypto, swift-protobuf, `swift-server/async-http-client` and `facebook/zstd`. All come from Apple, the Swift server workgroup, gRPC or Meta; no personal libraries.
 
+## Contributing
+
+Kuri's scope is closed: bug fixes, performance and usability improvements to what already exists are welcome; new features and UI additions aren't, and forks are encouraged. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 Copyright 2026 Stefano Gini. Kuri is licensed under the [Apache License 2.0](LICENSE). Bundled fonts and MathJax keep their own licences, listed above.
