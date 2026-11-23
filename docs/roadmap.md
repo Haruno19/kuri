@@ -20,7 +20,7 @@ Then the engine: everything below is done.
 3. Menu bar icon and mini window: a small glass chat floating above other windows, with its own chat and a native right-click menu. *(done)*
 4. Settings window, including editing providers and MCP servers. *(theme, context windows and sandbox options done)*
 5. A global hotkey for the mini window.
-6. A right-hand sidebar, the conversation's inspector: its steps (shell commands first), the task list (editable), the context, git status for repository folders, and a sandbox preview while the model uses it.
+6. A right-hand sidebar, the conversation's inspector: its steps (shell commands first), the task list (editable), the context, git status for repository folders, and a sandbox preview while the model uses it. *(done)*
 7. Playing with the main window for a polished, slightly retro feel: a background pattern, the logo's size, pixel animations around the composer.
 
 ## iOS client

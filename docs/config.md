@@ -58,6 +58,7 @@ Anywhere a secret is accepted (`apiKey`, `headers`, an MCP server's `env`), the 
 | `utilityModel` | `"<provider>/<model>"` | none | A small, fast model for background jobs: compaction summaries and titles. Without it, the conversation's own model does them. |
 | `generateTitles` | bool | `true` | Name a conversation after its first exchange. Settings › General toggles it (rewriting this file). |
 | `startInBackground` | bool | `false` | Launch with only the menu bar icon: no main window, no Dock icon until one opens. Settings › General sets it. (Opening at login is a macOS login item, set in Settings › General, not here.) |
+| `inspectorLayout` | `"stacked"` \| `"tabs"` | `"stacked"` | How the inspector (the right sidebar, ⌥⌘I) arranges its sections: one box per section in a column, or one section at a time picked from a row of icons. Settings › General and View › Inspector Layout set it. |
 | `appearance` | `"system"`, `"light"` or `"dark"` | `"system"` | The app's colour scheme: following macOS, or always light or dark. Applies as soon as the file is saved. Settings › General sets it. |
 | `providers` | object | `{}` | Providers by name; the name is the part before the slash in model references. |
 | `tools` | object | `{}` | Tool policies, see below. |

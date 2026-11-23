@@ -20,10 +20,9 @@ struct ToolCallView: View {
                 withAnimation(.snappy) { expanded.toggle() }
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: presentation.symbol)
-                        .font(.system(size: 11))
-                        .frame(width: 16)
-                        .foregroundStyle(result?.isError == true ? palette.accent : palette.faint)
+                    PencilIcon(glyph: presentation.glyph, size: 14 * scale,
+                               color: result?.isError == true ? palette.accent : palette.faint, weight: 1.3)
+                        .frame(width: 16 * scale)
                     Text(presentation.title)
                         .lineLimit(1)
                     if result == nil && isLive {
@@ -51,7 +50,7 @@ struct ToolCallView: View {
 /// How each tool reads in the transcript. Built-ins get their own wording;
 /// MCP tools show as "server › tool".
 private struct ToolPresentation {
-    let symbol: String
+    let glyph: Glyph
     let title: String
     let detail: AnyView
 
@@ -59,26 +58,27 @@ private struct ToolPresentation {
         let output = result?.output
         switch call.name {
         case "clarify":
-            symbol = "questionmark.bubble"
+            glyph = .question
             title = result == nil ? "Waiting for your answer" : "Asked you"
             detail = AnyView(OutputText(text: output ?? ""))
 
         case "tasklist":
             let entries = TaskListTool.entries(fromArguments: call.arguments) ?? []
             let done = entries.filter { $0.status == .completed }.count
-            symbol = "checklist"
-            title = "Updated the plan · \(done)/\(entries.count) done"
+            glyph = .checklist
+            title = TaskListTool.isUserEdit(call) ? "You edited the plan · \(done)/\(entries.count) done"
+                                                  : "Updated the plan · \(done)/\(entries.count) done"
             detail = AnyView(TaskListRows(entries: entries))
 
         case "memory":
-            symbol = "bookmark"
+            glyph = .bookmark
             title = result == nil ? "Updating memory" : "Updated memory"
             detail = AnyView(OutputText(text: output ?? ""))
 
         case "shell":
             let command = (try? JSONDecoder().decode([String: JSONValue].self, from: Data(call.arguments.utf8)))?["command"]?.stringValue ?? ""
             let firstLine = command.split(whereSeparator: \.isNewline).first.map(String.init) ?? command
-            symbol = "terminal"
+            glyph = .terminal
             title = firstLine.count > 70 ? String(firstLine.prefix(67)) + "…" : firstLine
             detail = AnyView(VStack(alignment: .leading, spacing: 6) {
                 if firstLine != command { OutputText(text: command) }
@@ -87,13 +87,13 @@ private struct ToolPresentation {
 
         case "conversation_search":
             let query = (try? JSONDecoder().decode([String: JSONValue].self, from: Data(call.arguments.utf8)))?["query"]?.stringValue
-            symbol = "magnifyingglass"
+            glyph = .search
             title = "Searched past conversations" + (query.map { " for “\($0)”" } ?? "")
             detail = AnyView(OutputText(text: output ?? ""))
 
         default:
             let parts = call.name.components(separatedBy: "__")
-            symbol = parts.count > 1 ? "puzzlepiece.extension" : "wrench.and.screwdriver"
+            glyph = .puzzle
             title = parts.count > 1 ? "\(parts[0]) › \(parts.dropFirst().joined(separator: "__"))" : call.name
             detail = AnyView(VStack(alignment: .leading, spacing: 8) {
                 OutputText(text: call.arguments)

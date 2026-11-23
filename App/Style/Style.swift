@@ -54,6 +54,11 @@ struct Palette {
     /// controls in it that must hide what scrolls beneath.
     var sidebar: Color { dark ? hex(0x313030) : hex(0xF4F3F0) }
 
+    /// The inspector: warm, a step off the chat (the native one is a cool
+    /// grey), and its boxes, solid so nothing shows through them.
+    var inspector: Color { dark ? hex(0x211F1D) : hex(0xF3F1EA) }
+    var inspectorBox: Color { dark ? hex(0x292724) : hex(0xFFFDF8) }
+
     /// User cards and other panels resting on the surface.
     var card: Color { dark ? hex(0x2F2B26) : hex(0xFFFDF8) }
     var shadow: Color { dark ? .black : hex(0x3A3226) }
@@ -314,11 +319,50 @@ struct Orb: View {
 /// round caps, and a second faint pass for the graphite.
 enum Glyph {
     case sidebar, folder, arrowUp, chevron, plus, compose, xmark, retry, copy, check, sliders
+    case inspector, terminal, checklist, gauge, branch, box, bookmark, search, question, puzzle
 
     /// Strokes on a 24-point grid.
     nonisolated var strokes: [[CGPoint]] {
         func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
+        /// A circle, or an arc of one, as points (angles in radians, y down).
+        func ring(_ x: CGFloat, _ y: CGFloat, _ r: CGFloat, from: Double = 0, to: Double = 2 * .pi, steps: Int = 12) -> [CGPoint] {
+            (0...steps).map { k in
+                let a = from + (to - from) * Double(k) / Double(steps)
+                return p(x + r * CGFloat(cos(a)), y + r * CGFloat(sin(a)))
+            }
+        }
         switch self {
+        case .inspector:
+            // The sidebar icon mirrored: the panel on the right.
+            return [[p(4, 5.5), p(20, 5.5), p(20, 18.5), p(4, 18.5), p(4, 5.4)], [p(14.5, 5.9), p(14.5, 18.2)]]
+        case .terminal:
+            return [[p(3.5, 5.5), p(20.5, 5.5), p(20.5, 18.5), p(3.5, 18.5), p(3.5, 5.4)],
+                    [p(7.5, 9.5), p(10.5, 12), p(7.5, 14.5)], [p(12.5, 14.5), p(16.5, 14.5)]]
+        case .checklist:
+            return [[p(4, 7), p(5.8, 8.8), p(8.6, 5.4)], [p(11.5, 7.2), p(20, 7.2)],
+                    [p(4, 12.6), p(5.8, 14.4), p(8.6, 11)], [p(11.5, 12.8), p(20, 12.8)],
+                    ring(6.2, 18.3, 1.7, steps: 10), [p(11.5, 18.4), p(20, 18.4)]]
+        case .gauge:
+            return [ring(12, 15.5, 8, from: .pi, to: 2 * .pi), [p(4, 15.5), p(20, 15.5)], [p(12, 15.5), p(15.8, 10.2)]]
+        case .branch:
+            return [ring(7, 5.5, 2, steps: 10), ring(7, 18.5, 2, steps: 10), ring(17, 7.5, 2, steps: 10),
+                    [p(7, 7.6), p(7, 16.4)], [p(17, 9.6), p(16.6, 12.2), p(13.6, 13.9), p(7.4, 15.2)]]
+        case .box:
+            return [[p(12, 3.5), p(19.5, 7.5), p(19.5, 16.5), p(12, 20.5), p(4.5, 16.5), p(4.5, 7.5), p(12, 3.4)],
+                    [p(4.8, 7.7), p(12, 11.6), p(19.2, 7.7)], [p(12, 11.6), p(12, 20.2)]]
+        case .bookmark:
+            return [[p(7, 4.5), p(17, 4.5), p(17, 19.5), p(12, 15.5), p(7, 19.5), p(7, 4.4)]]
+        case .search:
+            return [ring(10.5, 10.5, 5.5, steps: 14), [p(14.6, 14.6), p(19.5, 19.5)]]
+        case .question:
+            // A speech bubble with a question mark.
+            return [[p(4, 5.5), p(20, 5.5), p(20, 15.5), p(11, 15.5), p(7, 19), p(7.5, 15.5), p(4, 15.5), p(4, 5.4)],
+                    [p(10, 8.8), p(11, 7.6), p(13, 7.6), p(14, 8.8), p(13.6, 10.1), p(12, 11), p(12, 12)], [p(12, 13.6), p(12, 13.7)]]
+        case .puzzle:
+            // A piece with a knob on top and on the right.
+            return [[p(5, 8), p(9.5, 8), p(9.3, 6.5), p(10.5, 4.8), p(12.5, 4.8), p(13.7, 6.5), p(13.5, 8), p(18, 8),
+                     p(18, 11.5), p(19.5, 11.3), p(20.8, 12.5), p(20.8, 14.5), p(19.5, 15.7), p(18, 15.5), p(18, 19.5),
+                     p(5, 19.5), p(5, 7.9)]]
         case .sidebar:
             return [[p(4, 5.5), p(20, 5.5), p(20, 18.5), p(4, 18.5), p(4, 5.4)], [p(9.5, 5.9), p(9.5, 18.2)]]
         case .folder:

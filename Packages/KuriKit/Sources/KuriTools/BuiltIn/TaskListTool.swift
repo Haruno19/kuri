@@ -18,6 +18,11 @@ public struct TaskListTool: Tool {
 
         public var content: String
         public var status: Status
+
+        public init(content: String, status: Status) {
+            self.content = content
+            self.status = status
+        }
     }
 
     public let spec = ToolSpec(
@@ -59,6 +64,25 @@ public struct TaskListTool: Tool {
         }
         let done = tasks.filter { $0.status == .completed }.count
         return ToolOutput("Task list updated: \(done)/\(tasks.count) done.")
+    }
+
+    /// The user's own changes to the list (from the inspector) are stored
+    /// as a call and its result, like the model's: the current list stays
+    /// the arguments of the latest call, and the model reads the change in
+    /// its history. Their ids start with this.
+    public static let userCallPrefix = "kuri_user_tasklist_"
+
+    /// A call and result carrying the user's version of the list.
+    public static func userEdit(_ entries: [Entry]) -> (ToolCall, ToolResult) {
+        let id = userCallPrefix + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        let arguments = (try? JSONEncoder().encode(Arguments(tasks: entries))).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+        let done = entries.filter { $0.status == .completed }.count
+        let output = "The user edited the task list (\(done)/\(entries.count) done). It replaces yours: follow it from here."
+        return (ToolCall(id: id, name: "tasklist", arguments: arguments), ToolResult(callID: id, output: output, isError: false))
+    }
+
+    public static func isUserEdit(_ call: ToolCall) -> Bool {
+        call.id.hasPrefix(userCallPrefix)
     }
 
     /// The list carried by one call's arguments, if they're valid.

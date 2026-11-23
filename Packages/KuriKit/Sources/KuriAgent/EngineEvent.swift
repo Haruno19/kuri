@@ -24,6 +24,9 @@ public enum EngineEvent: Sendable {
     case modelFallback(conversationID: UUID, from: ModelRef, to: ModelRef, reason: String)
     /// A summary of the conversation is being written (true) or done (false).
     case compacting(conversationID: UUID, Bool)
+    /// What a running tool prints as it goes (a shell command's stdout and
+    /// stderr), for display only: the result arrives as `itemAdded`.
+    case toolOutput(conversationID: UUID, callID: String, String)
     /// A tool call finished; its result also arrives as `itemAdded`.
     case toolFinished(conversationID: UUID, call: ToolCall, output: ToolOutput)
     case inputRequested(InputRequest)
@@ -35,6 +38,8 @@ public enum EngineEvent: Sendable {
     case memoriesChanged
     case mcpServersChanged([MCPServerStatus])
     case sandboxChanged(SandboxStatus)
+    /// A conversation's container started (true) or stopped (false).
+    case sandboxContainer(conversationID: UUID, running: Bool)
     /// Messages waiting for a running turn's next step.
     case queueChanged(conversationID: UUID, [QueuedMessage])
     case foldersChanged(conversationID: UUID, [ConversationFolder])
@@ -67,6 +72,31 @@ public struct InputRequest: Identifiable, Sendable, Hashable {
 public enum InputResponse: Sendable, Hashable {
     case answers([String: String])
     case approved(Bool)
+}
+
+/// An estimate of what fills a conversation's context, in tokens.
+public struct ContextUsage: Sendable, Hashable {
+    public var tokens = 0
+    /// `nil` when config.json doesn't say.
+    public var window: Int?
+    /// Instructions and tool definitions.
+    public var system = 0
+    /// The user's memory, part of the instructions.
+    public var memory = 0
+    /// Messages, reasoning and summaries.
+    public var messages = 0
+    /// Tool calls and their results.
+    public var toolOutput = 0
+
+    public init(tokens: Int = 0, window: Int? = nil, system: Int = 0, memory: Int = 0, messages: Int = 0,
+                toolOutput: Int = 0) {
+        self.tokens = tokens
+        self.window = window
+        self.system = system
+        self.memory = memory
+        self.messages = messages
+        self.toolOutput = toolOutput
+    }
 }
 
 /// A message sent while its conversation was busy.

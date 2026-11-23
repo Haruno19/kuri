@@ -38,6 +38,9 @@ struct TurnRunner {
     /// Messages the user sent while this turn was running, taken at each
     /// step boundary so they join the turn.
     var takeQueued: @Sendable () async -> [String] = { [] }
+    /// The user's edit of the task list, if they made one while this turn
+    /// was running; it joins at the next step boundary too.
+    var takeTaskList: @Sendable () async -> [TaskListTool.Entry]? = { nil }
     /// False for models that can't be offered tools.
     var useTools = true
     /// Models to try, in order, when a request fails before producing
@@ -136,9 +139,16 @@ struct TurnRunner {
         return .other("max_rounds")
     }
 
-    /// Appends queued messages to the conversation. Returns whether there were any.
+    /// Appends the user's task list edit and queued messages to the
+    /// conversation, between steps where a call and its result can't be
+    /// split. Returns whether there were any messages.
     @discardableResult
     private func deliverQueued() async throws -> Bool {
+        if let entries = await takeTaskList() {
+            let (call, result) = TaskListTool.userEdit(entries)
+            try await append(.toolCall(call))
+            try await append(.toolResult(result))
+        }
         let messages = await takeQueued()
         for text in messages {
             try await append(.message(Message(role: .user, text: text)))
@@ -251,8 +261,10 @@ struct TurnRunner {
             case .allow:
                 break
             }
+            let conversationID = conversationID, emit = emit
             let context = ToolContext(conversationID: conversationID, turnID: turn.id, callID: call.id,
-                                      folders: folders, store: store, interaction: interaction)
+                                      folders: folders, store: store, interaction: interaction,
+                                      progress: { emit(.toolOutput(conversationID: conversationID, callID: call.id, $0)) })
             let output = try await tool.run(arguments: Data(call.arguments.utf8), context: context)
             return Self.cap(output, at: limits.maxToolOutputCharacters)
         } catch is CancellationError {

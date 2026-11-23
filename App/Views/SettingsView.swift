@@ -39,6 +39,16 @@ private struct GeneralSettings: View {
                     Text("Dark").tag(Appearance.dark)
                 }
                 .pickerStyle(.segmented)
+                Picker("Inspector", selection: Binding(
+                    get: { model.config.inspectorLayout ?? .stacked },
+                    set: { layout in Task { await model.setInspectorLayout(layout) } })
+                ) {
+                    Text("Stacked").tag(InspectorLayout.stacked)
+                    Text("Tabs").tag(InspectorLayout.tabs)
+                }
+                .pickerStyle(.segmented)
+                Text("The right sidebar (⌥⌘I): every section in a column, or one at a time.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Startup") {
                 Toggle("Open at login", isOn: Binding(

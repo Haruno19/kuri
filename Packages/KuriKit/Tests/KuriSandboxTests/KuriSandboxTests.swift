@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import KuriConfig
 import KuriStore
 import Testing
@@ -68,6 +69,17 @@ import Testing
         try buffer.write(Data("abcde".utf8))
         try buffer.write(Data("fghijklmnop".utf8))
         #expect(buffer.text == "abcde\n[… 6 bytes …]\nlmnop")
+    }
+
+    @Test func outputBufferStreamsWholeCharacters() throws {
+        let seen = Mutex<[String]>([])
+        let buffer = OutputBuffer(limit: 1_000) { text in seen.withLock { $0.append(text) } }
+        let bytes = Array("ok ✔ done".utf8)  // ✔ is three bytes
+        let split = bytes.firstIndex(of: 0xE2)! + 1
+        try buffer.write(Data(bytes[..<split]))
+        try buffer.write(Data(bytes[split...]))
+        #expect(seen.withLock { $0 } == ["ok ", "✔ done"])
+        #expect(buffer.text == "ok ✔ done")
     }
 }
 

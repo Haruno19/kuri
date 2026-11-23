@@ -34,6 +34,8 @@ public actor Engine {
     private var titling: [UUID: Task<Void, Never>] = [:]
     /// Messages sent while their conversation was busy, oldest first.
     private var queues: [UUID: [QueuedMessage]] = [:]
+    /// The user's task list edits waiting for a running turn's next step.
+    private var pendingTaskLists: [UUID: [TaskListTool.Entry]] = [:]
     private var watcher: Task<Void, Never>?
 
     /// Opens `~/.config/kuri` (creating it on first launch), loads the
@@ -63,6 +65,8 @@ public actor Engine {
         self.mcp = MCPManager(registry: registry, onChange: { broadcaster.emit(.mcpServersChanged($0)) })
         let sandbox = Sandbox(home: home, settings: SandboxSettings(config.sandbox), onStatus: { status in
             broadcaster.emit(.sandboxChanged(status))
+        }, onContainer: { conversationID, running in
+            broadcaster.emit(.sandboxContainer(conversationID: conversationID, running: running))
         })
         self.sandbox = sandbox
         self.broadcaster = broadcaster
@@ -329,6 +333,30 @@ public actor Engine {
         queues[conversationID] ?? []
     }
 
+    // MARK: Task list
+
+    /// Replaces the conversation's task list with the user's version. It's
+    /// stored like the model's own `tasklist` calls, so the current list is
+    /// still read from the items and the model sees the change; during a
+    /// turn it waits for the next step, where it can't split a call from
+    /// its result.
+    public func editTaskList(_ entries: [TaskListTool.Entry], in conversationID: UUID) async throws {
+        if running[conversationID] != nil {
+            pendingTaskLists[conversationID] = entries
+            return
+        }
+        let (call, result) = TaskListTool.userEdit(entries)
+        for payload in [Item.Payload.toolCall(call), .toolResult(result)] {
+            let item = Item(conversationID: conversationID, payload: payload)
+            try await store.append(item)
+            broadcaster.emit(.itemAdded(item))
+        }
+    }
+
+    private func takeTaskList(_ conversationID: UUID) -> [TaskListTool.Entry]? {
+        pendingTaskLists.removeValue(forKey: conversationID)
+    }
+
     /// Hands the queue to the running turn and empties it.
     private func takeQueued(_ conversationID: UUID) -> [String] {
         guard let queue = queues.removeValue(forKey: conversationID), !queue.isEmpty else { return [] }
@@ -465,6 +493,7 @@ public actor Engine {
             limits: limits,
             compactor: compactor(for: turn.model, fallback: provider),
             takeQueued: { [weak self] in await self?.takeQueued(conversation.id) ?? [] },
+            takeTaskList: { [weak self] in await self?.takeTaskList(conversation.id) },
             useTools: primary.useTools,
             fallbacks: fallbacks,
             emit: { [broadcaster] event in
@@ -487,6 +516,10 @@ public actor Engine {
     /// too late to join (or queued before Stop: probably a redirection).
     private func turnEnded(_ conversationID: UUID) async {
         running[conversationID] = nil
+        // An edit made after the turn's last step.
+        if let entries = takeTaskList(conversationID) {
+            try? await editTaskList(entries, in: conversationID)
+        }
         let queued = takeQueued(conversationID)
         guard !queued.isEmpty else { return }
         do {
@@ -505,6 +538,11 @@ public actor Engine {
 
     public func setStartInBackground(_ enabled: Bool) async throws {
         try ConfigEditor(home: home).setStartInBackground(enabled)
+        await reloadConfig()
+    }
+
+    public func setInspectorLayout(_ layout: InspectorLayout) async throws {
+        try ConfigEditor(home: home).setInspectorLayout(layout)
         await reloadConfig()
     }
 
@@ -591,10 +629,15 @@ public actor Engine {
         await turnEnded(conversationID)
     }
 
+    /// Whether the conversation's container is up.
+    public func isSandboxRunning(_ conversationID: UUID) async -> Bool {
+        await sandbox.isRunning(conversationID)
+    }
+
     /// An estimate of how much of the model's context the conversation
-    /// fills, in tokens. `window` is `nil` when config.json doesn't say.
-    public func contextUsage(_ conversationID: UUID) async throws -> (tokens: Int, window: Int?) {
-        guard let conversation = try await store.conversation(conversationID) else { return (0, nil) }
+    /// fills, in tokens, and what fills it.
+    public func contextUsage(_ conversationID: UUID) async throws -> ContextUsage {
+        guard let conversation = try await store.conversation(conversationID) else { return ContextUsage() }
         let items = try await store.items(of: conversationID)
         let model = conversation.model ?? config.defaultModel
         let folders = try await store.folders(of: conversationID)
@@ -604,9 +647,21 @@ public actor Engine {
             conversation: conversation, folders: folders,
             mounts: SandboxMounts.plan(folders: folders, scratch: home.scratchFolder(for: conversationID)),
             memories: try await store.memories(), tools: Set(tools.map(\.name)))
+        let history = TurnRunner.history(from: items)
         let request = InferenceRequest(model: model?.model ?? "", instructions: instructions,
-                                       items: TurnRunner.history(from: items), tools: tools)
-        return (ContextEstimate.tokens(request), model.flatMap { config.contextWindow(for: $0) })
+                                       items: history, tools: tools)
+        let total = ContextEstimate.tokens(request)
+        let memory = try await store.memories().reduce(0) { $0 + $1.handle.count + $1.content.count + 3 } / 4
+        let toolOutput = ContextEstimate.tokens(history.filter {
+            switch $0 {
+            case .toolCall, .toolResult: true
+            default: false
+            }
+        })
+        let messages = ContextEstimate.tokens(history) - toolOutput
+        return ContextUsage(tokens: total, window: model.flatMap { config.contextWindow(for: $0) },
+                            system: max(0, total - messages - toolOutput - memory), memory: memory,
+                            messages: messages, toolOutput: toolOutput)
     }
 
     /// Summaries come from the utility model when one is set, otherwise from

@@ -204,6 +204,20 @@ import Testing
     }
 }
 
+@Suite struct InspectorLayoutSettingTests {
+    @Test func writesTabsAndLeavesTheDefaultOut() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-inspector-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let home = KuriHome(root: root)
+        try home.prepare()
+        try Data(#"{ providers: {} }"#.utf8).write(to: home.configFile)
+        try ConfigEditor(home: home).setInspectorLayout(.tabs)
+        #expect(try ConfigLoader(home: home).loadConfig().inspectorLayout == .tabs)
+        try ConfigEditor(home: home).setInspectorLayout(.stacked)
+        #expect(try ConfigLoader(home: home).loadConfig().inspectorLayout == nil)
+    }
+}
+
 @Suite struct GenerateTitlesSettingTests {
     @Test func editorWritesTheToggle() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "kuri-titles-\(UUID().uuidString)")

@@ -43,6 +43,8 @@ public actor Sandbox {
     public private(set) var settings: SandboxSettings
     public private(set) var status: SandboxStatus = .notInstalled
     private let onStatus: @Sendable (SandboxStatus) -> Void
+    /// A conversation's container started (true) or stopped (false).
+    private let onContainer: @Sendable (UUID, Bool) -> Void
     private var manager: ContainerManager?
     private var running: [UUID: Running] = [:]
     private var starting: [UUID: Task<Running, any Error>] = [:]
@@ -52,10 +54,12 @@ public actor Sandbox {
     static let maxOutputBytes = 1_000_000
 
     public init(home: KuriHome, settings: SandboxSettings,
-                onStatus: @escaping @Sendable (SandboxStatus) -> Void = { _ in }) {
+                onStatus: @escaping @Sendable (SandboxStatus) -> Void = { _ in },
+                onContainer: @escaping @Sendable (UUID, Bool) -> Void = { _, _ in }) {
         self.layout = SandboxLayout(home: home)
         self.settings = settings
         self.onStatus = onStatus
+        self.onContainer = onContainer
     }
 
     // MARK: Installation
@@ -151,14 +155,15 @@ public actor Sandbox {
     // MARK: Commands
 
     /// Runs `command` with `/bin/sh -lc` in the conversation's container,
-    /// starting it if needed, from `/work`.
+    /// starting it if needed, from `/work`. `onOutput` sees the output as it
+    /// comes, in whole characters.
     public func run(_ command: String, conversationID: UUID, mounts: [SandboxMount],
-                    timeout: Duration) async throws -> CommandResult {
+                    timeout: Duration, onOutput: (@Sendable (String) -> Void)? = nil) async throws -> CommandResult {
         guard status == .ready else { throw KuriError.provider("The sandbox isn't set up yet.") }
         let container = try await container(for: conversationID, mounts: mounts)
 
         commandCount += 1
-        let output = OutputBuffer(limit: Self.maxOutputBytes)
+        let output = OutputBuffer(limit: Self.maxOutputBytes, onText: onOutput)
         let process = try await container.exec("cmd-\(commandCount)") { configuration in
             configuration.arguments = ["/bin/sh", "-lc", command]
             configuration.workingDirectory = SandboxMounts.workdir
@@ -202,6 +207,7 @@ public actor Sandbox {
         let started = try await task.value
         running[conversationID] = started
         touch(conversationID)
+        onContainer(conversationID, true)
         return started.container
     }
 
@@ -263,6 +269,7 @@ public actor Sandbox {
     public func stop(_ conversationID: UUID) async {
         guard let entry = running.removeValue(forKey: conversationID) else { return }
         entry.idleCheck?.cancel()
+        onContainer(conversationID, false)
         try? await entry.container.stop()
         try? manager?.delete(entry.id)
     }
@@ -277,12 +284,26 @@ public actor Sandbox {
 final class OutputBuffer: Writer, Sendable {
     private let state = Mutex<(head: Data, tail: Data, dropped: Int)>((Data(), Data(), 0))
     private let limit: Int
+    private let onText: (@Sendable (String) -> Void)?
+    /// Bytes of a character split across writes, held for the next one.
+    private let pending = Mutex(Data())
 
-    init(limit: Int) {
+    init(limit: Int, onText: (@Sendable (String) -> Void)? = nil) {
         self.limit = limit
+        self.onText = onText
     }
 
     func write(_ data: Data) throws {
+        if let onText {
+            let text = pending.withLock { pending -> String in
+                pending.append(data)
+                let complete = Self.completePrefix(of: pending)
+                let text = String(decoding: pending.prefix(complete), as: UTF8.self)
+                pending.removeFirst(complete)
+                return text
+            }
+            if !text.isEmpty { onText(text) }
+        }
         state.withLock { state in
             if state.head.count < limit / 2 {
                 let room = limit / 2 - state.head.count
@@ -304,6 +325,19 @@ final class OutputBuffer: Writer, Sendable {
     }
 
     func close() throws {}
+
+    /// How many leading bytes end on a character boundary: an incomplete
+    /// UTF-8 sequence at the end (at most three bytes) waits.
+    static func completePrefix(of data: Data) -> Int {
+        let bytes = [UInt8](data.suffix(3))
+        for (offset, byte) in bytes.enumerated().reversed() {
+            let fromEnd = bytes.count - offset
+            if byte & 0b1100_0000 == 0b1000_0000 { continue }  // continuation byte
+            let length = byte >= 0xF0 ? 4 : byte >= 0xE0 ? 3 : byte >= 0xC0 ? 2 : 1
+            return length > fromEnd ? data.count - fromEnd : data.count
+        }
+        return data.count
+    }
 
     var text: String {
         state.withLock { state in

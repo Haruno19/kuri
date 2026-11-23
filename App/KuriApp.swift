@@ -50,11 +50,38 @@ struct KuriApp: App {
         .windowToolbarStyle(.unified)
         .defaultSize(width: 1040, height: 760)
         .defaultLaunchBehavior(startsInBackground ? .suppressed : .automatic)
+        .commands {
+            CommandGroup(after: .sidebar) {
+                InspectorCommands(model: model)
+            }
+        }
 
         Settings {
             SettingsView()
                 .environment(model)
         }
+    }
+}
+
+/// View › Show Inspector (⌥⌘I) and Inspector Layout, next to the sidebar's
+/// own items.
+private struct InspectorCommands: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        Button(model.showsInspector ? "Hide Inspector" : "Show Inspector") {
+            withAnimation(Tune.move) { model.showsInspector.toggle() }
+        }
+        .keyboardShortcut("i", modifiers: [.command, .option])
+        .disabled(model.phase.isReady == false)
+        Picker("Inspector Layout", selection: Binding(
+            get: { model.config.inspectorLayout ?? .stacked },
+            set: { layout in Task { await model.setInspectorLayout(layout) } })
+        ) {
+            Text("Stacked").tag(InspectorLayout.stacked)
+            Text("Tabs").tag(InspectorLayout.tabs)
+        }
+        Divider()
     }
 }
 

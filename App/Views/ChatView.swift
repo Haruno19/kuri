@@ -149,7 +149,8 @@ private struct Transcript<C: View>: View {
                     ForEach(model.inputRequests.filter { $0.conversationID == model.selection }) { request in
                         InputRequestView(request: request)
                     }
-                    TaskListPanel(entries: model.taskList)
+                    // The inspector's Tasks section has it when that's open.
+                    if !model.showsInspector { TaskListPanel(entries: model.taskList) }
                     QueuedMessages()
                     FolderBar()
                     composer

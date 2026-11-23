@@ -1,15 +1,17 @@
 import KuriStore
 import SwiftUI
 
-/// The standard macOS sidebar (collapsed at launch) and the chat. The
-/// toolbar is there but invisible: macOS draws its sidebar toggle next to
-/// the traffic lights, and nothing else shows above the content.
+/// The standard macOS sidebar (collapsed at launch), the chat, and the
+/// inspector on the right (closed at launch). The toolbar is there but
+/// invisible: macOS draws its sidebar toggle next to the traffic lights,
+/// and the inspector's toggle mirrors it in the chat's top-right corner.
 struct MainView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     @State private var columns: NavigationSplitViewVisibility = .detailOnly
 
     var body: some View {
+        @Bindable var model = model
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar()
                 .navigationSplitViewColumnWidth(min: 240, ideal: 290, max: 380)
@@ -28,11 +30,23 @@ struct MainView: View {
                     .background(palette.background)
                 case .ready:
                     ChatView()
+                        // Like the sidebar toggle by the traffic lights, and
+                        // outside the inspector, which macOS would put a
+                        // toolbar button over.
+                        .overlay(alignment: .topTrailing) {
+                            InspectorToggle()
+                                .padding(.top, 8)
+                                .padding(.trailing, 14)
+                        }
                 }
             }
             // Only the top: the content stays beside the sidebar, so the chat
             // shifts right when it opens instead of sliding under it.
             .ignoresSafeArea(edges: .top)
+            .inspector(isPresented: $model.showsInspector) {
+                InspectorView()
+                    .inspectorColumnWidth(min: 270, ideal: 320, max: 460)
+            }
         }
         .toolbar(removing: .title)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)

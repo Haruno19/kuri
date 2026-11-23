@@ -17,6 +17,10 @@ final class AppModel {
         case starting
         case ready
         case failed(String)
+
+        var isReady: Bool {
+            if case .ready = self { true } else { false }
+        }
     }
 
     private(set) var phase: Phase = .starting
@@ -44,8 +48,17 @@ final class AppModel {
     private(set) var lastTurn: Turn?
     /// The selected conversation's turns, for each answer's time and tokens.
     private(set) var turns: [UUID: Turn] = [:]
-    /// Estimated tokens the selected conversation fills, and the model's window if known.
-    private(set) var contextUsage: (tokens: Int, window: Int?)?
+    /// Estimated tokens the selected conversation fills, what fills them,
+    /// and the model's window if known.
+    private(set) var contextUsage: ContextUsage?
+    /// What the selected conversation's running commands have printed so
+    /// far, by call id, until their results arrive.
+    private(set) var liveOutput: [String: String] = [:]
+    /// Conversations whose sandbox container is up.
+    private(set) var sandboxUp: Set<UUID> = []
+    /// Task lists the user edited during a turn, shown until the turn
+    /// takes them at its next step.
+    private(set) var pendingTasks: [UUID: [TaskListTool.Entry]] = [:]
     private(set) var inputRequests: [InputRequest] = []
     private(set) var models: [ModelRef] = []
     private(set) var config = Config() {
@@ -58,6 +71,9 @@ final class AppModel {
     /// Folders attached to the selected conversation.
     private(set) var folders: [ConversationFolder] = []
     var errorMessage: String?
+    /// The inspector is open (the main window's; ⌥⌘I). Not remembered:
+    /// the window opens on the chat alone.
+    var showsInspector = false
     /// The model picked on the new-chat page, before a conversation exists.
     var draftModel: ModelRef?
 
@@ -73,9 +89,27 @@ final class AppModel {
         inputRequests.contains { $0.conversationID == conversationID }
     }
 
-    /// The selected conversation's current plan, from its latest `tasklist` call.
+    /// The selected conversation's current plan, from its latest `tasklist`
+    /// call, or the user's edit waiting for the running turn.
     var taskList: [TaskListTool.Entry] {
-        TaskListTool.current(in: items)
+        selection.flatMap { pendingTasks[$0] } ?? TaskListTool.current(in: items)
+    }
+
+    /// The user's edit is waiting for the running turn's next step.
+    var hasPendingTasks: Bool {
+        selection.map { pendingTasks[$0] != nil } ?? false
+    }
+
+    /// Replaces the plan with the user's version (from the inspector).
+    func editTasks(_ entries: [TaskListTool.Entry]) async {
+        guard let engine, let id = selection else { return }
+        if running.contains(id) { pendingTasks[id] = entries }
+        do {
+            try await engine.editTaskList(entries, in: id)
+        } catch {
+            pendingTasks[id] = nil
+            errorMessage = error.localizedDescription
+        }
     }
 
     // MARK: Lifecycle
@@ -231,6 +265,7 @@ final class AppModel {
     private func loadSelection() async {
         streamingText = ""
         streamingReasoning = ""
+        liveOutput = [:]
         guard let engine, let id = selection else {
             items = []
             lastTurn = nil
@@ -241,6 +276,7 @@ final class AppModel {
         }
         items = (try? await engine.store.items(of: id)) ?? []
         folders = (try? await engine.folders(of: id)) ?? []
+        if await engine.isSandboxRunning(id) { sandboxUp.insert(id) } else { sandboxUp.remove(id) }
         await refreshTurnState()
     }
 
@@ -251,6 +287,14 @@ final class AppModel {
         turns = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { $1 })
         contextUsage = try? await engine.contextUsage(id)
     }
+
+    private func refreshContextUsage() async {
+        guard let engine, let id = selection else { return }
+        contextUsage = try? await engine.contextUsage(id)
+    }
+
+    /// Characters of a running command's output kept for display.
+    static let liveOutputLimit = 20_000
 
     func reconnect(mcpServer name: String) async {
         await engine?.reconnectMCPServer(name)
@@ -291,6 +335,14 @@ final class AppModel {
     func setStartInBackground(_ enabled: Bool) async {
         do {
             try await engine?.setStartInBackground(enabled)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func setInspectorLayout(_ layout: InspectorLayout) async {
+        do {
+            try await engine?.setInspectorLayout(layout)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -401,12 +453,18 @@ final class AppModel {
             if selection == id { selection = nil }
 
         case .itemAdded(let item):
+            // The turn took the user's plan edit (or the model wrote a newer one).
+            if case .toolCall(let call) = item.payload, call.name == "tasklist" {
+                pendingTasks[item.conversationID] = nil
+            }
             guard item.conversationID == selection else { return }
             items.append(item)
             switch item.payload {
             case .message: streamingText = ""
             case .reasoning: streamingReasoning = ""
             case .compaction: Task { await refreshTurnState() }
+            // The inspector's context meter follows the turn as it goes.
+            case .toolResult: Task { await refreshContextUsage() }
             default: break
             }
 
@@ -446,8 +504,18 @@ final class AppModel {
         case .compacting(let id, let active):
             if active { compacting.insert(id) } else { compacting.remove(id) }
 
-        case .toolFinished:
-            break
+        case .toolOutput(let id, let callID, let text):
+            guard id == selection else { return }
+            // The tail is what the inspector shows; keep it bounded.
+            var output = liveOutput[callID, default: ""] + text
+            if output.count > Self.liveOutputLimit { output = String(output.suffix(Self.liveOutputLimit)) }
+            liveOutput[callID] = output
+
+        case .toolFinished(let id, let call, _):
+            if id == selection { liveOutput[call.id] = nil }
+
+        case .sandboxContainer(let id, let up):
+            if up { sandboxUp.insert(id) } else { sandboxUp.remove(id) }
 
         case .inputRequested(let request):
             inputRequests.append(request)

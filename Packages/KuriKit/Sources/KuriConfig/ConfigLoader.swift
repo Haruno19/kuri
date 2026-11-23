@@ -68,6 +68,9 @@ public struct ConfigLoader: Sendable {
           // Launch with only the menu bar icon, no main window.
           startInBackground: false,
 
+          // The inspector (⌥⌘I): "stacked" sections (the default) or "tabs".
+          inspectorLayout: "stacked",
+
           providers: {
             // Anything that speaks Open Responses: Ollama, LM Studio, vLLM, OpenAI…
             ollama: {

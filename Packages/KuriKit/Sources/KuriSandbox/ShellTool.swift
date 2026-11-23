@@ -56,7 +56,7 @@ public struct ShellTool: Tool {
         let timeout = min(max(args.timeout_seconds ?? Self.defaultTimeout, 1), Self.maxTimeout)
         let mounts = SandboxMounts.plan(folders: context.folders, scratch: scratch(context.conversationID))
         let result = try await sandbox.run(args.command, conversationID: context.conversationID, mounts: mounts,
-                                           timeout: .seconds(timeout))
+                                           timeout: .seconds(timeout), onOutput: context.progress)
         return Self.output(for: result, timeout: timeout)
     }
 

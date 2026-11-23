@@ -26,7 +26,7 @@ The brief for the redesign. Every app change is checked against it. Directions a
 
 ## Main window layout
 
-- **No toolbar.** Native traffic lights stay. The sidebar toggle floats in the top-left corner, next to them. Everything else (model selector, folders, attachments, send/stop) lives in the composer.
+- **No toolbar.** Native traffic lights stay. The sidebar toggle floats in the top-left corner, next to them; the inspector's toggle mirrors it in the chat's top-right corner. Everything else (model selector, folders, attachments, send/stop) lives in the composer.
 - **Sidebar starts collapsed**: the app opens on the chat alone. At its top, *New chat* is the primary button (filled in the accent, like send) and *Settings* a secondary one (outlined) below it.
 - **New chat**: content centred vertically; Kuri's logo and a welcome line side by side on one row, aligned left, above the composer.
 - **Logo**: made of the glassy material, coloured with the icon's chestnut gradient. Always alive in a subtle way: idle motion, reacting to hover and clicks (a tilt toward the pointer, a squish and bounce on click). Not anthropomorphic, but with the same friendly, human feel.
@@ -45,7 +45,7 @@ The brief for the redesign. Every app change is checked against it. Directions a
 3. **Menu bar icon and mini window** *(done)*: left click opens a small chat in Liquid Glass that floats like picture in picture; right click a native menu (Open Kuri, Settings, Quit). This also covers the floating window, item 5.
 4. Settings window (compact, retro, dense).
 5. Floating window: the mini window above; a global hotkey for it is still to do.
-6. **Right sidebar**: an inspector for the conversation, in sections (sketched in `Sketches/Inspector.swift`, stacked or as tabs):
+6. **Right sidebar** *(done)*: an inspector for the conversation, in sections (sketched in `Sketches/Inspector.swift`; stacked boxes by default, or tabs, set by `inspectorLayout`). Its toggle mirrors the sidebar's, in the chat's top-right corner; the cards start at the column's top edge, with sans headers:
    - **Steps**: every tool call of the conversation, with the shell commands in the foreground.
    - **Tasks**: the model's task list, when it made one, editable by the user.
    - **Context**: what fills the context window.

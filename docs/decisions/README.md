@@ -26,3 +26,4 @@ To change one, write a new record that supersedes it, and mark the old one *Supe
 | [0018](0018-literata.md) | Literata replaces Publico Text (amends 0015) |
 | [0019](0019-latex-with-mathjax.md) | LaTeX with MathJax in JavaScriptCore |
 | [0020](0020-mini-window.md) | The menu bar opens a mini window with its own chat |
+| [0021](0021-inspector.md) | The inspector: derived sections, user plan edits as tasklist calls |

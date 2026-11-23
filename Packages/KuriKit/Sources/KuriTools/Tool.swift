@@ -50,15 +50,18 @@ public struct ToolContext: Sendable {
     public var folders: [ConversationFolder]
     public var store: Store
     public var interaction: any UserInteraction
+    /// Output as it comes, for tools that print over time (the shell).
+    public var progress: @Sendable (String) -> Void
 
     public init(conversationID: UUID, turnID: UUID, callID: String, folders: [ConversationFolder],
-                store: Store, interaction: any UserInteraction) {
+                store: Store, interaction: any UserInteraction, progress: @escaping @Sendable (String) -> Void = { _ in }) {
         self.conversationID = conversationID
         self.turnID = turnID
         self.callID = callID
         self.folders = folders
         self.store = store
         self.interaction = interaction
+        self.progress = progress
     }
 }
 
