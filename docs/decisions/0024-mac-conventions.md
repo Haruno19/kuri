@@ -9,7 +9,7 @@
 - **Icon-only controls have names.** Pencil icons are hidden from VoiceOver; every button made of one carries an accessibility label, and status drawn as a dot or a colour is also said in words. Controls that only appear on hover are in a context menu too, and small crosses get a 20-point target.
 - **The menu bar icon can be turned off** (`menuBarIcon`). Without it Kuri keeps its Dock icon and ignores `startInBackground`, so there's always a way back to a window.
 - **Errors say what failed.** The alert's title names the action ("Couldn't send the message"); settings that fail say so under their control.
-- **Words.** One term for one thing: *chat*, never *conversation*, in the interface. Menu items and buttons in title case.
+- **Words.** One term for one thing: *chat*, never *conversation*, in the interface. Menu items and buttons in title case. Interface text is in a String Catalog (`App/Localizable.xcstrings`), English and Italian: whole sentences per key, never pieces joined in code, and positional arguments where Italian reorders them. Text that comes from the engine (errors, sandbox setup steps) stays English.
 
 **Why.** The custom look is a choice; breaking what people expect from every Mac app (menus, VoiceOver, Reduce Motion, contrast) isn't part of it. These cost nothing visible to someone who doesn't need them.
 

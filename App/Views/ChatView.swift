@@ -93,7 +93,7 @@ private struct Welcome<C: View>: View {
         let name = NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
         let hour = Calendar.current.component(.hour, from: .now)
         if name.isEmpty {
-            return hour < 5 ? String(localized: "Still up.")
+            return hour < 5 ? String(localized: "Still up?")
                 : hour < 12 ? String(localized: "Good morning.")
                 : hour < 18 ? String(localized: "Good afternoon.")
                 : String(localized: "Good evening.")
@@ -326,7 +326,7 @@ struct LiveTail: View {
                 .padding(.horizontal, 6)
         }
         if let id = model.selection, model.compacting.contains(id) {
-            Working(status: "Summarizing earlier messages")
+            Working(status: String(localized: "Summarizing earlier messages"))
                 .padding(.horizontal, 6)
         } else if model.isSelectedRunning && model.streamingText.isEmpty {
             Working(status: model.workingStatus)
@@ -743,7 +743,7 @@ struct ModelPicker: View {
             }
         } label: {
             HStack(spacing: small ? 4 : 5) {
-                Text(model.composerModel?.model ?? "No model")
+                Text(model.composerModel?.model ?? String(localized: "No model"))
                     .lineLimit(1)
                     .foregroundStyle(small ? palette.dim : palette.ink.opacity(0.85))
                 PencilIcon(glyph: .chevron, size: small ? 9 : 11, color: small ? palette.faint : palette.secondary)
@@ -757,7 +757,7 @@ struct ModelPicker: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(model.composerModel?.description ?? "Choose a model")
+        .help(model.composerModel?.description ?? String(localized: "Choose a model"))
     }
 }
 
@@ -903,7 +903,7 @@ private struct FolderBar: View {
         HStack(spacing: 6) {
             PencilIcon(glyph: .folder, size: 13, color: palette.secondary)
             Text(URL(filePath: folder.path).lastPathComponent).foregroundStyle(palette.ink.opacity(0.85))
-            Text(guestPath + (folder.readOnly ? " · read-only" : ""))
+            Text(folder.readOnly ? String(localized: "\(guestPath) · read-only") : guestPath)
                 .font(Typeface.mono(11)).foregroundStyle(palette.dim)
             Button { Task { await model.detach(folder) } } label: {
                 // A 20-point target around the small cross.

@@ -235,10 +235,10 @@ private struct InspectorAccessory: View {
 
 /// Quiet text for a section with nothing to show yet.
 private struct Quiet: View {
-    let text: String
+    let text: LocalizedStringKey
     @Environment(\.palette) private var palette
 
-    init(_ text: String) { self.text = text }
+    init(_ text: LocalizedStringKey) { self.text = text }
 
     var body: some View {
         Text(text)
@@ -392,7 +392,7 @@ private struct StepsPane: View {
 }
 
 private struct Pill: View {
-    let title: String
+    let title: LocalizedStringKey
     let on: Bool
     let action: () -> Void
     @Environment(\.palette) private var palette
@@ -720,7 +720,7 @@ private struct ContextPane: View {
                     .font(Typeface.serif(20))
                     .foregroundStyle(palette.ink)
                     .contentTransition(.opacity)
-                Text(usage.window.map { "of \(TokenCount.short($0)) tokens" } ?? "tokens, about")
+                (usage.window.map { Text("of \(TokenCount.short($0)) tokens") } ?? Text("tokens, about"))
                     .font(Typeface.sans(12))
                     .foregroundStyle(palette.dim)
                 Spacer()
@@ -771,10 +771,10 @@ private struct ContextPart: Identifiable {
     let tone: Color
 
     static func parts(of usage: ContextUsage, _ palette: Palette) -> [ContextPart] {
-        [ContextPart(name: "System", tokens: usage.system, tone: palette.faint.opacity(0.8)),
-         ContextPart(name: "Memory", tokens: usage.memory, tone: CodeTheme(dark: palette.dark).yellow),
-         ContextPart(name: "Messages", tokens: usage.messages, tone: palette.accentLight),
-         ContextPart(name: "Tool output", tokens: usage.toolOutput, tone: palette.accent)]
+        [ContextPart(name: String(localized: "System"), tokens: usage.system, tone: palette.faint.opacity(0.8)),
+         ContextPart(name: String(localized: "Memory"), tokens: usage.memory, tone: CodeTheme(dark: palette.dark).yellow),
+         ContextPart(name: String(localized: "Messages"), tokens: usage.messages, tone: palette.accentLight),
+         ContextPart(name: String(localized: "Tool output"), tokens: usage.toolOutput, tone: palette.accent)]
     }
 }
 
@@ -937,7 +937,7 @@ private enum SandboxState {
 
     init(_ model: AppModel) {
         switch model.sandboxStatus {
-        case .notInstalled: self = .unavailable("Not set up yet: Settings › Sandbox")
+        case .notInstalled: self = .unavailable(String(localized: "Not set up yet: Settings › Sandbox"))
         case .installing(let step, _): self = .unavailable(step)
         case .failed(let message): self = .unavailable(message)
         case .ready:
@@ -991,7 +991,7 @@ private struct SandboxPane: View {
                     .frame(height: 140)
                     .transition(.moving(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom))))
                 ForEach(mounts, id: \.guestPath) { mount in
-                    Text("\(mount.guestPath)  ←  \(mount.isScratch ? "this chat's scratch folder" : Self.abbreviate(mount.hostPath))")
+                    Text("\(mount.guestPath)  ←  \(mount.isScratch ? String(localized: "this chat's scratch folder") : Self.abbreviate(mount.hostPath))")
                         .font(Typeface.mono(10.5))
                         .foregroundStyle(palette.dim)
                         .lineLimit(1)
@@ -1027,8 +1027,8 @@ private struct SandboxPane: View {
     private func status(_ state: SandboxState, _ settings: SandboxSettings) -> String {
         switch state {
         case .running(let command): command
-        case .awake: "Awake · sleeps after \(settings.idleMinutes) quiet minutes"
-        case .asleep: "Asleep · wakes with the next command"
+        case .awake: String(localized: "Awake · sleeps after \(settings.idleMinutes) quiet minutes")
+        case .asleep: String(localized: "Asleep · wakes with the next command")
         case .unavailable(let reason): reason
         }
     }
