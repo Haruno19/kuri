@@ -4,7 +4,7 @@ Kuri's first principle is to be **essential**: few features, done well. That sha
 
 ## Kuri's scope
 
-Kuri does what it does today, plus the few items still planned in [docs/roadmap.md](docs/roadmap.md). Growing beyond that, one feature at a time, isn't what this project is for.
+Kuri does what it does today. Growing beyond that, one feature at a time, isn't what this project is for.
 
 **Welcome:**
 

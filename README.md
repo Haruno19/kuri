@@ -162,7 +162,6 @@ None of this includes a model's weights. A local model runs in its own process (
 | [docs/config.md](docs/config.md) | Every configuration key |
 | [docs/ui.md](docs/ui.md) | The UI and UX brief: principles, style, layout |
 | [docs/decisions/](docs/decisions/) | Why things are the way they are |
-| [docs/roadmap.md](docs/roadmap.md) | What's done and what comes next |
 | [CLAUDE.md](CLAUDE.md) | Working agreements, build and test commands |
 
 ## Dependencies

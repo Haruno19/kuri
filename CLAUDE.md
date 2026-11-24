@@ -3,7 +3,6 @@
 Kuri is a native macOS app for working with language models, local or hosted: an in-process engine (the `KuriKit` Swift package) and a SwiftUI app around it. Read these before changing anything substantial:
 
 - [README.md](README.md): what Kuri is, its principles, architecture, tools, providers and dependencies.
-- [docs/roadmap.md](docs/roadmap.md): what's done and what comes next.
 - [docs/design.md](docs/design.md): how each part works, in detail.
 - [docs/flows.html](docs/flows.html): every flow as a sequence diagram with the code behind each step, plus the engine-event and protocol reference.
 - [docs/decisions/](docs/decisions/): why things are the way they are. Don't reverse a decision without a new record that supersedes it.
@@ -32,7 +31,7 @@ The engine is done; the work now is the UI redesign, following [docs/ui.md](docs
 - When a config key is added or changes meaning, update `docs/config.md` and the template in `ConfigLoader`.
 - When making a decision that future work should respect, add a record in `docs/decisions/`.
 - Database migrations are append-only: never edit a shipped one in `Migrations.swift`, add the next.
-- Keep the README an overview: its module table, tool and provider lists and dependencies in step with the code. Detailed explanations go in `docs/design.md`, plans in `docs/roadmap.md`.
+- Keep the README an overview: its module table, tool and provider lists and dependencies in step with the code. Detailed explanations go in `docs/design.md`.
 
 ## Build and test
 
