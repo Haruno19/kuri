@@ -458,8 +458,8 @@ const FLOWS = [
     summary: "A chat is renamed in place in the sidebar. The new title wins over one still being generated, and the chat keeps its place in the list.",
     participants: ["user", "sidebar", "appmodel", "engine", "store"],
     steps: [
-      ["user", "sidebar", "Rename Chat, double-click, or Return", 'App/Views/MainView.swift:159: Button("Rename Chat") { model.renaming = conversation.id }'],
-      ["sidebar", "appmodel", "Return or click away: `rename(id, to:)`", 'App/Views/MainView.swift:264: Task { await model.rename(id, to: text) }'],
+      ["user", "sidebar", "Rename Chat, double-click, or Return", 'App/Views/MainView.swift:179: Button("Rename Chat") { model.renaming = conversation.id }'],
+      ["sidebar", "appmodel", "Return or click away: `rename(id, to:)`", 'App/Views/MainView.swift:284: Task { await model.rename(id, to: text) }'],
       ["appmodel", "engine", "`rename(id, to:)`", 'App/AppModel.swift:319: try await engine?.rename(id, to: title)'],
       ["engine", "engine", "drop a title still being generated", 'KuriAgent/Engine.swift:310: titling[conversationID]?.cancel()'],
       ["engine", "store", "`updateConversation` — `updatedAt` unchanged", 'KuriAgent/Engine.swift:313: try await store.updateConversation(conversation)'],
@@ -473,8 +473,8 @@ const FLOWS = [
     summary: "Deleting a chat can't be undone, so Kuri asks first. Its items, turns, folders and scratch folder go, and its container stops.",
     participants: ["user", "sidebar", "appmodel", "engine", "sandbox", "store"],
     steps: [
-      ["user", "sidebar", "Delete Chat…, Chat menu, or Delete", 'App/Views/MainView.swift:161: Button("Delete Chat…", role: .destructive) { model.pendingDeletion = conversation.id }'],
-      ["sidebar", "appmodel", "confirmed: `delete(id)`", 'App/Views/MainView.swift:101: Task { await model.delete(id) }'],
+      ["user", "sidebar", "Delete Chat…, Chat menu, or Delete", 'App/Views/MainView.swift:181: Button("Delete Chat…", role: .destructive) { model.pendingDeletion = conversation.id }'],
+      ["sidebar", "appmodel", "confirmed: `delete(id)`", 'App/Views/MainView.swift:121: Task { await model.delete(id) }'],
       ["appmodel", "engine", "`delete(id)`", 'App/AppModel.swift:329: try await engine?.delete(id)'],
       ["engine", "sandbox", "`stop(id)`", 'KuriAgent/Engine.swift:319: await sandbox.stop(conversationID)'],
       ["engine", "store", "`deleteConversation(id)`", 'KuriAgent/Engine.swift:321: try await store.deleteConversation(conversationID)'],

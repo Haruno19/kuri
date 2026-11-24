@@ -30,3 +30,4 @@ To change one, write a new record that supersedes it, and mark the old one *Supe
 | [0022](0022-kuri-sandbox-image.md) | Kuri's own sandbox image, published to GitHub's container registry |
 | [0023](0023-meadow.md) | A pixel meadow on the new chat page, drawn as a bitmap in a layer |
 | [0024](0024-mac-conventions.md) | Mac conventions under the custom look: menus, confirmation, contrast, Reduce Motion, VoiceOver, menu bar icon optional |
+| [0025](0025-pane-toggles-in-the-chat.md) | The panes' toggles are drawn by the chat, with system symbols (amends 0021) |

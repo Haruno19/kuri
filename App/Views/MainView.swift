@@ -3,11 +3,13 @@ import SwiftUI
 
 /// The standard macOS sidebar (collapsed at launch), the chat, and the
 /// inspector on the right (closed at launch). The toolbar is there but
-/// invisible; the two toggles are Kuri's own, a matching pair in the
-/// chat's top corners.
+/// invisible and empty; the two toggles are Kuri's own, a matching pair in
+/// the chat's top corners.
 struct MainView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
+    /// Where the window's traffic lights are, to sit the toggles beside them.
+    @State private var lights = TrafficLights()
 
     var body: some View {
         @Bindable var model = model
@@ -33,36 +35,49 @@ struct MainView: View {
                     ChatView()
                 }
             }
-            // The sidebar's toggle is a toolbar item of the chat's column:
-            // macOS keeps it at the column's leading edge, next to the
-            // traffic lights or just outside the open sidebar, and moves it
-            // with the sidebar. Its own toggle would sit inside the sidebar.
-            .toolbar {
-                ToolbarItem(placement: .navigation) {
-                    PaneToggle(glyph: .sidebar,
+            // Both toggles are drawn by the chat, a matching pair in its top
+            // corners, so they stay put in full screen too (where macOS hides
+            // toolbar items until the pointer reaches the top). The
+            // sidebar's sits just past the traffic lights, or just outside
+            // the open sidebar; the inspector's mirrors it on the right.
+            .overlay(alignment: .top) {
+                HStack(spacing: 0) {
+                    PaneToggle(symbol: "sidebar.left",
                                label: model.showsSidebar ? "Hide Sidebar" : "Show Sidebar",
                                help: model.showsSidebar ? "Hide the sidebar (⌃⌘S)" : "Show the sidebar (⌃⌘S)") {
                         model.showsSidebar.toggle()
                     }
-                    // macOS leaves 4 points after the open sidebar; this
-                    // makes it the inspector toggle's inset.
-                    .padding(.leading, model.showsSidebar ? PaneToggle.inset - 4 : 0)
-                    .animation(Tune.move, value: model.showsSidebar)
+                    .padding(.leading, model.showsSidebar ? PaneToggle.inset
+                             : max(PaneToggle.inset, lights.trailing + PaneToggle.afterLights))
+                    Spacer(minLength: 0)
+                    if model.phase.isReady {
+                        PaneToggle(symbol: "sidebar.right",
+                                   label: model.showsInspector ? "Hide Inspector" : "Show Inspector",
+                                   help: model.showsInspector ? "Hide the inspector (⌥⌘I)" : "Show the inspector (⌥⌘I)") {
+                            model.toggleInspector()
+                        }
+                        .padding(.trailing, PaneToggle.inset)
+                    }
+                }
+                // Never past the window's top edge, even if the title bar
+                // comes out shorter than the circles.
+                .padding(.top, max(PaneToggle.top, lights.midY.map { $0 - PaneToggle.size / 2 } ?? PaneToggle.top))
+                .animation(Tune.move, value: model.showsSidebar)
+            }
+            .background(TrafficLightsReader { lights = $0 })
+            // An empty toolbar item: with no item at all macOS drops the
+            // toolbar, the title bar shrinks to 28 points and the traffic
+            // lights rise above where the toggles fit. This keeps the
+            // unified title bar's height, and the lights level with them. In
+            // the middle, away from the toggles: the toolbar sits above the
+            // content, and an item over a toggle would take its clicks.
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Color.clear.frame(width: 1, height: 1)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
                 .sharedBackgroundVisibility(.hidden)
-            }
-            // The inspector's is drawn by the chat: as a toolbar item, macOS
-            // would put it over the inspector.
-            .overlay(alignment: .topTrailing) {
-                if model.phase.isReady {
-                    PaneToggle(glyph: .inspector,
-                               label: model.showsInspector ? "Hide Inspector" : "Show Inspector",
-                               help: model.showsInspector ? "Hide the inspector (⌥⌘I)" : "Show the inspector (⌥⌘I)") {
-                        model.toggleInspector()
-                    }
-                    .padding(.trailing, PaneToggle.inset)
-                    .padding(.top, PaneToggle.top)
-                }
             }
             // Only the top: the content stays beside the sidebar, so the chat
             // shifts right when it opens instead of sliding under it.
@@ -81,6 +96,11 @@ struct MainView: View {
         .navigationTitle(model.selectedConversation.map(\.displayTitle) ?? String(localized: "New Chat"))
         .toolbar(removing: .title)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        // In full screen macOS draws the toolbar in a window of its own,
+        // opaque whatever its background says: a band across the top that
+        // hides the chat's and the inspector's tops. It slides in with the
+        // menu bar instead, and the content reaches the screen's top edge.
+        .windowToolbarFullScreenVisibility(.onHover)
         .alert(model.problem?.title ?? "", isPresented: Binding(
             get: { model.problem != nil },
             set: { if !$0 { model.problem = nil } }),
@@ -262,5 +282,60 @@ private extension ConversationRow {
         renaming = false
         let id = conversation.id, text = draft
         Task { await model.rename(id, to: text) }
+    }
+}
+
+/// Where the window's traffic lights are, in the content's coordinates
+/// (top-left origin): their trailing edge, and the line through their
+/// centres. Empty in full screen, where there are none.
+struct TrafficLights: Equatable {
+    var trailing: CGFloat = 0
+    var midY: CGFloat?
+}
+
+/// Reads `TrafficLights` from the window it's in, again when the window
+/// enters or leaves full screen or changes size.
+struct TrafficLightsReader: NSViewRepresentable {
+    let changed: (TrafficLights) -> Void
+
+    func makeNSView(context: Context) -> ReaderView {
+        let view = ReaderView()
+        view.changed = changed
+        return view
+    }
+
+    func updateNSView(_ view: ReaderView, context: Context) { view.changed = changed }
+
+    final class ReaderView: NSView {
+        var changed: ((TrafficLights) -> Void)?
+        private var last: TrafficLights?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            NotificationCenter.default.removeObserver(self)
+            guard let window else { return }
+            for name in [NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification,
+                         NSWindow.didResizeNotification] {
+                NotificationCenter.default.addObserver(self, selector: #selector(windowChanged), name: name, object: window)
+            }
+            // Once the title bar has laid its buttons out.
+            DispatchQueue.main.async { [weak self] in self?.report() }
+        }
+
+        @objc private func windowChanged() { report() }
+
+        private func report() {
+            guard let window else { return }
+            var lights = TrafficLights()
+            if !window.styleMask.contains(.fullScreen),
+               let zoom = window.standardWindowButton(.zoomButton), !zoom.isHidden, zoom.window === window {
+                // Window coordinates have their origin at the bottom left.
+                let frame = zoom.convert(zoom.bounds, to: nil)
+                lights = TrafficLights(trailing: frame.maxX, midY: window.frame.height - frame.midY)
+            }
+            guard lights != last else { return }
+            last = lights
+            changed?(lights)
+        }
     }
 }

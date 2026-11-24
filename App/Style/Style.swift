@@ -229,26 +229,37 @@ struct QuietButton: View {
     }
 }
 
-/// Shows or hides a side pane: a pencil icon in a glass circle, sized and
-/// placed like macOS's own toolbar buttons. The sidebar's and the
+/// Shows or hides a side pane: the system's symbol in a glass circle, sized
+/// and placed like macOS's own toolbar buttons. The sidebar's and the
 /// inspector's are a matching pair in the chat's top corners.
 struct PaneToggle: View {
-    let glyph: Glyph
+    /// `sidebar.left` or `sidebar.right`, as in Xcode's toolbar.
+    let symbol: String
     /// What VoiceOver says, like the View menu's item.
     let label: LocalizedStringKey
     let help: LocalizedStringKey
     let action: () -> Void
     @Environment(\.palette) private var palette
 
-    /// From the window's top edge, level with the traffic lights.
+    /// The glass circle's diameter.
+    static let size: CGFloat = 36
+    /// The symbol's point size, as in a toolbar button.
+    static let symbolSize: CGFloat = 15
+    /// From the window's top edge when there are no traffic lights to line
+    /// up with (full screen).
     static let top: CGFloat = 8
-    /// From the chat's side edge when the pane next to it is open.
+    /// From the chat's side edge when the pane next to it is open, and from
+    /// the screen's edge in full screen.
     static let inset: CGFloat = 14
+    /// From the zoom button to the sidebar's toggle while the sidebar is closed.
+    static let afterLights: CGFloat = 10
 
     var body: some View {
         Button { withAnimation(Tune.move) { action() } } label: {
-            PencilIcon(glyph: glyph, size: 17, color: palette.secondary, weight: 1.4)
-                .frame(width: 36, height: 36)
+            Image(systemName: symbol)
+                .font(.system(size: Self.symbolSize))
+                .foregroundStyle(palette.ink)
+                .frame(width: Self.size, height: Self.size)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -404,8 +415,8 @@ struct Orb: View {
 /// Icons drawn as if with a pencil: strokes through slightly wobbly points,
 /// round caps, and a second faint pass for the graphite.
 enum Glyph {
-    case sidebar, folder, arrowUp, chevron, plus, compose, xmark, retry, copy, check, sliders
-    case inspector, terminal, checklist, gauge, branch, box, bookmark, search, question, puzzle
+    case folder, arrowUp, chevron, plus, compose, xmark, retry, copy, check, sliders
+    case terminal, checklist, gauge, branch, box, bookmark, search, question, puzzle
 
     /// Strokes on a 24-point grid.
     nonisolated var strokes: [[CGPoint]] {
@@ -418,9 +429,6 @@ enum Glyph {
             }
         }
         switch self {
-        case .inspector:
-            // The sidebar icon mirrored: the panel on the right.
-            return [[p(4, 5.5), p(20, 5.5), p(20, 18.5), p(4, 18.5), p(4, 5.4)], [p(14.5, 5.9), p(14.5, 18.2)]]
         case .terminal:
             return [[p(3.5, 5.5), p(20.5, 5.5), p(20.5, 18.5), p(3.5, 18.5), p(3.5, 5.4)],
                     [p(7.5, 9.5), p(10.5, 12), p(7.5, 14.5)], [p(12.5, 14.5), p(16.5, 14.5)]]
@@ -450,8 +458,6 @@ enum Glyph {
             return [[p(5, 8), p(9.5, 8), p(9.3, 6.5), p(10.5, 4.8), p(12.5, 4.8), p(13.7, 6.5), p(13.5, 8), p(18, 8),
                      p(18, 11.5), p(19.5, 11.3), p(20.8, 12.5), p(20.8, 14.5), p(19.5, 15.7), p(18, 15.5), p(18, 19.5),
                      p(5, 19.5), p(5, 7.9)]]
-        case .sidebar:
-            return [[p(4, 5.5), p(20, 5.5), p(20, 18.5), p(4, 18.5), p(4, 5.4)], [p(9.5, 5.9), p(9.5, 18.2)]]
         case .folder:
             return [[p(3.5, 18), p(3.5, 6), p(9.5, 6), p(11.5, 8.5), p(20.5, 8.5), p(20.5, 18), p(3.4, 18.1)]]
         case .arrowUp:
