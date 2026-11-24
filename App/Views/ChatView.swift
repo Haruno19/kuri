@@ -352,6 +352,7 @@ struct LiveTail: View {
         }
         if !model.streamingText.isEmpty {
             ReplyText(text: model.streamingText)
+                .environment(\.replyStreaming, true)
         }
         if let id = model.selection, let notice = model.fallbackNotices[id] {
             Text(notice)
