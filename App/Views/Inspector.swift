@@ -16,6 +16,17 @@ import SwiftUI
 enum InspectorPane: String {
     case steps = "Steps", tasks = "Tasks", context = "Context", git = "Git", sandbox = "Sandbox"
 
+    /// The name shown in its header (`rawValue` keys its stored state).
+    var title: LocalizedStringKey {
+        switch self {
+        case .steps: "Steps"
+        case .tasks: "Tasks"
+        case .context: "Context"
+        case .git: "Git"
+        case .sandbox: "Sandbox"
+        }
+    }
+
     var glyph: Glyph {
         switch self {
         case .steps: .terminal
@@ -130,18 +141,23 @@ private struct InspectorSection<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 7) {
-                PencilIcon(glyph: pane.glyph, size: 14, color: palette.secondary, weight: 1.4)
-                Text(pane.rawValue).font(Typeface.sans(13).weight(.medium)).foregroundStyle(palette.ink)
-                Spacer(minLength: 6)
-                InspectorAccessory(pane: pane)
-                PencilIcon(glyph: .chevron, size: 10, color: palette.faint)
-                    .rotationEffect(.degrees(open ? 0 : -90))
+            // A button, so the keyboard and VoiceOver can fold it too.
+            Button { withAnimation(Tune.move) { open.toggle() } } label: {
+                HStack(spacing: 7) {
+                    PencilIcon(glyph: pane.glyph, size: 14, color: palette.secondary, weight: 1.4)
+                    Text(pane.title).font(Typeface.sans(13).weight(.medium)).foregroundStyle(palette.ink)
+                    Spacer(minLength: 6)
+                    InspectorAccessory(pane: pane)
+                    PencilIcon(glyph: .chevron, size: 10, color: palette.faint)
+                        .rotationEffect(.degrees(open ? 0 : -90))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .contentShape(.rect)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .contentShape(.rect)
-            .onTapGesture { withAnimation(Tune.move) { open.toggle() } }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityValue(open ? Text("Expanded") : Text("Collapsed"))
             if open {
                 content
                     .padding(.horizontal, 10)
@@ -211,7 +227,7 @@ private struct InspectorAccessory: View {
             }
         }
         .font(Typeface.sans(11.5).monospacedDigit())
-        .foregroundStyle(palette.faint)
+        .foregroundStyle(palette.dim)
         .contentTransition(.opacity)
         .animation(Tune.status, value: model.contextUsage?.tokens)
     }
@@ -227,7 +243,7 @@ private struct Quiet: View {
     var body: some View {
         Text(text)
             .font(Typeface.sans(12))
-            .foregroundStyle(palette.faint)
+            .foregroundStyle(palette.dim)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
@@ -358,13 +374,13 @@ private struct StepsPane: View {
                                 Text(turn.date, format: .dateTime.hour().minute()).monospacedDigit()
                             }
                             .font(Typeface.sans(11))
-                            .foregroundStyle(palette.faint)
+                            .foregroundStyle(palette.dim)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
                         }
                         ForEach(rows) { step in
                             StepRow(step: step, running: step.result == nil && isLive)
-                                .transition(.opacity.combined(with: .offset(y: 6)))
+                                .transition(.moving(.opacity.combined(with: .offset(y: 6))))
                         }
                     }
                 }
@@ -385,7 +401,7 @@ private struct Pill: View {
         Button(action: { withAnimation(Tune.move) { action() } }) {
             Text(title)
                 .font(Typeface.sans(11.5))
-                .foregroundStyle(on ? palette.ink : palette.faint)
+                .foregroundStyle(on ? palette.ink : palette.dim)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 2.5)
                 .background(Capsule().fill(palette.wash).opacity(on ? 1 : 0))
@@ -415,14 +431,17 @@ private struct StepRow: View {
                 if step.isShell, let seconds = step.seconds {
                     Text(Self.duration(seconds))
                         .font(Typeface.sans(10.5).monospacedDigit())
-                        .foregroundStyle(palette.faint)
+                        .foregroundStyle(palette.dim)
                 }
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
             .modifier(HoverWash(shape: RoundedRectangle(cornerRadius: 6, style: .continuous)))
-            .onTapGesture { if hasDetail { withAnimation(Tune.move) { expanded.toggle() } } }
-            .help(hasDetail ? "Click to see \(step.isShell ? "the output" : "the details")" : step.title)
+            .onTapGesture { toggle() }
+            .help(hasDetail ? Text(step.isShell ? "Click to see the output" : "Click to see the details") : Text(verbatim: step.title))
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(hasDetail ? .isButton : [])
+            .accessibilityAction { toggle() }
             if expanded {
                 VStack(alignment: .leading, spacing: 4) {
                     if let command = step.summary.command, command != step.summary.commandLine {
@@ -437,7 +456,7 @@ private struct StepRow: View {
                 .padding(.leading, 26)
                 .padding(.trailing, 2)
                 .padding(.bottom, 4)
-                .transition(.opacity.combined(with: .offset(y: -4)))
+                .transition(.moving(.opacity.combined(with: .offset(y: -4))))
             }
         }
     }
@@ -449,6 +468,10 @@ private struct StepRow: View {
     }
 
     private var hasDetail: Bool { !output.isEmpty }
+
+    private func toggle() {
+        if hasDetail { withAnimation(Tune.move) { expanded.toggle() } }
+    }
 
     static func duration(_ seconds: Double) -> String {
         if seconds < 0.05 { return "<0.1s" }
@@ -464,6 +487,12 @@ private struct StepStatus: View {
     @Environment(\.palette) private var palette
 
     var body: some View {
+        mark.accessibilityLabel(running ? Text("Running")
+            : step.failed ? (step.timedOut ? Text("Timed out") : step.exitCode.map { Text("Failed with exit status \($0)") } ?? Text("Failed"))
+            : Text("Done"))
+    }
+
+    @ViewBuilder private var mark: some View {
         if running {
             Orb(size: 6)
         } else if step.failed {
@@ -473,7 +502,7 @@ private struct StepStatus: View {
                 .padding(.horizontal, 3)
                 .frame(minWidth: 14, minHeight: 14)
                 .background(Capsule().fill(palette.accentFill))
-                .help(step.timedOut ? "Timed out" : step.exitCode.map { "Exit status \($0)" } ?? "Failed")
+                .help(step.timedOut ? Text("Timed out") : step.exitCode.map { Text("Exit status \($0)") } ?? Text("Failed"))
         } else if step.isShell {
             PencilIcon(glyph: .check, size: 12, color: palette.faint)
         } else {
@@ -513,7 +542,7 @@ private struct TasksPane: View {
                     updated.remove(at: index)
                     save(updated)
                 }
-                .transition(.opacity.combined(with: .offset(y: -4)))
+                .transition(.moving(.opacity.combined(with: .offset(y: -4))))
             }
             if adding {
                 HStack(spacing: 8) {
@@ -552,7 +581,7 @@ private struct TasksPane: View {
                 if model.hasPendingTasks {
                     Text("Kuri sees your changes at its next step")
                         .font(Typeface.sans(10.5))
-                        .foregroundStyle(palette.faint)
+                        .foregroundStyle(palette.dim)
                         .multilineTextAlignment(.trailing)
                         .transition(.opacity)
                 }
@@ -594,10 +623,16 @@ private struct TaskRow: View {
         HStack(alignment: .top, spacing: 8) {
             Button {
                 withAnimation(Tune.press) { setStatus(task.status == .completed ? .pending : .completed) }
-            } label: { TaskCheck(status: task.status) }
+            } label: {
+                // A 20-point target around the 14-point mark.
+                TaskCheck(status: task.status).padding(3).contentShape(.rect)
+            }
                 .buttonStyle(Squish())
+                .padding(-3)
                 .padding(.top, 1)
                 .help(task.status == .completed ? "Mark as not done" : "Mark as done")
+                .accessibilityLabel(Text(task.content))
+                .accessibilityValue(task.status == .completed ? Text("Done") : task.status == .inProgress ? Text("In progress") : Text("Not done"))
             if editing {
                 TextField("", text: $draft, prompt: Text(""), axis: .vertical)
                     .textFieldStyle(.plain)
@@ -611,30 +646,47 @@ private struct TaskRow: View {
             } else {
                 Text(task.content)
                     .font(Typeface.sans(12.5))
-                    .foregroundStyle(task.status == .completed ? palette.faint : palette.ink)
+                    .foregroundStyle(task.status == .completed ? palette.dim : palette.ink)
                     .strikethrough(task.status == .completed, color: palette.faint)
                     .fontWeight(task.status == .inProgress ? .medium : .regular)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(.rect)
-                    .onTapGesture(count: 2) {
-                        draft = task.content
-                        editing = true
-                        focused = true
-                    }
+                    .onTapGesture(count: 2) { startEditing() }
                     .help("Double-click to edit")
             }
             Button(action: remove) {
-                PencilIcon(glyph: .xmark, size: 10, color: palette.faint).padding(2)
+                // Shown on hover; the context menu and VoiceOver reach it too.
+                PencilIcon(glyph: .xmark, size: 10, color: palette.faint)
+                    .frame(width: 20, height: 20)
+                    .contentShape(.rect)
             }
             .buttonStyle(Squish())
+            .padding(.vertical, -3)
             .opacity(hovering && !editing ? 1 : 0)
             .help("Remove")
+            .accessibilityLabel(Text("Remove Task"))
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
         .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(palette.wash).opacity(hovering ? 1 : 0))
         .onHover { hovering = $0 }
         .animation(Tune.hover, value: hovering)
+        // What hovering and double-clicking do, for touch and the keyboard.
+        .contextMenu {
+            Button(task.status == .completed ? "Mark as Not Done" : "Mark as Done") {
+                setStatus(task.status == .completed ? .pending : .completed)
+            }
+            Button("Edit Task") { startEditing() }
+            Divider()
+            Button("Remove Task", role: .destructive, action: remove)
+        }
+        .accessibilityAction(named: Text("Edit Task")) { startEditing() }
+    }
+
+    private func startEditing() {
+        draft = task.content
+        editing = true
+        focused = true
     }
 
     private func commit() {
@@ -670,7 +722,7 @@ private struct ContextPane: View {
                     .contentTransition(.opacity)
                 Text(usage.window.map { "of \(TokenCount.short($0)) tokens" } ?? "tokens, about")
                     .font(Typeface.sans(12))
-                    .foregroundStyle(palette.faint)
+                    .foregroundStyle(palette.dim)
                 Spacer()
             }
             if let window = usage.window, window > 0 {
@@ -685,7 +737,7 @@ private struct ContextPane: View {
                                 Text(part.name).foregroundStyle(palette.secondary).lineLimit(1)
                                 Spacer(minLength: 4)
                                 Text(TokenCount.short(part.tokens))
-                                    .foregroundStyle(palette.faint)
+                                    .foregroundStyle(palette.dim)
                                     .monospacedDigit()
                                     .contentTransition(.opacity)
                             }
@@ -698,7 +750,7 @@ private struct ContextPane: View {
                 Text(usage.window == nil ? "Set contextWindow to compact automatically"
                                          : "Compacts at \(Int(model.config.compactionThreshold * 100))%")
                     .font(Typeface.sans(10.5))
-                    .foregroundStyle(palette.faint)
+                    .foregroundStyle(palette.dim)
                 Spacer()
                 Button { Task { await model.compactSelected() } } label: {
                     Text("Compact now").font(Typeface.sans(11.5)).padding(.horizontal, 9).padding(.vertical, 3.5)
@@ -839,7 +891,7 @@ private struct RepositoryView: View {
             if let commit = status.lastCommit {
                 Text("\(commit.hash)  \(commit.subject) · \(commit.date, format: .relative(presentation: .named))")
                     .font(Typeface.sans(11))
-                    .foregroundStyle(palette.faint)
+                    .foregroundStyle(palette.dim)
                     .lineLimit(1)
                     .padding(.horizontal, 6)
             }
@@ -849,7 +901,7 @@ private struct RepositoryView: View {
     private func path(_ path: String) -> some View {
         let parts = path.split(separator: "/")
         let directory = parts.dropLast().joined(separator: "/") + (parts.count > 1 ? "/" : "")
-        return Text("\(Text(directory).foregroundStyle(palette.faint))\(Text(String(parts.last ?? "")).foregroundStyle(palette.ink))")
+        return Text("\(Text(directory).foregroundStyle(palette.dim))\(Text(String(parts.last ?? "")).foregroundStyle(palette.ink))")
             .font(Typeface.sans(12))
             .lineLimit(1)
             .truncationMode(.head)
@@ -860,7 +912,7 @@ private struct RepositoryView: View {
         HStack(spacing: 1) {
             PencilIcon(glyph: .arrowUp, size: 10, color: palette.faint, weight: 1.4)
                 .rotationEffect(.degrees(down ? 180 : 0))
-            Text("\(n)").font(Typeface.sans(11).monospacedDigit()).foregroundStyle(palette.faint)
+            Text("\(n)").font(Typeface.sans(11).monospacedDigit()).foregroundStyle(palette.dim)
         }
     }
 
@@ -868,7 +920,7 @@ private struct RepositoryView: View {
         switch kind {
         case .added: code.green
         case .deleted, .conflicted: code.red
-        case .untracked: palette.faint
+        case .untracked: palette.dim
         default: code.yellow
         }
     }
@@ -930,18 +982,18 @@ private struct SandboxPane: View {
                 Spacer(minLength: 6)
                 Text("\(settings.cpus) CPUs · \(Self.memory(settings.memoryMiB))")
                     .font(Typeface.sans(11))
-                    .foregroundStyle(palette.faint)
+                    .foregroundStyle(palette.dim)
                     .fixedSize()
             }
             // Open once the running turn has run a command.
             if model.isSelectedRunning && !lines.isEmpty {
                 TerminalText(lines: lines, cursor: isRunning(state))
                     .frame(height: 140)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom)))
+                    .transition(.moving(.opacity.combined(with: .scale(scale: 0.96, anchor: .bottom))))
                 ForEach(mounts, id: \.guestPath) { mount in
                     Text("\(mount.guestPath)  ←  \(mount.isScratch ? "this chat's scratch folder" : Self.abbreviate(mount.hostPath))")
                         .font(Typeface.mono(10.5))
-                        .foregroundStyle(palette.faint)
+                        .foregroundStyle(palette.dim)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }

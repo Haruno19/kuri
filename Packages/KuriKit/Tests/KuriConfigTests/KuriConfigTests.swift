@@ -219,6 +219,21 @@ import Testing
     }
 }
 
+@Suite struct MenuBarIconSettingTests {
+    @Test func writesFalseAndLeavesTheDefaultOut() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-menubar-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let home = KuriHome(root: root)
+        try home.prepare()
+        try Data(#"{ providers: {} }"#.utf8).write(to: home.configFile)
+        #expect(try ConfigLoader(home: home).loadConfig().menuBarIcon == nil)
+        try ConfigEditor(home: home).setMenuBarIcon(false)
+        #expect(try ConfigLoader(home: home).loadConfig().menuBarIcon == false)
+        try ConfigEditor(home: home).setMenuBarIcon(true)
+        #expect(try ConfigLoader(home: home).loadConfig().menuBarIcon == nil)
+    }
+}
+
 @Suite struct GenerateTitlesSettingTests {
     @Test func editorWritesTheToggle() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "kuri-titles-\(UUID().uuidString)")

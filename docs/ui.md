@@ -17,6 +17,7 @@ The brief for the redesign. Every app change is checked against it. Directions a
 
 - **Classy and warm**, built from **layers and depth**: surfaces sit on surfaces, with real shadows and light from above.
 - **Light and dark** themes, following the system unless `appearance` in `config.json` picks one ([config.md](config.md)).
+- **Mac conventions under the look** ([decision 0024](decisions/0024-mac-conventions.md)): every action in the menu bar, text at 4.5:1 (`dim` for the quietest text, `faint` only for icons and rules), Increase Contrast and Reduce Motion honoured (moving transitions become fades), every icon-only control named for VoiceOver.
 - **Autumn palette**: chestnut, amber, toasted cream, warm brown-blacks. The accent is the app icon's chestnut gradient (top `p3(0.60, 0.35, 0.16)` → bottom `sRGB(0.73, 0.58, 0.34)`; the dark icon starts at `p3(0.50, 0.31, 0.14)`). No cold greys: neutrals are warm.
 - **Type** (see decisions [0015](decisions/0015-typography.md) and [0018](decisions/0018-literata.md) for where each font comes from):
   - **Serif** (model replies, headings, accents): *Literata*, bundled ([decision 0018](decisions/0018-literata.md)).
@@ -45,7 +46,7 @@ The brief for the redesign. Every app change is checked against it. Directions a
 2. Layout and styling of the main window, from the Autumn sketch, with conversation management: rename *(done)*, archive, delete; maybe projects / groups, or grouping by root folder.
    - **Running chats** show a status indicator in the sidebar: a single orb in the accent colour, with the same 3D feel as the working dots.
    - **Sidebar snaps shut**: dragging its edge past a threshold collapses it, if SwiftUI allows it.
-3. **Menu bar icon and mini window** *(done)*: left click opens a small chat in Liquid Glass that floats like picture in picture; right click a native menu (Open Kuri, Settings, Quit). This also covers the floating window, item 5.
+3. **Menu bar icon and mini window** *(done)*: left click opens a small chat in Liquid Glass that floats like picture in picture; right click a native menu (Open Kuri, New Chat, Settings, Quit). `menuBarIcon: false` removes it; Kuri then stays in the Dock. This also covers the floating window, item 5.
 4. Settings window (compact, retro, dense).
 5. Floating window: the mini window above; a global hotkey for it is still to do.
 6. **Right sidebar** *(done)*: an inspector for the conversation, in sections (sketched in `Sketches/Inspector.swift`): boxes stacked in a column, each folding from its header, the sandbox pinned at the bottom. Its toggle mirrors the sidebar's, in the chat's top-right corner; the cards start at the column's top edge, with sans headers. The sandbox section shows what the model ran for the latest message:

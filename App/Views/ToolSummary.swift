@@ -64,23 +64,27 @@ struct ToolSummary: Equatable {
         switch kind {
         case .shell: commandLine
         case .tasklist(let byUser):
-            "\(byUser ? "You edited" : "Updated") the plan · \(tasks.filter { $0.status == .completed }.count)/\(tasks.count) done"
-        case .memory: finished ? "Updated memory" : "Updating memory"
-        case .search(let query): "Searched past conversations" + (query.map { " for “\($0)”" } ?? "")
-        case .clarify: finished ? "Asked you" : "Waiting for your answer"
+            byUser ? String(localized: "You edited the plan · \(done)/\(tasks.count) done")
+                   : String(localized: "Updated the plan · \(done)/\(tasks.count) done")
+        case .memory: finished ? String(localized: "Updated memory") : String(localized: "Updating memory")
+        case .search(let query):
+            query.map { String(localized: "Searched past chats for “\($0)”") } ?? String(localized: "Searched past chats")
+        case .clarify: finished ? String(localized: "Asked you") : String(localized: "Waiting for your answer")
         case .other(let name): name
         }
     }
 
+    private var done: Int { tasks.filter { $0.status == .completed }.count }
+
     /// The working indicator's words while the call runs.
     var status: String {
         switch kind {
-        case .shell: "Running a command"
-        case .tasklist: "Updating the plan"
-        case .memory: "Updating memory"
-        case .search: "Searching past conversations"
-        case .clarify: "Waiting for your answer"
-        case .other(let name): "Using \(name)"
+        case .shell: String(localized: "Running a command")
+        case .tasklist: String(localized: "Updating the plan")
+        case .memory: String(localized: "Updating memory")
+        case .search: String(localized: "Searching past chats")
+        case .clarify: String(localized: "Waiting for your answer")
+        case .other(let name): String(localized: "Using \(name)")
         }
     }
 

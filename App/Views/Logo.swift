@@ -39,6 +39,11 @@ struct Logo: View {
         .keyframeAnimator(initialValue: Pose(), trigger: hops, content: { Self.pose($0, $1) }) { _ in Self.hop }
         .keyframeAnimator(initialValue: Pose(), trigger: shakes, content: { Self.pose($0, $1) }) { _ in Self.shake }
         .onTapGesture {
+            // Reduce Motion: only the shine, which doesn't move the logo.
+            if Motion.reduced {
+                shines += 1
+                return
+            }
             switch clicks % 3 {
             case 0: hops += 1
             case 1: shines += 1

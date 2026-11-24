@@ -10,7 +10,6 @@ struct MiniChat: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     @State private var draft = ""
-    @State private var choosingFolder = false
 
     static let scale: CGFloat = 0.85
     /// The title bar's height, which the traffic lights sit in.
@@ -29,16 +28,16 @@ struct MiniChat: View {
                 ForEach(model.inputRequests.filter { $0.conversationID == model.selection }) { request in
                     InputRequestView(request: request)
                 }
-                if let message = model.errorMessage {
-                    Text(message)
+                if let problem = model.problem {
+                    Text("\(problem.title): \(problem.message)")
                         .font(Typeface.sans(11.5))
-                        .foregroundStyle(palette.accent)
+                        .foregroundStyle(palette.accentText)
                         .textSelection(.enabled)
-                        .onTapGesture { model.errorMessage = nil }
+                        .onTapGesture { model.problem = nil }
                         .help("Click to dismiss")
                 }
                 HStack(spacing: 2) {
-                    MiniFolderButton(choosingFolder: $choosingFolder)
+                    MiniFolderButton()
                     Spacer(minLength: 8)
                     ModelPicker(small: true)
                 }
@@ -56,7 +55,7 @@ struct MiniChat: View {
         .environment(\.glassOnly, true)
         .environment(\.allowsMath, false)
         .ignoresSafeArea()
-        .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder], allowsMultipleSelection: true) { result in
+        .fileImporter(isPresented: Bindable(model).choosingFolder, allowedContentTypes: [.folder], allowsMultipleSelection: true) { result in
             if case .success(let urls) = result { Task { await model.attach(urls) } }
         }
     }
@@ -106,9 +105,8 @@ private struct MiniTitleBar: View {
     }
 
     private var title: String {
-        guard model.selection != nil else { return "New chat" }
-        let title = model.selectedConversation?.title ?? ""
-        return title.isEmpty ? "New chat" : title
+        guard model.selection != nil else { return String(localized: "New Chat") }
+        return model.selectedConversation?.displayTitle ?? String(localized: "New Chat")
     }
 }
 
@@ -121,10 +119,10 @@ private struct MiniChatList: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 1) {
-                row(nil, title: "New chat", glyph: .compose)
+                row(nil, title: String(localized: "New Chat"), glyph: .compose)
                 Rectangle().fill(palette.faint.opacity(0.25)).frame(height: 1).padding(.vertical, 4).padding(.horizontal, 6)
                 ForEach(model.conversations) { conversation in
-                    row(conversation.id, title: conversation.title.isEmpty ? "New chat" : conversation.title, glyph: nil)
+                    row(conversation.id, title: conversation.displayTitle, glyph: nil)
                 }
             }
             .padding(6)
@@ -201,14 +199,13 @@ private struct MiniTranscript: View {
 
 /// A folder icon and label, small and dim like the context meter.
 private struct MiniFolderButton: View {
-    @Binding var choosingFolder: Bool
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
 
     var body: some View {
         Group {
             if model.folders.isEmpty {
-                Button { choosingFolder = true } label: { label("Folder") }
+                Button { model.choosingFolder = true } label: { label(String(localized: "Folder")) }
                     .buttonStyle(Squish())
                     .help("Let Kuri work in a folder: it's mounted in the sandbox at /work")
             } else {
@@ -217,7 +214,7 @@ private struct MiniFolderButton: View {
                         Button("Detach \(name(folder))") { Task { await model.detach(folder) } }
                     }
                     Divider()
-                    Button("Add Folder…") { choosingFolder = true }
+                    Button("Add Folder…") { model.choosingFolder = true }
                 } label: {
                     label(model.folders.map(name).joined(separator: ", "))
                 }
@@ -237,7 +234,7 @@ private struct MiniFolderButton: View {
             Text(text).lineLimit(1)
         }
         .font(Typeface.sans(11.5))
-        .foregroundStyle(palette.faint)
+        .foregroundStyle(palette.dim)
         .padding(.horizontal, 5)
         .padding(.vertical, 3)
         .modifier(HoverWash(shape: RoundedRectangle(cornerRadius: 6, style: .continuous)))

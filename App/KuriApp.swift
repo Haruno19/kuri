@@ -17,7 +17,10 @@ struct KuriApp: App {
         // config, loaded asynchronously, takes over from there.
         let config = try? ConfigLoader(home: KuriHome.resolve()).loadConfig()
         AppModel.apply(config?.appearance)
-        startsInBackground = config?.startInBackground ?? false
+        // Without the menu bar icon there'd be no way back to a window.
+        let showsIcon = config?.menuBarIcon ?? true
+        MiniController.shared.setShowsIcon(showsIcon)
+        startsInBackground = showsIcon && (config?.startInBackground ?? false)
         MiniController.shared.startsInBackground = startsInBackground
         // The engine starts with the app, not with a window: Kuri keeps
         // running from the menu bar when every window is closed.
@@ -51,10 +54,23 @@ struct KuriApp: App {
         .defaultSize(width: 1040, height: 760)
         .defaultLaunchBehavior(startsInBackground ? .suppressed : .automatic)
         .commands {
+            // File › New Chat: the main window has a single chat page, so
+            // this takes the place of New Window.
+            CommandGroup(replacing: .newItem) {
+                Button("New Chat") {
+                    model.selection = nil
+                    WindowActions.openMain()
+                }
+                .keyboardShortcut("n")
+                .disabled(model.phase.isReady == false)
+            }
             // View › Show Sidebar (⌃⌘S): Kuri draws its own sidebar toggle.
             SidebarCommands()
             CommandGroup(after: .sidebar) {
                 InspectorCommands(model: model)
+            }
+            CommandMenu("Chat") {
+                ChatCommands(model: model)
             }
         }
 
@@ -79,6 +95,39 @@ private struct InspectorCommands: View {
     }
 }
 
+/// Chat: every action the chat page offers, so each has a menu item and
+/// the buttons are shortcuts to it. They act on the main window's chat.
+private struct ChatCommands: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        let ready = model.phase.isReady
+        let chosen = ready && model.selection != nil
+        Button("Stop") { Task { await model.cancel() } }
+            .keyboardShortcut(".")
+            .disabled(!model.isSelectedBusy)
+        Button("Retry") { Task { await model.retrySelected() } }
+            .keyboardShortcut("r")
+            .disabled(!model.canRetry)
+        Button("Continue") { Task { await model.continueSelected() } }
+            .disabled(!model.canContinue)
+        Divider()
+        Button("Attach Folder…") {
+            WindowActions.openMain()
+            model.choosingFolder = true
+        }
+        .keyboardShortcut("o", modifiers: [.command, .shift])
+        .disabled(!ready)
+        Button("Compact Chat") { Task { await model.compactSelected() } }
+            .disabled(!chosen || model.isSelectedBusy)
+        Divider()
+        Button("Rename Chat") { withAnimation(Tune.move) { model.renameSelected() } }
+            .disabled(!chosen)
+        Button("Delete Chat…") { model.pendingDeletion = model.selection }
+            .disabled(!chosen)
+    }
+}
+
 /// The menu bar icon goes in once AppKit has finished launching; closing
 /// every window leaves Kuri running there.
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -89,4 +138,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    /// Clicking the Dock icon with no window open brings the main one back.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows { WindowActions.openMain() }
+        return true
+    }
 }

@@ -10,7 +10,6 @@ struct ChatView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     @State private var draft = ""
-    @State private var choosingFolder = false
     /// The meadow's tree: a new one each window, the same one while it's open.
     @State private var meadowSeed = UInt64.random(in: 0 ... .max)
     @Namespace private var space
@@ -43,7 +42,7 @@ struct ChatView: View {
             }
         }
         .animation(Tune.move, value: showsWelcome)
-        .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder], allowsMultipleSelection: true) { result in
+        .fileImporter(isPresented: Bindable(model).choosingFolder, allowedContentTypes: [.folder], allowsMultipleSelection: true) { result in
             if case .success(let urls) = result { Task { await model.attach(urls) } }
         }
     }
@@ -53,8 +52,9 @@ struct ChatView: View {
     }
 
     private var composer: some View {
-        Composer(draft: $draft, choosingFolder: $choosingFolder)
-            .matchedGeometryEffect(id: "composer", in: space)
+        Composer(draft: $draft)
+            // With Reduce Motion, the composer fades into place instead.
+            .matchedGeometryEffect(id: "composer", in: space, isSource: !Motion.reduced)
     }
 }
 
@@ -78,7 +78,7 @@ private struct Welcome<C: View>: View {
             }
             .padding(.leading, 6)
             .transition(.asymmetric(insertion: .opacity,
-                                    removal: .opacity.combined(with: .scale(scale: 0.96, anchor: .leading)).combined(with: .offset(y: -12))))
+                                    removal: .moving(.opacity.combined(with: .scale(scale: 0.96, anchor: .leading)).combined(with: .offset(y: -12)))))
             FolderBar()
             composer
         }
@@ -88,11 +88,20 @@ private struct Welcome<C: View>: View {
         .offset(x: 12, y: -20)
     }
 
+    /// Whole sentences, so each language can place the name its own way.
     private var greeting: String {
         let name = NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
         let hour = Calendar.current.component(.hour, from: .now)
-        let part = hour < 5 ? "Still up" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
-        return name.isEmpty ? "\(part)." : "\(part), \(name)."
+        if name.isEmpty {
+            return hour < 5 ? String(localized: "Still up.")
+                : hour < 12 ? String(localized: "Good morning.")
+                : hour < 18 ? String(localized: "Good afternoon.")
+                : String(localized: "Good evening.")
+        }
+        return hour < 5 ? String(localized: "Still up, \(name)?")
+            : hour < 12 ? String(localized: "Good morning, \(name).")
+            : hour < 18 ? String(localized: "Good afternoon, \(name).")
+            : String(localized: "Good evening, \(name).")
     }
 }
 
@@ -149,22 +158,23 @@ private struct StatusLine: View {
     var body: some View {
         Text(text)
             .font(Typeface.mono(11))
-            .foregroundStyle(palette.faint)
+            .foregroundStyle(palette.dim)
             .contentTransition(.opacity)
             .animation(Tune.status, value: text)
             .padding(.leading, 20)
             .padding(.bottom, aboveMeadow ? 30 : 16)
             .allowsHitTesting(false)
+            .accessibilityLabel(Text("Status: \(text)"))
     }
 
     private var text: String {
         switch model.phase {
-        case .starting: return "Starting…"
-        case .failed: return "Not ready"
+        case .starting: return String(localized: "Starting…")
+        case .failed: return String(localized: "Not ready")
         case .ready:
             let others = model.running.count
-            if others > 0 { return others == 1 ? "Working in 1 chat" : "Working in \(others) chats" }
-            return model.models.isEmpty ? "No model set up" : "Ready"
+            if others > 0 { return String(localized: "Working in \(others) chats") }
+            return model.models.isEmpty ? String(localized: "No model set up") : String(localized: "Ready")
         }
     }
 }
@@ -321,7 +331,7 @@ struct LiveTail: View {
         } else if model.isSelectedRunning && model.streamingText.isEmpty {
             Working(status: model.workingStatus)
                 .padding(.horizontal, 6)
-                .transition(.opacity.combined(with: .offset(y: 6)))
+                .transition(.moving(.opacity.combined(with: .offset(y: 6))))
         } else if !model.isSelectedRunning, let turn = model.lastTurn {
             TurnEndBar(turn: turn)
         }
@@ -399,6 +409,9 @@ struct AnswerFooter: View {
                     .monospacedDigit()
                     .contentTransition(.opacity)
                     .onHover { hovering in withAnimation(Tune.hover) { showsSplit = hovering } }
+                    // The split, without hovering: as a tooltip and to VoiceOver.
+                    .help("\(Self.count(turn.usage.inputTokens)) tokens in, \(Self.count(turn.usage.outputTokens)) out")
+                    .accessibilityLabel(Text("\(Self.count(turn.usage.inputTokens)) tokens in, \(Self.count(turn.usage.outputTokens)) out"))
             }
             Spacer()
             if canRetry {
@@ -412,11 +425,11 @@ struct AnswerFooter: View {
                     .modifier(HoverWash())
                 }
                 .buttonStyle(Squish())
-                .help("Answer again, replacing this answer")
+                .help("Answer again, replacing this answer (⌘R)")
             }
         }
         .font(Typeface.sans(12))
-        .foregroundStyle(palette.faint)
+        .foregroundStyle(palette.dim)
         .padding(.horizontal, 6)
     }
 
@@ -450,7 +463,7 @@ struct ItemView: View {
                 .padding(.vertical, 12 * scale)
                 .modifier(Pane())
                 .transition(.asymmetric(
-                    insertion: .scale(scale: 0.98, anchor: .bottom).combined(with: .opacity).combined(with: .offset(y: 16)),
+                    insertion: .moving(.scale(scale: 0.98, anchor: .bottom).combined(with: .opacity).combined(with: .offset(y: 16))),
                     removal: .opacity))
 
         case .message(let message):
@@ -496,7 +509,7 @@ struct ReplyText: View {
 
 /// A quiet line that opens to show more: reasoning, summaries.
 struct Folded<Content: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     @ViewBuilder let content: Content
     @Environment(\.palette) private var palette
     @Environment(\.chatScale) private var scale
@@ -512,12 +525,13 @@ struct Folded<Content: View>: View {
                     PencilIcon(glyph: .chevron, size: 11 * scale, color: palette.faint)
                         .rotationEffect(.degrees(open ? 0 : -90))
                 }
-                .foregroundStyle(palette.faint)
+                .foregroundStyle(palette.dim)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            .accessibilityValue(open ? Text("Expanded") : Text("Collapsed"))
             if open {
-                content.transition(.opacity.combined(with: .offset(y: -4)))
+                content.transition(.moving(.opacity.combined(with: .offset(y: -4))))
             }
         }
     }
@@ -529,27 +543,32 @@ struct Working: View {
     let status: String
     @Environment(\.palette) private var palette
     @Environment(\.chatScale) private var scale
+    @Environment(\.accessibilityReduceMotion) private var still
 
     var body: some View {
         HStack(spacing: 12 * scale) {
             OrbitingDots().scaleEffect(scale)
-            TimelineView(.animation) { context in
+            // With Reduce Motion the light doesn't cross: plain text.
+            TimelineView(.animation(paused: still)) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
-                let p = t.truncatingRemainder(dividingBy: Tune.shimmer) / Tune.shimmer * 1.8 - 0.4
+                let p = still ? -1 : t.truncatingRemainder(dividingBy: Tune.shimmer) / Tune.shimmer * 1.8 - 0.4
                 Text(status)
                     .font(Typeface.sans(15 * scale))
                     .foregroundStyle(LinearGradient(stops: [
-                        .init(color: palette.faint, location: 0),
-                        .init(color: palette.faint, location: clamp(p - 0.25)),
+                        .init(color: palette.dim, location: 0),
+                        .init(color: palette.dim, location: clamp(p - 0.25)),
                         .init(color: palette.secondary, location: clamp(p)),
-                        .init(color: palette.faint, location: clamp(p + 0.25)),
-                        .init(color: palette.faint, location: 1),
+                        .init(color: palette.dim, location: clamp(p + 0.25)),
+                        .init(color: palette.dim, location: 1),
                     ], startPoint: .leading, endPoint: .trailing))
             }
             .id(status)
-            .transition(.push(from: .bottom).combined(with: .opacity))
+            .transition(.moving(.push(from: .bottom).combined(with: .opacity)))
         }
         .animation(Tune.status, value: status)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(status))
+        .accessibilityAddTraits(.updatesFrequently)
     }
 
     private func clamp(_ x: Double) -> Double { min(1, max(0, x)) }
@@ -557,10 +576,12 @@ struct Working: View {
 
 struct OrbitingDots: View {
     @Environment(\.palette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var still
 
     var body: some View {
-        TimelineView(.animation) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
+        // Still with Reduce Motion: the three dots resting in a row.
+        TimelineView(.animation(paused: still)) { context in
+            let t = still ? 0 : context.date.timeIntervalSinceReferenceDate
             ZStack {
                 ForEach(0..<3) { i in
                     let a = t * 2.4 + Double(i) * 2 * .pi / 3
@@ -578,6 +599,7 @@ struct OrbitingDots: View {
             .frame(width: 28, height: 20)
             .rotationEffect(.degrees(-10))
         }
+        .accessibilityHidden(true)
     }
 }
 
@@ -603,7 +625,7 @@ struct LiveReasoning: View {
         let overflows = height > cap + 0.5
         Text(text)
             .font(Typeface.sans(13 * scale))
-            .foregroundStyle(palette.faint)
+            .foregroundStyle(palette.dim)
             .lineSpacing(2)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -660,7 +682,6 @@ struct ShiftReturnBreaksLine: ViewModifier {
 /// Controls blend into it; only send/stop stands out.
 private struct Composer: View {
     @Binding var draft: String
-    @Binding var choosingFolder: Bool
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     @FocusState private var focused: Bool
@@ -678,8 +699,8 @@ private struct Composer: View {
                 .modifier(ShiftReturnBreaksLine())
                 .padding(.horizontal, 5)
             HStack(spacing: 0) {
-                QuietButton(glyph: .folder) { choosingFolder = true }
-                    .help("Let Kuri work in a folder: it's mounted in the sandbox at /work")
+                QuietButton(glyph: .folder, name: "Attach Folder") { model.choosingFolder = true }
+                    .help("Let Kuri work in a folder: it's mounted in the sandbox at /work (⇧⌘O)")
                 Spacer()
                 ContextMeter()
                 ModelPicker()
@@ -724,7 +745,7 @@ struct ModelPicker: View {
             HStack(spacing: small ? 4 : 5) {
                 Text(model.composerModel?.model ?? "No model")
                     .lineLimit(1)
-                    .foregroundStyle(small ? palette.faint : palette.ink.opacity(0.85))
+                    .foregroundStyle(small ? palette.dim : palette.ink.opacity(0.85))
                 PencilIcon(glyph: .chevron, size: small ? 9 : 11, color: small ? palette.faint : palette.secondary)
             }
             .font(Typeface.sans(small ? 11.5 : 13))
@@ -771,10 +792,10 @@ struct SendButton: View {
                         RoundedRectangle(cornerRadius: 2.5 * k, style: .continuous)
                             .fill(.white)
                             .frame(width: 10 * k, height: 10 * k)
-                            .transition(.scale(scale: 0.5).combined(with: .opacity))
+                            .transition(.moving(.scale(scale: 0.5).combined(with: .opacity)))
                     } else {
                         PencilIcon(glyph: .arrowUp, size: 16 * k, color: ready ? .white : palette.background.opacity(0.9), weight: 1.7)
-                            .transition(.scale(scale: 0.5).combined(with: .opacity))
+                            .transition(.moving(.scale(scale: 0.5).combined(with: .opacity)))
                     }
                 }
             }
@@ -785,6 +806,7 @@ struct SendButton: View {
         .buttonStyle(Squish())
         .keyboardShortcut(stops ? "." : .return, modifiers: stops ? .command : [])
         .help(stops ? "Stop (⌘.)" : model.isSelectedBusy ? "Queue: joins the turn at its next step" : "Send")
+        .accessibilityLabel(stops ? Text("Stop") : model.isSelectedBusy ? Text("Queue") : Text("Send"))
     }
 }
 
@@ -796,12 +818,12 @@ private struct ContextMeter: View {
     var body: some View {
         if let usage = model.contextUsage, model.selection != nil {
             Menu {
-                Button("Compact Conversation") { Task { await model.compactSelected() } }
+                Button("Compact Chat") { Task { await model.compactSelected() } }
                     .disabled(model.isSelectedBusy)
             } label: {
                 Text(usage.window.map { "\(TokenCount.short(usage.tokens)) / \(TokenCount.short($0))" } ?? "≈ \(TokenCount.short(usage.tokens))")
                     .font(Typeface.sans(12).monospacedDigit())
-                    .foregroundStyle(palette.faint)
+                    .foregroundStyle(palette.dim)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
                     .modifier(HoverWash())
@@ -810,6 +832,7 @@ private struct ContextMeter: View {
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
+            .accessibilityLabel(Text("Context"))
             .help(usage.window == nil
                 ? "Estimated context size. Set contextWindow for this model in config.json to compact automatically."
                 : "Estimated context size. Kuri summarizes earlier messages at \(Int(model.config.compactionThreshold * 100))%.")
@@ -834,14 +857,15 @@ private struct QueuedMessages: View {
     var body: some View {
         ForEach(model.selectedQueue) { message in
             HStack(spacing: 8) {
-                Text("Queued").font(Typeface.sans(12)).foregroundStyle(palette.faint)
+                Text("Queued").font(Typeface.sans(12)).foregroundStyle(palette.dim)
                 Text(message.text).font(Typeface.sans(13)).foregroundStyle(palette.secondary).lineLimit(2)
                 Spacer()
                 Button { Task { await model.unqueue(message) } } label: {
-                    PencilIcon(glyph: .xmark, size: 12, color: palette.faint).padding(4).modifier(HoverWash())
+                    PencilIcon(glyph: .xmark, size: 12, color: palette.faint).padding(8).modifier(HoverWash())
                 }
                 .buttonStyle(Squish())
                 .help("Remove from the queue")
+                .accessibilityLabel(Text("Remove from the Queue"))
             }
             .padding(.horizontal, 12)
             .help("Joins the turn at its next step")
@@ -868,7 +892,7 @@ private struct FolderBar: View {
                 }
                 if model.sandboxStatus != .ready {
                     Text("Set up the sandbox in Settings › Sandbox to let Kuri work in these folders.")
-                        .font(Typeface.sans(12)).foregroundStyle(palette.faint)
+                        .font(Typeface.sans(12)).foregroundStyle(palette.dim)
                 }
             }
             .padding(.horizontal, 6)
@@ -880,12 +904,17 @@ private struct FolderBar: View {
             PencilIcon(glyph: .folder, size: 13, color: palette.secondary)
             Text(URL(filePath: folder.path).lastPathComponent).foregroundStyle(palette.ink.opacity(0.85))
             Text(guestPath + (folder.readOnly ? " · read-only" : ""))
-                .font(Typeface.mono(11)).foregroundStyle(palette.faint)
+                .font(Typeface.mono(11)).foregroundStyle(palette.dim)
             Button { Task { await model.detach(folder) } } label: {
+                // A 20-point target around the small cross.
                 PencilIcon(glyph: .xmark, size: 11, color: palette.faint)
+                    .frame(width: 20, height: 20)
+                    .contentShape(.rect)
             }
             .buttonStyle(Squish())
+            .padding(.vertical, -3)
             .help("Detach")
+            .accessibilityLabel(Text("Detach \(URL(filePath: folder.path).lastPathComponent)"))
         }
         .font(Typeface.sans(13))
         .padding(.horizontal, 10).padding(.vertical, 5)
@@ -911,7 +940,7 @@ struct TurnEndBar: View {
         if let message {
             HStack(spacing: 10) {
                 Text(message)
-                    .foregroundStyle(turn.status == .failed ? palette.accent : palette.secondary)
+                    .foregroundStyle(turn.status == .failed ? palette.accentText : palette.secondary)
                     .textSelection(.enabled)
                 Spacer()
                 Button("Continue") { Task { await model.continueSelected() } }
@@ -929,9 +958,9 @@ struct TurnEndBar: View {
 
     private var message: String? {
         switch turn.status {
-        case .cancelled: "Stopped."
-        case .failed where turn.error == "Interrupted": "Interrupted: Kuri quit during this turn."
-        case .failed: turn.error ?? "This turn failed."
+        case .cancelled: String(localized: "Stopped.")
+        case .failed where turn.error == "Interrupted": String(localized: "Interrupted: Kuri quit during this turn.")
+        case .failed: turn.error ?? String(localized: "This turn failed.")
         default: nil
         }
     }
@@ -974,7 +1003,7 @@ private struct PlanCard: View {
             Button(action: toggle) {
                 HStack(spacing: 6) {
                     Text("Plan").foregroundStyle(palette.ink)
-                    Text("\(done)/\(entries.count)").foregroundStyle(palette.faint).monospacedDigit()
+                    Text("\(done)/\(entries.count)").foregroundStyle(palette.dim).monospacedDigit()
                     Spacer()
                     PencilIcon(glyph: .chevron, size: 11, color: palette.faint)
                         .rotationEffect(.degrees(expanded ? 0 : -90))
@@ -1034,6 +1063,7 @@ struct InputRequestView: View {
                 Text(approval.arguments).font(Typeface.mono(11.5 * scale)).foregroundStyle(palette.secondary).lineLimit(6)
                 HStack {
                     Button("Deny") { Task { await model.respond(to: request, with: .approved(false)) } }
+                        .keyboardShortcut(.cancelAction)
                     Button("Allow") { Task { await model.respond(to: request, with: .approved(true)) } }
                         .keyboardShortcut(.defaultAction)
                 }

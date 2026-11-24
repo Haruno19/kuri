@@ -75,7 +75,10 @@ final class AppModel {
     private(set) var inputRequests: [InputRequest] = []
     private(set) var models: [ModelRef] = []
     private(set) var config = Config() {
-        didSet { Self.apply(config.appearance) }
+        didSet {
+            Self.apply(config.appearance)
+            MiniController.shared.setShowsIcon(config.menuBarIcon ?? true)
+        }
     }
     private(set) var tools: [ToolInfo] = []
     private(set) var memories: [Memory] = []
@@ -87,7 +90,17 @@ final class AppModel {
     /// here, not in the inspector, so the Git box is already there when the
     /// inspector opens again.
     var repositories: [String: RepositoryStatus] = [:]
-    var errorMessage: String?
+    /// What went wrong last, for the alert (the mini window shows it inline).
+    var problem: Problem?
+    /// The sidebar is open (the main window's; ⌃⌘S). Here rather than in the
+    /// view so the Chat menu can open it to rename.
+    var showsSidebar = false
+    /// The chat whose title is being edited in place in the sidebar.
+    var renaming: UUID?
+    /// The chat waiting for the user to confirm its deletion.
+    var pendingDeletion: UUID?
+    /// The folder picker is up (the composer's button, Chat › Attach Folder…).
+    var choosingFolder = false
     /// The inspector is open (the main window's; ⌥⌘I). Not remembered:
     /// the window opens on the chat alone.
     var showsInspector = false
@@ -118,7 +131,7 @@ final class AppModel {
 
     /// The working indicator's words: the tool in progress, or thinking.
     var workingStatus: String {
-        guard let last = inspectorTurns.last?.steps.last, last.result == nil else { return "Thinking" }
+        guard let last = inspectorTurns.last?.steps.last, last.result == nil else { return String(localized: "Thinking") }
         return last.summary.status
     }
 
@@ -154,7 +167,7 @@ final class AppModel {
             try await engine.editTaskList(entries, in: id)
         } catch {
             pendingTasks[id] = nil
-            errorMessage = error.localizedDescription
+            report("Couldn't change the tasks", error)
         }
     }
 
@@ -210,7 +223,7 @@ final class AppModel {
             let conversation = try await engine.newConversation()
             selection = conversation.id
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't start a new chat", error)
         }
     }
 
@@ -225,7 +238,7 @@ final class AppModel {
             guard let id = selection else { return }
             try await engine.send(text, to: id)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't send the message", error)
         }
     }
 
@@ -275,7 +288,7 @@ final class AppModel {
         do {
             try await engine.retry(id)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't answer again", error)
         }
     }
 
@@ -284,7 +297,7 @@ final class AppModel {
         do {
             try await engine.continueConversation(id)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't continue", error)
         }
     }
 
@@ -293,7 +306,7 @@ final class AppModel {
         do {
             try await engine.compact(id)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't compact the chat", error)
         }
     }
 
@@ -305,12 +318,40 @@ final class AppModel {
         do {
             try await engine?.rename(id, to: title)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't rename the chat", error)
         }
     }
 
+    /// Deletes for good: the chat menu and the sidebar ask first
+    /// (`pendingDeletion`).
     func delete(_ id: UUID) async {
-        try? await engine?.delete(id)
+        do {
+            try await engine?.delete(id)
+        } catch {
+            report("Couldn't delete the chat", error)
+        }
+    }
+
+    func report(_ title: LocalizedStringResource, _ error: Error) {
+        problem = Problem(title: String(localized: title), message: error.localizedDescription)
+    }
+
+    /// Edits the selected chat's title in the sidebar, opening it first.
+    func renameSelected() {
+        guard let id = selection else { return }
+        showsSidebar = true
+        renaming = id
+    }
+
+    /// The latest turn is over and can be answered again.
+    var canRetry: Bool {
+        selection != nil && !isSelectedBusy && lastTurn?.endedAt != nil
+    }
+
+    /// The latest turn stopped or failed, and can be picked up.
+    var canContinue: Bool {
+        guard selection != nil, !isSelectedBusy, let status = lastTurn?.status else { return false }
+        return status == .cancelled || status == .failed
     }
 
     func respond(to request: InputRequest, with response: InputResponse) async {
@@ -379,7 +420,7 @@ final class AppModel {
         do {
             try await engine?.register(model, provider: provider)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't add the model", error)
         }
     }
 
@@ -387,7 +428,7 @@ final class AppModel {
         do {
             try await engine?.unregister(model: id, provider: provider)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't remove the model", error)
         }
     }
 
@@ -395,7 +436,7 @@ final class AppModel {
         do {
             try await engine?.setAPIKey(key, provider: provider)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't save the API key", error)
         }
     }
 
@@ -403,7 +444,7 @@ final class AppModel {
         do {
             try await engine?.setGenerateTitles(enabled)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't change the setting", error)
         }
     }
 
@@ -411,7 +452,7 @@ final class AppModel {
         do {
             try await engine?.setStartInBackground(enabled)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't change the setting", error)
         }
     }
 
@@ -419,7 +460,15 @@ final class AppModel {
         do {
             try await engine?.setCompactAt(percent)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't change the setting", error)
+        }
+    }
+
+    func setMenuBarIcon(_ enabled: Bool) async {
+        do {
+            try await engine?.setMenuBarIcon(enabled)
+        } catch {
+            report("Couldn't change the setting", error)
         }
     }
 
@@ -427,7 +476,7 @@ final class AppModel {
         do {
             try await engine?.setMeadow(enabled)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't change the setting", error)
         }
     }
 
@@ -435,7 +484,7 @@ final class AppModel {
         do {
             try await engine?.setAppearance(appearance)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't change the setting", error)
         }
     }
 
@@ -443,7 +492,7 @@ final class AppModel {
         do {
             try await engine?.setSandbox(image: image, cpus: cpus, memoryMiB: memoryMiB, idleMinutes: idleMinutes)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't change the sandbox settings", error)
         }
     }
 
@@ -451,7 +500,7 @@ final class AppModel {
         do {
             try await engine?.setDefaultModel(ref)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't change the default model", error)
         }
     }
 
@@ -461,7 +510,7 @@ final class AppModel {
         do {
             try await engine?.setUpSandbox()
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't set up the sandbox", error)
         }
     }
 
@@ -477,7 +526,7 @@ final class AppModel {
             }
             try await engine.setFolders(updated, for: id)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't attach the folder", error)
         }
     }
 
@@ -498,7 +547,7 @@ final class AppModel {
         do {
             try await engine.setFolders(updated, for: id)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't change the folders", error)
         }
     }
 
@@ -508,7 +557,7 @@ final class AppModel {
         do {
             try await engine?.changeMemories(changes)
         } catch {
-            errorMessage = error.localizedDescription
+            report("Couldn't change the memories", error)
         }
     }
 
@@ -578,7 +627,7 @@ final class AppModel {
             }
 
         case .modelFallback(let id, let from, let to, let reason):
-            fallbackNotices[id] = "\(from) failed (\(reason)); \(to) took over."
+            fallbackNotices[id] = String(localized: "\(String(describing: from)) failed (\(reason)); \(String(describing: to)) took over.")
             if id == selection {
                 streamingText = ""
                 streamingReasoning = ""
@@ -615,7 +664,7 @@ final class AppModel {
             }
 
         case .configFailed(let message):
-            errorMessage = message
+            problem = Problem(title: String(localized: "Couldn't read the configuration"), message: message)
 
         case .toolsChanged:
             Task { tools = await engine?.toolCatalog() ?? [] }
@@ -639,6 +688,13 @@ final class AppModel {
             }
         }
     }
+}
+
+/// Something that went wrong: what the user was doing, and why it failed.
+struct Problem: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
 }
 
 extension AppModel {
