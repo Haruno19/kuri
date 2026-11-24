@@ -156,15 +156,21 @@ private struct StatusLine: View {
     @Environment(\.palette) private var palette
 
     var body: some View {
-        Text(text)
-            .font(Typeface.mono(11))
-            .foregroundStyle(palette.dim)
-            .contentTransition(.opacity)
-            .animation(Tune.status, value: text)
-            .padding(.leading, 20)
-            .padding(.bottom, aboveMeadow ? 30 : 16)
-            .allowsHitTesting(false)
-            .accessibilityLabel(Text("Status: \(text)"))
+        // Signed with 栗, as old software signed its status bar.
+        HStack(spacing: 7) {
+            Seal()
+                .help("栗 · kuri, chestnut in Japanese")
+                .accessibilityHidden(true)
+            Text(text)
+                .font(Typeface.mono(11))
+                .foregroundStyle(palette.dim)
+                .contentTransition(.opacity)
+                .animation(Tune.status, value: text)
+                .allowsHitTesting(false)
+                .accessibilityLabel(Text("Status: \(text)"))
+        }
+        .padding(.leading, 20)
+        .padding(.bottom, aboveMeadow ? 30 : 16)
     }
 
     private var text: String {
@@ -176,6 +182,34 @@ private struct StatusLine: View {
             if others > 0 { return String(localized: "Working in \(others) chats") }
             return model.models.isEmpty ? String(localized: "No model set up") : String(localized: "Ready")
         }
+    }
+}
+
+/// 栗 (kuri, the chestnut) as a hanko stamp: a square of chestnut ink with
+/// the character cut out of it, set a little crooked as a hand would stamp
+/// it. Tried in Sketches/Seal.swift.
+struct Seal: View {
+    static let size: CGFloat = 15
+    /// Degrees; a stamp is never quite straight.
+    static let tilt: Double = -4
+    /// The character's share of the square.
+    static let glyph: CGFloat = 0.78
+    /// Ink isn't perfectly even.
+    static let ink = 0.92
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: Self.size * 0.16, style: .continuous).fill(palette.accent)
+            // Hiragino Mincho ships with macOS; the bundled faces have no kanji.
+            Text(verbatim: "栗")
+                .font(.custom("HiraMinProN-W6", size: Self.size * Self.glyph))
+                .foregroundStyle(palette.background)
+                .offset(y: Self.size * 0.02)
+        }
+        .frame(width: Self.size, height: Self.size)
+        .opacity(Self.ink)
+        .rotationEffect(.degrees(Self.tilt))
     }
 }
 

@@ -7,6 +7,16 @@
     "“%@”" : {
       "shouldTranslate" : false
     },
+    "栗 · kuri, chestnut in Japanese" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "栗 · kuri, castagna in giapponese"
+          }
+        }
+      }
+    },
     "%@  %@ · %@" : {
       "localizations" : {
         "it" : {
@@ -287,6 +297,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un castagno ed erba autunnale in fondo a una nuova chat. Fai clic sull'albero per scuoterlo."
+          }
+        }
+      }
+    },
+    "About Kuri" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informazioni su Kuri"
           }
         }
       }
