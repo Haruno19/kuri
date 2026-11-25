@@ -54,6 +54,10 @@ struct KuriApp: App {
         .defaultSize(width: 1040, height: 760)
         .defaultLaunchBehavior(startsInBackground ? .suppressed : .automatic)
         .commands {
+            // Kuri › About Kuri: the standard panel, signed with 栗.
+            CommandGroup(replacing: .appInfo) {
+                Button("About Kuri") { AboutPanel.show() }
+            }
             // File › New Chat: the main window has a single chat page, so
             // this takes the place of New Window.
             CommandGroup(replacing: .newItem) {
@@ -92,6 +96,29 @@ private struct InspectorCommands: View {
         .keyboardShortcut("i", modifiers: [.command, .option])
         .disabled(model.phase.isReady == false)
         Divider()
+    }
+}
+
+/// The standard About panel, with Kuri's name in Japanese under the icon:
+/// 栗, kuri, the chestnut. Just the character, unexplained.
+enum AboutPanel {
+    /// The chestnut of the app's accent, light and dark.
+    private static let ink = NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0xC0 / 255.0, green: 0x84 / 255.0, blue: 0x52 / 255.0, alpha: 1)
+            : NSColor(srgbRed: 0xA4 / 255.0, green: 0x69 / 255.0, blue: 0x3D / 255.0, alpha: 1)
+    }
+
+    static func show() {
+        let centred = NSMutableParagraphStyle()
+        centred.alignment = .center
+        let credits = NSAttributedString(string: "栗", attributes: [
+            .font: NSFont(name: "HiraMinProN-W6", size: 30) ?? NSFont.systemFont(ofSize: 30),
+            .foregroundColor: ink,
+            .paragraphStyle: centred,
+        ])
+        NSApplication.shared.orderFrontStandardAboutPanel(options: [.credits: credits])
+        NSApplication.shared.activate()
     }
 }
 
