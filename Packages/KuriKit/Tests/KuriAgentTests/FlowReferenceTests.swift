@@ -1,4 +1,5 @@
 import Foundation
+import JavaScriptCore
 import Testing
 
 /// The code references in docs/flows.html point at real lines: every step
@@ -41,6 +42,28 @@ import Testing
                 : "\(path):\(line): “\(code)” is now at line \(actual.joined(separator: ", ")); \(Self.fix)")
         }
         #expect(count > 100)
+    }
+
+    /// The flows are data in the page's script: one stray quote or a lost
+    /// brace and no diagram draws, while every reference above still reads.
+    @Test func pageScriptParses() throws {
+        let start = try #require(page.range(of: "<script>"))
+        let end = try #require(page.range(of: "</script>", range: start.upperBound..<page.endIndex))
+        let script = String(page[start.upperBound..<end.lowerBound])
+        let line = page[..<start.upperBound].count { $0 == "\n" } + 1
+        let context = JSGlobalContextCreate(nil)
+        defer { JSGlobalContextRelease(context) }
+        let source = JSStringCreateWithCFString(script as CFString)
+        defer { JSStringRelease(source) }
+        var exception: JSValueRef?
+        if !JSCheckScriptSyntax(context, source, nil, Int32(line), &exception) {
+            let error = JSValueToStringCopy(context, exception, nil)
+            defer { error.map(JSStringRelease) }
+            let lineValue = JSObjectGetProperty(context, JSValueToObject(context, exception, nil),
+                                                JSStringCreateWithCFString("line" as CFString), nil)
+            let message = error.map { JSStringCopyCFString(nil, $0) as String } ?? "syntax error"
+            Issue.record("docs/flows.html:\(Int(JSValueToNumber(context, lineValue, nil))): \(message)")
+        }
     }
 
     @Test func everyStepInsideKuriHasAReference() throws {
