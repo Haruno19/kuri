@@ -32,3 +32,4 @@ To change one, write a new record that supersedes it, and mark the old one *Supe
 | [0024](0024-mac-conventions.md) | Mac conventions under the custom look: menus, confirmation, contrast, Reduce Motion, VoiceOver, menu bar icon optional |
 | [0025](0025-pane-toggles-in-the-chat.md) | The panes' toggles are drawn by the chat, with system symbols (amends 0021) |
 | [0026](0026-reply-blocks.md) | Key figures and charts as fenced blocks of JSON, drawn natively |
+| [0027](0027-releases.md) | Releases are a disk image made by one script, ad-hoc signed until there's a Developer ID |

@@ -35,6 +35,18 @@ Kuri is a single app that contains both the engine and the interface. It runs of
 
 </p>
 
+## Install
+
+Kuri needs a Mac with Apple silicon and macOS 26. Download the `.dmg` from [Releases](https://github.com/Haruno19/kuri/releases), open it and drag Kuri to Applications.
+
+Releases aren't notarized by Apple yet, so the first time you open Kuri macOS says it can't verify it. Open **System Settings › Privacy & Security**, scroll down to the message about Kuri and click **Open Anyway**. Or, in Terminal:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Kuri.app
+```
+
+To build a release yourself: `Release/make-dmg.sh` (what it does, and how to sign and notarize, is at the top of the script).
+
 ## Architecture
 
 ```
