@@ -109,19 +109,17 @@ enum ReplyBlock {
     case kpi([KPI])
     case chart(ChartSpec)
 
-    /// The fences' languages: all the engine describes, since the app draws them all.
-    static let kinds = Set(ReplyBlockKind.allCases.map(\.rawValue))
     /// More series than there are colours: the block stays code.
     static let maxSeries = SeriesColors.light.count
 
     /// The block a fence holds, or nil when it isn't one or its JSON doesn't fit.
     static func decode(language: String?, _ source: String) -> ReplyBlock? {
-        guard let kind = language?.lowercased(), kinds.contains(kind) else { return nil }
+        guard let kind = language.flatMap({ ReplyBlockKind(rawValue: $0.lowercased()) }) else { return nil }
         let decoder = JSONDecoder()
         // Trailing commas and unquoted keys shouldn't cost the reader the chart.
         decoder.allowsJSON5 = true
         let data = Data(source.utf8)
-        if kind == "kpi" {
+        if kind == .kpi {
             if let list = try? decoder.decode([KPI].self, from: data), !list.isEmpty { return .kpi(list) }
             return (try? decoder.decode(KPI.self, from: data)).map { .kpi([$0]) }
         }
@@ -610,7 +608,7 @@ private struct DataTable: View {
 /// Where a block will be while its JSON is still arriving: its shape,
 /// breathing, so the reply doesn't show half a JSON and then jump.
 struct ReplyBlockPlaceholder: View {
-    let kind: String
+    let kind: ReplyBlockKind
     @Environment(\.palette) private var palette
     @Environment(\.chatScale) private var scale
     @Environment(\.accessibilityReduceMotion) private var still
@@ -620,7 +618,7 @@ struct ReplyBlockPlaceholder: View {
             let t = context.date.timeIntervalSinceReferenceDate
             let pulse = still ? 0.5 : (sin(t * 2 * .pi / Tune.breathe) + 1) / 2
             let fill = palette.ink.opacity(palette.dark ? 0.06 + 0.04 * pulse : 0.045 + 0.035 * pulse)
-            if kind == "kpi" {
+            if kind == .kpi {
                 HStack(spacing: 10 * scale) {
                     ForEach(0..<3, id: \.self) { _ in
                         VStack(alignment: .leading, spacing: 8 * scale) {
@@ -647,6 +645,6 @@ struct ReplyBlockPlaceholder: View {
             }
         }
         .accessibilityElement()
-        .accessibilityLabel(kind == "kpi" ? "Figures on the way" : "Chart on the way")
+        .accessibilityLabel(kind == .kpi ? "Figures on the way" : "Chart on the way")
     }
 }

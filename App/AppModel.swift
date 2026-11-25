@@ -315,25 +315,27 @@ final class AppModel {
     }
 
     func rename(_ id: UUID, to title: String) async {
-        do {
-            try await engine?.rename(id, to: title)
-        } catch {
-            report("Couldn't rename the chat", error)
-        }
+        await attempt("Couldn't rename the chat") { try await $0.rename(id, to: title) }
     }
 
     /// Deletes for good: the chat menu and the sidebar ask first
     /// (`pendingDeletion`).
     func delete(_ id: UUID) async {
-        do {
-            try await engine?.delete(id)
-        } catch {
-            report("Couldn't delete the chat", error)
-        }
+        await attempt("Couldn't delete the chat") { try await $0.delete(id) }
     }
 
     func report(_ title: LocalizedStringResource, _ error: Error) {
         problem = Problem(title: String(localized: title), message: error.localizedDescription)
+    }
+
+    /// Runs an engine call, reporting a failure under `title`.
+    private func attempt(_ title: LocalizedStringResource, _ work: (Engine) async throws -> Void) async {
+        guard let engine else { return }
+        do {
+            try await work(engine)
+        } catch {
+            report(title, error)
+        }
     }
 
     /// Edits the selected chat's title in the sidebar, opening it first.
@@ -417,101 +419,53 @@ final class AppModel {
     }
 
     func register(_ model: ModelConfig, provider: String) async {
-        do {
-            try await engine?.register(model, provider: provider)
-        } catch {
-            report("Couldn't add the model", error)
-        }
+        await attempt("Couldn't add the model") { try await $0.register(model, provider: provider) }
     }
 
     func unregister(model id: String, provider: String) async {
-        do {
-            try await engine?.unregister(model: id, provider: provider)
-        } catch {
-            report("Couldn't remove the model", error)
-        }
+        await attempt("Couldn't remove the model") { try await $0.unregister(model: id, provider: provider) }
     }
 
     func setAPIKey(_ key: String?, provider: String) async {
-        do {
-            try await engine?.setAPIKey(key, provider: provider)
-        } catch {
-            report("Couldn't save the API key", error)
-        }
+        await attempt("Couldn't save the API key") { try await $0.setAPIKey(key, provider: provider) }
     }
 
     func setGenerateTitles(_ enabled: Bool) async {
-        do {
-            try await engine?.setGenerateTitles(enabled)
-        } catch {
-            report("Couldn't change the setting", error)
-        }
+        await attempt("Couldn't change the setting") { try await $0.setGenerateTitles(enabled) }
     }
 
     func setStartInBackground(_ enabled: Bool) async {
-        do {
-            try await engine?.setStartInBackground(enabled)
-        } catch {
-            report("Couldn't change the setting", error)
-        }
+        await attempt("Couldn't change the setting") { try await $0.setStartInBackground(enabled) }
     }
 
     func setCompactAt(_ percent: Int) async {
-        do {
-            try await engine?.setCompactAt(percent)
-        } catch {
-            report("Couldn't change the setting", error)
-        }
+        await attempt("Couldn't change the setting") { try await $0.setCompactAt(percent) }
     }
 
     func setMenuBarIcon(_ enabled: Bool) async {
-        do {
-            try await engine?.setMenuBarIcon(enabled)
-        } catch {
-            report("Couldn't change the setting", error)
-        }
+        await attempt("Couldn't change the setting") { try await $0.setMenuBarIcon(enabled) }
     }
 
     func setMeadow(_ enabled: Bool) async {
-        do {
-            try await engine?.setMeadow(enabled)
-        } catch {
-            report("Couldn't change the setting", error)
-        }
+        await attempt("Couldn't change the setting") { try await $0.setMeadow(enabled) }
     }
 
     func setAppearance(_ appearance: Appearance) async {
-        do {
-            try await engine?.setAppearance(appearance)
-        } catch {
-            report("Couldn't change the setting", error)
-        }
+        await attempt("Couldn't change the setting") { try await $0.setAppearance(appearance) }
     }
 
     func setSandbox(image: String?, cpus: Int?, memoryMiB: Int?, idleMinutes: Int?) async {
-        do {
-            try await engine?.setSandbox(image: image, cpus: cpus, memoryMiB: memoryMiB, idleMinutes: idleMinutes)
-        } catch {
-            report("Couldn't change the sandbox settings", error)
-        }
+        await attempt("Couldn't change the sandbox settings") { try await $0.setSandbox(image: image, cpus: cpus, memoryMiB: memoryMiB, idleMinutes: idleMinutes) }
     }
 
     func setDefaultModel(_ ref: ModelRef?) async {
-        do {
-            try await engine?.setDefaultModel(ref)
-        } catch {
-            report("Couldn't change the default model", error)
-        }
+        await attempt("Couldn't change the default model") { try await $0.setDefaultModel(ref) }
     }
 
     // MARK: Sandbox and folders
 
     func setUpSandbox() async {
-        do {
-            try await engine?.setUpSandbox()
-        } catch {
-            report("Couldn't set up the sandbox", error)
-        }
+        await attempt("Couldn't set up the sandbox") { try await $0.setUpSandbox() }
     }
 
     /// Adds folders to the selected conversation, creating one if needed.
@@ -554,11 +508,7 @@ final class AppModel {
     // MARK: Memory
 
     func changeMemories(_ changes: [MemoryChange]) async {
-        do {
-            try await engine?.changeMemories(changes)
-        } catch {
-            report("Couldn't change the memories", error)
-        }
+        await attempt("Couldn't change the memories") { try await $0.changeMemories(changes) }
     }
 
     private func reloadMemories() async {

@@ -204,33 +204,39 @@ import Testing
     }
 }
 
-@Suite struct MeadowSettingTests {
-    @Test func writesFalseAndLeavesTheDefaultOut() throws {
-        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-meadow-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let home = KuriHome(root: root)
-        try home.prepare()
-        try Data(#"{ providers: {} }"#.utf8).write(to: home.configFile)
-        #expect(try ConfigLoader(home: home).loadConfig().meadow == nil)
-        try ConfigEditor(home: home).setMeadow(false)
-        #expect(try ConfigLoader(home: home).loadConfig().meadow == false)
-        try ConfigEditor(home: home).setMeadow(true)
-        #expect(try ConfigLoader(home: home).loadConfig().meadow == nil)
-    }
-}
+/// Toggles that default to on: off writes `false`, on removes the key.
+@Suite struct DefaultOnSettingTests {
+    enum Toggle: String, CaseIterable {
+        case meadow, menuBarIcon
 
-@Suite struct MenuBarIconSettingTests {
-    @Test func writesFalseAndLeavesTheDefaultOut() throws {
-        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-menubar-\(UUID().uuidString)")
+        func set(_ enabled: Bool, in home: KuriHome) throws {
+            switch self {
+            case .meadow: try ConfigEditor(home: home).setMeadow(enabled)
+            case .menuBarIcon: try ConfigEditor(home: home).setMenuBarIcon(enabled)
+            }
+        }
+
+        func read(_ home: KuriHome) throws -> Bool? {
+            let config = try ConfigLoader(home: home).loadConfig()
+            return switch self {
+            case .meadow: config.meadow
+            case .menuBarIcon: config.menuBarIcon
+            }
+        }
+    }
+
+    @Test(arguments: Toggle.allCases)
+    func writesFalseAndLeavesTheDefaultOut(_ toggle: Toggle) throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "kuri-\(toggle.rawValue)-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let home = KuriHome(root: root)
         try home.prepare()
         try Data(#"{ providers: {} }"#.utf8).write(to: home.configFile)
-        #expect(try ConfigLoader(home: home).loadConfig().menuBarIcon == nil)
-        try ConfigEditor(home: home).setMenuBarIcon(false)
-        #expect(try ConfigLoader(home: home).loadConfig().menuBarIcon == false)
-        try ConfigEditor(home: home).setMenuBarIcon(true)
-        #expect(try ConfigLoader(home: home).loadConfig().menuBarIcon == nil)
+        #expect(try toggle.read(home) == nil)
+        try toggle.set(false, in: home)
+        #expect(try toggle.read(home) == false)
+        try toggle.set(true, in: home)
+        #expect(try toggle.read(home) == nil)
     }
 }
 

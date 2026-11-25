@@ -1,5 +1,4 @@
 import Foundation
-import KuriInference
 import KuriSandbox
 import KuriStore
 
@@ -70,13 +69,6 @@ enum Instructions {
         }
 
         return sections.joined(separator: "\n\n")
-    }
-
-    /// The blocks worth describing to a model. Providers without tools are
-    /// the on-device model today (decision 0013): its 4,096-token context
-    /// can't spare the schema, and it writes JSON unreliably.
-    static func blocks(_ blocks: Set<ReplyBlockKind>, for provider: any InferenceProvider) -> Set<ReplyBlockKind> {
-        provider.supportsTools ? blocks : []
     }
 
     /// How to write the blocks the client draws. Kept with the user's own

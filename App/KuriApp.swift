@@ -61,10 +61,7 @@ struct KuriApp: App {
             // File › New Chat: the main window has a single chat page, so
             // this takes the place of New Window.
             CommandGroup(replacing: .newItem) {
-                Button("New Chat") {
-                    model.selection = nil
-                    WindowActions.openMain()
-                }
+                Button("New Chat") { WindowActions.newChat(in: model) }
                 .keyboardShortcut("n")
                 .disabled(model.phase.isReady == false)
             }
@@ -102,11 +99,9 @@ private struct InspectorCommands: View {
 /// The standard About panel, with Kuri's name in Japanese under the icon:
 /// 栗, kuri, the chestnut. Just the character, unexplained.
 enum AboutPanel {
-    /// The chestnut of the app's accent, light and dark.
+    /// The palette's accent, light and dark.
     private static let ink = NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            ? NSColor(srgbRed: 0xC0 / 255.0, green: 0x84 / 255.0, blue: 0x52 / 255.0, alpha: 1)
-            : NSColor(srgbRed: 0xA4 / 255.0, green: 0x69 / 255.0, blue: 0x3D / 255.0, alpha: 1)
+        NSColor(Palette(scheme: appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .dark : .light).accent)
     }
 
     static func show() {

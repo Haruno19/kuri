@@ -39,6 +39,12 @@ enum WindowActions {
         NSApplication.shared.activate()
     }
 
+    /// The main window on a new chat: File › New Chat, and the menu bar icon's.
+    static func newChat(in model: AppModel?) {
+        model?.selection = nil
+        openMain()
+    }
+
     static func showSettings() {
         Dock.show()
         if let openSettings {
@@ -168,10 +174,7 @@ final class MiniController: NSObject, NSWindowDelegate {
     @objc private func openMain() { WindowActions.openMain() }
 
     /// A new chat in the main window, as File › New Chat.
-    @objc private func newChat() {
-        main?.selection = nil
-        WindowActions.openMain()
-    }
+    @objc private func newChat() { WindowActions.newChat(in: main) }
 
     /// The mini window's chat in the main window.
     func openInMain() { expand() }

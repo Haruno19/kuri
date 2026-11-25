@@ -19,7 +19,10 @@ public actor Engine {
     public private(set) var mcpConfig: MCPConfig
     public var limits = TurnLimits()
     /// The fenced blocks the client draws natively, which the instructions
-    /// then describe (decision 0026). The engine only names them.
+    /// then describe (decision 0026). The engine only names them. Providers
+    /// without tools (the on-device model, decision 0013) get none: its
+    /// 4,096-token context can't spare the schema, and it writes JSON
+    /// unreliably.
     public nonisolated let blocks: Set<ReplyBlockKind>
 
     private let registry: ToolRegistry
@@ -489,7 +492,7 @@ public actor Engine {
                 instructions: Instructions.build(conversation: conversation, folders: folders, mounts: mounts,
                                                  image: SandboxSettings(config.sandbox).image,
                                                  memories: memories, tools: toolNames,
-                                                 blocks: Instructions.blocks(blocks, for: provider)),
+                                                 blocks: provider.supportsTools ? blocks : []),
                 useTools: provider.supportsTools)
         }
         let primary = await choice(turn.model, provider)

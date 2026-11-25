@@ -1,3 +1,4 @@
+import KuriAgent
 import SwiftUI
 
 // Model replies as Markdown. Foundation's own parser (CommonMark with GitHub's
@@ -22,7 +23,7 @@ indirect enum MarkdownBlock {
     case block(ReplyBlock)
     /// A block's fence the reply hasn't closed yet: a placeholder while it
     /// streams, its source if it ended that way.
-    case unfinished(kind: String, source: String)
+    case unfinished(kind: ReplyBlockKind, source: String)
 }
 
 /// A formula found in a reply.
@@ -78,7 +79,7 @@ enum Markdown {
         // The parser runs an unclosed fence to the end of the text, so a
         // block still streaming reads as a code block of half a JSON.
         if let kind = unclosedBlockFence(text), case .code(let language, let source)? = blocks.last,
-           language?.lowercased() == kind {
+           language?.lowercased() == kind.rawValue {
             blocks[blocks.count - 1] = .unfinished(kind: kind, source: source)
         }
         let document = MarkdownDocument(blocks: blocks, math: math)
@@ -186,7 +187,7 @@ enum Markdown {
 
     /// The language of a block fence (```kpi, ```chart) the text opens and
     /// doesn't close, following CommonMark's rules for fences.
-    static func unclosedBlockFence(_ text: String) -> String? {
+    static func unclosedBlockFence(_ text: String) -> ReplyBlockKind? {
         var open: (marker: Character, length: Int, info: String)?
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let trimmed = line.drop { $0 == " " || $0 == "\t" }
@@ -200,8 +201,7 @@ enum Markdown {
                 open = (marker, length, rest.split(separator: " ").first.map(String.init) ?? "")
             }
         }
-        guard let info = open?.info.lowercased(), ReplyBlock.kinds.contains(info) else { return nil }
-        return info
+        return open.flatMap { ReplyBlockKind(rawValue: $0.info.lowercased()) }
     }
 
     /// A node of the block tree while it's being rebuilt from the runs.
@@ -405,13 +405,13 @@ private struct MarkdownBlockView: View {
 
         case .block(let block):
             ReplyBlockView(block: block)
-                .transition(.opacity.combined(with: .scale(0.985, anchor: .top)))
+                .transition(.moving(.opacity.combined(with: .scale(scale: 0.985, anchor: .top))))
 
         case .unfinished(let kind, let source):
             if streaming {
                 ReplyBlockPlaceholder(kind: kind).transition(.opacity)
             } else {
-                CodeBlock(language: kind, code: source, size: size * Typeface.monoScale)
+                CodeBlock(language: kind.rawValue, code: source, size: size * Typeface.monoScale)
             }
 
         case .quote(let blocks):

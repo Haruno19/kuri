@@ -56,11 +56,7 @@ public struct ConfigEditor: Sendable {
     }
 
     public func setGenerateTitles(_ enabled: Bool) throws {
-        try edit { tree in
-            guard case .object(var root) = tree else { return }
-            root["generateTitles"] = .bool(enabled)
-            tree = .object(root)
-        }
+        try set("generateTitles", .bool(enabled))
     }
 
     /// Writes the sandbox keys Settings edits; `nil` removes a key (its
@@ -80,54 +76,30 @@ public struct ConfigEditor: Sendable {
 
     /// `false` is the default, so it leaves the key out.
     public func setStartInBackground(_ enabled: Bool) throws {
-        try edit { tree in
-            guard case .object(var root) = tree else { return }
-            root["startInBackground"] = enabled ? .bool(true) : nil
-            tree = .object(root)
-        }
+        try set("startInBackground", enabled ? .bool(true) : nil)
     }
 
     /// `true` is the default, so it leaves the key out.
     public func setMenuBarIcon(_ enabled: Bool) throws {
-        try edit { tree in
-            guard case .object(var root) = tree else { return }
-            root["menuBarIcon"] = enabled ? nil : .bool(false)
-            tree = .object(root)
-        }
+        try set("menuBarIcon", enabled ? nil : .bool(false))
     }
 
     /// `true` is the default, so it leaves the key out.
     public func setMeadow(_ enabled: Bool) throws {
-        try edit { tree in
-            guard case .object(var root) = tree else { return }
-            root["meadow"] = enabled ? nil : .bool(false)
-            tree = .object(root)
-        }
+        try set("meadow", enabled ? nil : .bool(false))
     }
 
     public func setAppearance(_ appearance: Appearance) throws {
-        try edit { tree in
-            guard case .object(var root) = tree else { return }
-            root["appearance"] = appearance == .system ? nil : .string(appearance.rawValue)
-            tree = .object(root)
-        }
+        try set("appearance", appearance == .system ? nil : .string(appearance.rawValue))
     }
 
     /// The default leaves the key out.
     public func setCompactAt(_ percent: Int) throws {
-        try edit { tree in
-            guard case .object(var root) = tree else { return }
-            root["compactAt"] = percent == Config.defaultCompactAt ? nil : .number(Double(percent))
-            tree = .object(root)
-        }
+        try set("compactAt", percent == Config.defaultCompactAt ? nil : .number(Double(percent)))
     }
 
     public func setDefaultModel(_ ref: ModelRef?) throws {
-        try edit { tree in
-            guard case .object(var root) = tree else { return }
-            root["defaultModel"] = ref.map { .string($0.description) }
-            tree = .object(root)
-        }
+        try set("defaultModel", ref.map { .string($0.description) })
     }
 
     // MARK: Providers
@@ -142,6 +114,15 @@ public struct ConfigEditor: Sendable {
     }
 
     // MARK: Tree helpers
+
+    /// Sets a top-level key; `nil` removes it, so its default applies.
+    private func set(_ key: String, _ value: JSONValue?) throws {
+        try edit { tree in
+            guard case .object(var root) = tree else { return }
+            root[key] = value
+            tree = .object(root)
+        }
+    }
 
     private static func provider(_ name: String, in tree: JSONValue) throws -> [String: JSONValue] {
         guard case .object(let providers) = tree["providers"] ?? .null,
