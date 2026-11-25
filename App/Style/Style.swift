@@ -42,6 +42,8 @@ enum Tune {
     static let grow = Animation.spring(response: 0.7, dampingFraction: 0.86)
     /// Seconds before they grow, so the panel has settled first.
     static let growDelay = 0.08
+    /// Seconds a copy button says "Copied" before going back.
+    static let copied = 1.6
 }
 
 /// The system's Reduce Motion setting, read where an animation is made,

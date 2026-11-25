@@ -317,20 +317,20 @@ private struct Transcript<C: View>: View {
         }
     }
 
-    /// The status line goes under each finished turn's last reply; only
-    /// the latest one can be retried.
+    /// The status line goes under each finished turn's last reply, which it
+    /// can copy; only the latest one can be retried.
     private var answerFooters: [UUID: AnswerFooter] {
-        var last: [UUID: UUID] = [:]  // turn → its last assistant message
+        var last: [UUID: (id: UUID, text: String)] = [:]  // turn → its last assistant message
         for item in model.items {
             if case .message(let message) = item.payload, message.role == .assistant, let turn = item.turnID {
-                last[turn] = item.id
+                last[turn] = (item.id, message.text)
             }
         }
         var footers: [UUID: AnswerFooter] = [:]
-        for (turnID, itemID) in last {
+        for (turnID, reply) in last {
             guard let turn = model.turns[turnID], turn.endedAt != nil else { continue }
             let latest = turnID == model.lastTurn?.id && !model.isSelectedRunning
-            footers[itemID] = AnswerFooter(turn: turn, canRetry: latest)
+            footers[reply.id] = AnswerFooter(turn: turn, text: reply.text, canRetry: latest)
         }
         return footers
     }
@@ -425,13 +425,16 @@ struct TranscriptRowView: View {
 }
 
 /// Under a finished answer: when it ended and what it cost, dim and small
-/// like the context meter; the latest answer can be retried.
+/// like the context meter; any answer can be copied, the latest retried.
 struct AnswerFooter: View {
     let turn: Turn
+    /// The reply as the model wrote it (Markdown), for copying.
+    let text: String
     let canRetry: Bool
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
     @State private var showsSplit = false
+    @State private var copied = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -449,6 +452,17 @@ struct AnswerFooter: View {
                     .accessibilityLabel(Text("\(Self.count(turn.usage.inputTokens)) tokens in, \(Self.count(turn.usage.outputTokens)) out"))
             }
             Spacer()
+            Button(action: copy) {
+                HStack(spacing: 4) {
+                    PencilIcon(glyph: copied ? .check : .copy, size: 12, color: palette.faint)
+                    Text(copied ? "Copied" : "Copy")
+                }
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .modifier(HoverWash())
+                .animation(Tune.status, value: copied)
+            }
+            .buttonStyle(Squish())
             if canRetry {
                 Button { Task { await model.retrySelected() } } label: {
                     HStack(spacing: 4) {
@@ -469,6 +483,16 @@ struct AnswerFooter: View {
     }
 
     private var total: Int { turn.usage.inputTokens + turn.usage.outputTokens }
+
+    private func copy() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        copied = true
+        Task {
+            try? await Task.sleep(for: .seconds(Tune.copied))
+            copied = false
+        }
+    }
 
     private var time: String {
         let date = turn.endedAt ?? turn.startedAt

@@ -92,7 +92,7 @@ struct CodeBlock: View {
         NSPasteboard.general.setString(code, forType: .string)
         copied = true
         Task {
-            try? await Task.sleep(for: .seconds(1.6))
+            try? await Task.sleep(for: .seconds(Tune.copied))
             copied = false
         }
     }
