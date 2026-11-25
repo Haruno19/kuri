@@ -9,8 +9,8 @@ A lightweight, macOS native, human-designed & Claude-coded app for working with 
 Kuri is a single app that contains both the engine and the interface. It runs offline with local models, talks to any hosted provider when you want it to, discovers MCP servers at runtime, and runs the model's commands inside a lightweight Linux VM. 
 
 <p align="center">
-  <img height="320" alt="Main window" src="https://github.com/user-attachments/assets/2302a54d-b12b-43dd-b739-55daa7098e68" />
-  <img height="320" alt="Mini window" src="https://github.com/user-attachments/assets/4bc4e9ae-7db8-4331-b376-8bc11239ca6e" />
+  <img height="320" alt="Main window" src="docs/images/main-window.png" />
+  <img height="320" alt="Mini window" src="docs/images/mini-window.png" />
 </p>
 
 ## Principles
@@ -24,14 +24,14 @@ Kuri is a single app that contains both the engine and the interface. It runs of
 
 ## Gallery
 <p align="center">
-  <img width="48%" alt="Light theme welcome page" src="https://github.com/user-attachments/assets/c51e280a-d43f-4c15-b31a-41fa198fcb6d" />
-  <img width="48%" alt="Dark theme welcome page and inspector" src="https://github.com/user-attachments/assets/289988b0-9c2c-4eb0-b908-949454487e34" />
+  <img width="48%" alt="Light theme welcome page" src="docs/images/welcome-light.png" />
+  <img width="48%" alt="Dark theme welcome page and inspector" src="docs/images/welcome-dark-inspector.png" />
   
-  <img width="48%" alt="Dark theme chat and inspector" src="https://github.com/user-attachments/assets/2b7e1e98-b754-42ff-a7ee-904c06262fce" />
-  <img width="48%" alt="Light theme chat with latex and inspector" src="https://github.com/user-attachments/assets/54bed49e-9490-4835-8edf-31953a16122e" />
+  <img width="48%" alt="Dark theme chat and inspector" src="docs/images/chat-dark-inspector.png" />
+  <img width="48%" alt="Light theme chat with LaTeX and sidebar" src="docs/images/chat-light-latex.png" />
   
-  <img width="48%" alt="Light theme chat with both sidebars" src="https://github.com/user-attachments/assets/ff5dcae9-2dc7-473b-abc8-e19602f0bf5a" />
-  <img width="48%" alt="Dark theme chat with a codeblock and sidebar" src="https://github.com/user-attachments/assets/1cc6304e-fdd8-44a7-8531-26f542478780" />
+  <img width="48%" alt="Light theme chat with both sidebars" src="docs/images/chat-light-sidebars.png" />
+  <img width="48%" alt="Dark theme chat with a codeblock and sidebar" src="docs/images/chat-dark-code.png" />
 
 </p>
 
