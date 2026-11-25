@@ -176,7 +176,7 @@ final class AppModel {
     func start() async {
         guard engine == nil else { return }
         do {
-            let engine = try await Engine.open()
+            let engine = try await Engine.open(blocks: Set(ReplyBlockKind.allCases))
             try await attach(to: engine)
             await engine.resumePendingTurns()
         } catch {

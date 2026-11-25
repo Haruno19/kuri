@@ -4,18 +4,48 @@
     "" : {
 
     },
-    "“%@”" : {
-      "shouldTranslate" : false
-    },
-    "栗 · kuri, chestnut in Japanese" : {
+    "Hide Sidebar" : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "栗 · kuri, castagna in giapponese"
+            "value" : "Nascondi barra laterale"
           }
         }
       }
+    },
+    "Hide the sidebar (⌃⌘S)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondi la barra laterale (⌃⌘S)"
+          }
+        }
+      }
+    },
+    "Show Sidebar" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra barra laterale"
+          }
+        }
+      }
+    },
+    "Show the sidebar (⌃⌘S)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra la barra laterale (⌃⌘S)"
+          }
+        }
+      }
+    },
+    "“%@”" : {
+      "shouldTranslate" : false
     },
     "%@  %@ · %@" : {
       "localizations" : {
@@ -547,6 +577,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Annulla"
+          }
+        }
+      }
+    },
+    "Chart" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grafico"
+          }
+        }
+      }
+    },
+    "Chart on the way" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grafico in arrivo"
           }
         }
       }
@@ -1221,6 +1271,16 @@
         }
       }
     },
+    "Figures on the way" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indicatori in arrivo"
+          }
+        }
+      }
+    },
     "Fills up as the chat goes" : {
       "localizations" : {
         "it" : {
@@ -1361,16 +1421,6 @@
         }
       }
     },
-    "Hide Sidebar" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nascondi barra laterale"
-          }
-        }
-      }
-    },
     "Hide the inspector (⌥⌘I)" : {
       "localizations" : {
         "it" : {
@@ -1381,15 +1431,8 @@
         }
       }
     },
-    "Hide the sidebar (⌃⌘S)" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nascondi la barra laterale (⌃⌘S)"
-          }
-        }
-      }
+    "i" : {
+      "shouldTranslate" : false
     },
     "Image" : {
       "localizations" : {
@@ -2281,6 +2324,16 @@
         }
       }
     },
+    "Series" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serie"
+          }
+        }
+      }
+    },
     "Set contextWindow to compact automatically" : {
       "localizations" : {
         "it" : {
@@ -2381,16 +2434,6 @@
         }
       }
     },
-    "Show Sidebar" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostra barra laterale"
-          }
-        }
-      }
-    },
     "Show the inspector (⌥⌘I)" : {
       "localizations" : {
         "it" : {
@@ -2401,12 +2444,12 @@
         }
       }
     },
-    "Show the sidebar (⌃⌘S)" : {
+    "Slice" : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mostra la barra laterale (⌃⌘S)"
+            "value" : "Fetta"
           }
         }
       }
@@ -2561,6 +2604,16 @@
         }
       }
     },
+    "Table" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tabella"
+          }
+        }
+      }
+    },
     "Tasks" : {
       "localizations" : {
         "it" : {
@@ -2691,6 +2744,16 @@
         }
       }
     },
+    "total" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "totale"
+          }
+        }
+      }
+    },
     "Try Again" : {
       "localizations" : {
         "it" : {
@@ -2760,6 +2823,9 @@
           }
         }
       }
+    },
+    "v" : {
+      "shouldTranslate" : false
     },
     "Waiting for your answer" : {
       "localizations" : {
@@ -2847,6 +2913,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hai modificato il piano · %1$lld/%2$lld fatte"
+          }
+        }
+      }
+    },
+    "栗 · kuri, chestnut in Japanese" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "栗 · kuri, castagna in giapponese"
           }
         }
       }

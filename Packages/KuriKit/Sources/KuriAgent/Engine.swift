@@ -18,6 +18,9 @@ public actor Engine {
     public private(set) var config: Config
     public private(set) var mcpConfig: MCPConfig
     public var limits = TurnLimits()
+    /// The fenced blocks the client draws natively, which the instructions
+    /// then describe (decision 0026). The engine only names them.
+    public nonisolated let blocks: Set<ReplyBlockKind>
 
     private let registry: ToolRegistry
     private let mcp: MCPManager
@@ -40,21 +43,23 @@ public actor Engine {
 
     /// Opens `~/.config/kuri` (creating it on first launch), loads the
     /// config and the database, and starts watching the config files.
-    public static func open(home: KuriHome = .resolve()) async throws -> Engine {
+    public static func open(home: KuriHome = .resolve(), blocks: Set<ReplyBlockKind> = []) async throws -> Engine {
         try home.prepare()
         let loader = ConfigLoader(home: home)
         let engine = Engine(
             home: home,
             store: try Store(url: home.database),
             config: try loader.loadConfig(),
-            mcpConfig: try loader.loadMCP())
+            mcpConfig: try loader.loadMCP(),
+            blocks: blocks)
         try await engine.store.recoverInterruptedTurns()
         await engine.start()
         return engine
     }
 
     init(home: KuriHome, store: Store, config: Config, mcpConfig: MCPConfig,
-         tools: [any Tool] = BuiltInTools.all, factory: ProviderFactory = ProviderFactory()) {
+         tools: [any Tool] = BuiltInTools.all, factory: ProviderFactory = ProviderFactory(),
+         blocks: Set<ReplyBlockKind> = []) {
         let broadcaster = EventBroadcaster()
         let registry = ToolRegistry(tools)
         self.home = home
@@ -72,6 +77,7 @@ public actor Engine {
         self.broadcaster = broadcaster
         self.broker = InteractionBroker(emit: { broadcaster.emit($0) })
         self.factory = factory
+        self.blocks = blocks
     }
 
     /// Hooks up observers, applies the loaded configuration and connects
@@ -482,7 +488,8 @@ public actor Engine {
                                                  contextWindow: config.contextWindow(for: model)),
                 instructions: Instructions.build(conversation: conversation, folders: folders, mounts: mounts,
                                                  image: SandboxSettings(config.sandbox).image,
-                                                 memories: memories, tools: toolNames),
+                                                 memories: memories, tools: toolNames,
+                                                 blocks: Instructions.blocks(blocks, for: provider)),
                 useTools: provider.supportsTools)
         }
         let primary = await choice(turn.model, provider)
@@ -671,7 +678,8 @@ public actor Engine {
             conversation: conversation, folders: folders,
             mounts: SandboxMounts.plan(folders: folders, scratch: home.scratchFolder(for: conversationID)),
             image: SandboxSettings(config.sandbox).image,
-            memories: try await store.memories(), tools: Set(tools.map(\.name)))
+            memories: try await store.memories(), tools: Set(tools.map(\.name)),
+            blocks: usesTools ? blocks : [])
         let history = TurnRunner.history(from: items)
         let request = InferenceRequest(model: model?.model ?? "", instructions: instructions,
                                        items: history, tools: tools)

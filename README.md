@@ -168,7 +168,7 @@ None of this includes a model's weights. A local model runs in its own process (
 
 | Dependency | Why |
 |---|---|
-| Apple frameworks (SwiftUI, AppKit, Foundation, Security, SQLite3, Virtualization, FoundationModels, JavaScriptCore, ServiceManagement) | Everything |
+| Apple frameworks (SwiftUI, Swift Charts, AppKit, Foundation, Security, SQLite3, Virtualization, FoundationModels, JavaScriptCore, ServiceManagement) | Everything |
 | [modelcontextprotocol/swift-sdk](https://github.com/modelcontextprotocol/swift-sdk) | MCP client |
 | [apple/swift-log](https://github.com/apple/swift-log) | The SDK's logging API, which a custom transport has to implement |
 | [apple/containerization](https://github.com/apple/containerization) | Sandbox (pinned to an exact version: its API moves between minor versions) |

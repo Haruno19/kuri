@@ -57,3 +57,4 @@ The brief for the redesign. Every app change is checked against it. Directions a
    - **Git**: when the working folder is a repository, its branch and changes.
    - **Sandbox preview**: shown while the model uses the sandbox, previewing what happens in it.
 7. **Playing with the window** (after Markdown, Settings and the menu bar): give it a polished, slightly retro taste. Ideas to try: a background pattern (a faint grid) instead of the solid colour, a resized logo, small pixel animations on the composer's top-right edge.
+8. **Key figures and charts in replies** *(done)*: ```` ```kpi ```` and ```` ```chart ```` blocks of JSON drawn natively (sketched in `Sketches/Blocks.swift`, [decision 0026](decisions/0026-reply-blocks.md)). Figures sit in tiles, the value in the sans; charts in a panel like the code block's, with a hover tooltip and a Table view; a breathing placeholder while a block streams, and marks growing in once it arrives.

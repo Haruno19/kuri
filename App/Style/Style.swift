@@ -33,6 +33,15 @@ enum Tune {
     static let shine = 0.7
     /// Seconds for the light to cross the status text once.
     static let shimmer = 3.6
+    /// Seconds for a block's placeholder to breathe in and out once, while
+    /// its JSON streams.
+    static let breathe = 1.6
+    /// A finished block taking its placeholder's place.
+    static let reveal = Animation.spring(response: 0.45, dampingFraction: 0.9)
+    /// A chart's marks growing from the baseline once it has arrived.
+    static let grow = Animation.spring(response: 0.7, dampingFraction: 0.86)
+    /// Seconds before they grow, so the panel has settled first.
+    static let growDelay = 0.08
 }
 
 /// The system's Reduce Motion setting, read where an animation is made,

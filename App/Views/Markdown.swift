@@ -18,6 +18,11 @@ indirect enum MarkdownBlock {
     case rule
     /// A paragraph holding only display maths: an index into the document's maths.
     case math(Int)
+    /// Key figures or a chart, drawn natively (`ReplyBlocks.swift`).
+    case block(ReplyBlock)
+    /// A block's fence the reply hasn't closed yet: a placeholder while it
+    /// streams, its source if it ended that way.
+    case unfinished(kind: String, source: String)
 }
 
 /// A formula found in a reply.
@@ -69,7 +74,14 @@ enum Markdown {
         let key = ((allowsMath ? "1" : "0") + text) as NSString
         if let hit = cache.object(forKey: key) { return hit.document }
         let (markdown, math) = allowsMath ? extractMath(text) : (text, [])
-        let document = MarkdownDocument(blocks: parse(markdown), math: math)
+        var blocks = parse(markdown)
+        // The parser runs an unclosed fence to the end of the text, so a
+        // block still streaming reads as a code block of half a JSON.
+        if let kind = unclosedBlockFence(text), case .code(let language, let source)? = blocks.last,
+           language?.lowercased() == kind {
+            blocks[blocks.count - 1] = .unfinished(kind: kind, source: source)
+        }
+        let document = MarkdownDocument(blocks: blocks, math: math)
         cache.setObject(Parsed(document), forKey: key)
         return document
     }
@@ -172,6 +184,26 @@ enum Markdown {
         return (out, math)
     }
 
+    /// The language of a block fence (```kpi, ```chart) the text opens and
+    /// doesn't close, following CommonMark's rules for fences.
+    static func unclosedBlockFence(_ text: String) -> String? {
+        var open: (marker: Character, length: Int, info: String)?
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let trimmed = line.drop { $0 == " " || $0 == "\t" }
+            guard let marker = trimmed.first, marker == "`" || marker == "~" else { continue }
+            let length = trimmed.prefix { $0 == marker }.count
+            guard length >= 3 else { continue }
+            let rest = trimmed.dropFirst(length).trimmingCharacters(in: .whitespaces)
+            if let fence = open {
+                if marker == fence.marker, length >= fence.length, rest.isEmpty { open = nil }
+            } else if !(marker == "`" && rest.contains("`")) {
+                open = (marker, length, rest.split(separator: " ").first.map(String.init) ?? "")
+            }
+        }
+        guard let info = open?.info.lowercased(), ReplyBlock.kinds.contains(info) else { return nil }
+        return info
+    }
+
     /// A node of the block tree while it's being rebuilt from the runs.
     private final class Box {
         let kind: PresentationIntent.Kind?
@@ -233,6 +265,7 @@ enum Markdown {
             case .codeBlock(let hint)?:
                 var code = String(box.text.characters)
                 if code.hasSuffix("\n") { code.removeLast() }
+                if let block = ReplyBlock.decode(language: hint, code) { return [.block(block)] }
                 return [.code(language: hint?.isEmpty == false ? hint : nil, code)]
             case .thematicBreak?:
                 return [.rule]
@@ -336,8 +369,23 @@ private struct MarkdownBlockView: View {
     let size: CGFloat
     @Environment(\.palette) private var palette
     @Environment(\.markdownMath) private var math
+    @Environment(\.replyStreaming) private var streaming
 
     var body: some View {
+        // Animates a block taking its placeholder's place, and nothing else:
+        // text growing as it streams isn't animated.
+        content.animation(Tune.reveal, value: revealed)
+    }
+
+    private var revealed: Bool? {
+        switch block {
+        case .block: true
+        case .unfinished: false
+        default: nil
+        }
+    }
+
+    @ViewBuilder private var content: some View {
         switch block {
         case .paragraph(let text):
             inline(text, size: size)
@@ -354,6 +402,17 @@ private struct MarkdownBlockView: View {
 
         case .code(let language, let code):
             CodeBlock(language: language, code: code, size: size * Typeface.monoScale)
+
+        case .block(let block):
+            ReplyBlockView(block: block)
+                .transition(.opacity.combined(with: .scale(0.985, anchor: .top)))
+
+        case .unfinished(let kind, let source):
+            if streaming {
+                ReplyBlockPlaceholder(kind: kind).transition(.opacity)
+            } else {
+                CodeBlock(language: kind, code: source, size: size * Typeface.monoScale)
+            }
 
         case .quote(let blocks):
             MarkdownBlocks(blocks: blocks, size: size)
