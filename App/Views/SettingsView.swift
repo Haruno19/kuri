@@ -111,7 +111,7 @@ private struct GeneralSettings: View {
         loginItem = SMAppService.mainApp.status
     }
 
-    private func fileRow(_ title: String, url: URL) -> some View {
+    private func fileRow(_ title: LocalizedStringKey, url: URL) -> some View {
         LabeledContent(title) {
             Button("Open \(url.lastPathComponent)") { NSWorkspace.shared.open(url) }
         }
@@ -253,10 +253,10 @@ private struct ProviderModelsSection: View {
         defer { isDiscovering = false }
         do {
             available = try await model.availableModels(provider: name)
-            discoveryError = available.isEmpty ? "\(name) lists no models." : nil
+            discoveryError = available.isEmpty ? String(localized: "\(name) lists no models.") : nil
         } catch {
             available = []
-            discoveryError = "Couldn't list models: \(error.localizedDescription) You can still type an id."
+            discoveryError = String(localized: "Couldn't list models: \(error.localizedDescription) You can still type an id.")
         }
     }
 
@@ -313,10 +313,10 @@ private struct APIKeyRow: View {
     /// What's there now, as the empty field's prompt.
     private var status: String {
         switch apiKey {
-        case nil: "None: local servers don't need one"
-        case .keychain: inKeychain ? "Saved in the Keychain" : "Not in the Keychain yet"
-        case .environment(let variable): "From $\(variable); saving moves it to the Keychain"
-        case .literal: "Plain text in config.json; saving moves it to the Keychain"
+        case nil: String(localized: "None: local servers don't need one")
+        case .keychain: inKeychain ? String(localized: "Saved in the Keychain") : String(localized: "Not in the Keychain yet")
+        case .environment(let variable): String(localized: "From $\(variable); saving moves it to the Keychain")
+        case .literal: String(localized: "Plain text in config.json; saving moves it to the Keychain")
         }
     }
 
@@ -473,7 +473,8 @@ private struct SandboxOptions: View {
                 })
             ) {
                 ForEach(SandboxSettings.presets, id: \.image) { preset in
-                    Text(preset.image == SandboxSettings.defaultImage ? "\(preset.name) (default)" : preset.name).tag(preset.image)
+                    (preset.image == SandboxSettings.defaultImage ? Text("\(preset.name) (default)") : Text(verbatim: preset.name))
+                        .tag(preset.image)
                 }
                 Text("Custom…").tag("")
             }

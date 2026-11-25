@@ -1,0 +1,2836 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    "“%@”" : {
+      "shouldTranslate" : false
+    },
+    "%@  %@ · %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@  %2$@ · %3$@"
+          }
+        }
+      }
+    },
+    "%@  ←  %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@  ←  %2$@"
+          }
+        }
+      }
+    },
+    "%@ · read-only" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · sola lettura"
+          }
+        }
+      }
+    },
+    "%@ (default)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (predefinita)"
+          }
+        }
+      }
+    },
+    "%@ / %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ / %2$@"
+          }
+        }
+      }
+    },
+    "%@ failed (%@); %@ took over." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ non ha risposto (%2$@); ha continuato %3$@."
+          }
+        }
+      }
+    },
+    "%@ lists no models." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non elenca nessun modello."
+          }
+        }
+      }
+    },
+    "%@ tok" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ tok"
+          }
+        }
+      }
+    },
+    "%@ tok in · %@ tok out" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ tok in entrata · %2$@ tok in uscita"
+          }
+        }
+      }
+    },
+    "%@ tokens in, %@ out" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ token in entrata, %2$@ in uscita"
+          }
+        }
+      }
+    },
+    "%@: %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
+    "%@%@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@"
+          }
+        }
+      }
+    },
+    "%lld" : {
+      "shouldTranslate" : false
+    },
+    "%lld changes" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld modifiche"
+          }
+        }
+      }
+    },
+    "%lld commands" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld comandi"
+          }
+        }
+      }
+    },
+    "%lld commits not pushed yet" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld commit non ancora inviati"
+          }
+        }
+      }
+    },
+    "%lld commits to pull" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld commit da scaricare"
+          }
+        }
+      }
+    },
+    "%lld CPUs · %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld CPU · %2$@"
+          }
+        }
+      }
+    },
+    "%lld min idle" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld min di inattività"
+          }
+        }
+      }
+    },
+    "%lld steps" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld passaggi"
+          }
+        }
+      }
+    },
+    "%lld." : {
+      "shouldTranslate" : false
+    },
+    "%lld/%lld" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld/%2$lld"
+          }
+        }
+      }
+    },
+    "%lld%%" : {
+      "shouldTranslate" : false
+    },
+    "•" : {
+      "shouldTranslate" : false
+    },
+    "+%lld" : {
+      "shouldTranslate" : false
+    },
+    "−%lld" : {
+      "shouldTranslate" : false
+    },
+    "≈ %@" : {
+      "shouldTranslate" : false
+    },
+    "$ " : {
+      "shouldTranslate" : false
+    },
+    "1 change" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 modifica"
+          }
+        }
+      }
+    },
+    "1 command" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 comando"
+          }
+        }
+      }
+    },
+    "1 commit not pushed yet" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 commit non ancora inviato"
+          }
+        }
+      }
+    },
+    "1 commit to pull" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 commit da scaricare"
+          }
+        }
+      }
+    },
+    "1 step" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 passaggio"
+          }
+        }
+      }
+    },
+    "A chestnut tree and autumn grass along the bottom of a new chat. Click the tree to shake it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un castagno ed erba autunnale in fondo a una nuova chat. Fai clic sull'albero per scuoterlo."
+          }
+        }
+      }
+    },
+    "Add" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi"
+          }
+        }
+      }
+    },
+    "Add Folder…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi cartella…"
+          }
+        }
+      }
+    },
+    "Add task" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi attività"
+          }
+        }
+      }
+    },
+    "After the first answer, the utility model (or the chat's model) names the chat." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dopo la prima risposta, il modello di servizio (o quello della chat) dà un nome alla chat."
+          }
+        }
+      }
+    },
+    "All" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutti"
+          }
+        }
+      }
+    },
+    "Allow" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consenti"
+          }
+        }
+      }
+    },
+    "Allow **%@** to run?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consentire l'esecuzione di **%@**?"
+          }
+        }
+      }
+    },
+    "Allow Changes" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consenti modifiche"
+          }
+        }
+      }
+    },
+    "Allow Kuri in System Settings › General › Login Items." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consenti Kuri in Impostazioni di Sistema › Generali › Elementi login."
+          }
+        }
+      }
+    },
+    "Answer" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Risposta"
+          }
+        }
+      }
+    },
+    "Answer again, replacing this answer (⌘R)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rispondi di nuovo, sostituendo questa risposta (⌘R)"
+          }
+        }
+      }
+    },
+    "API key" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiave API"
+          }
+        }
+      }
+    },
+    "Appearance" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aspetto"
+          }
+        }
+      }
+    },
+    "Ask %@ which models it serves" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiedi a %@ quali modelli offre"
+          }
+        }
+      }
+    },
+    "Ask anything" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiedi qualsiasi cosa"
+          }
+        }
+      }
+    },
+    "Asked you" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ti ha fatto una domanda"
+          }
+        }
+      }
+    },
+    "Asleep" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In pausa"
+          }
+        }
+      }
+    },
+    "Asleep · wakes with the next command" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In pausa · riparte al prossimo comando"
+          }
+        }
+      }
+    },
+    "Attach Folder" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allega cartella"
+          }
+        }
+      }
+    },
+    "Attach Folder…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allega cartella…"
+          }
+        }
+      }
+    },
+    "Awake" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva"
+          }
+        }
+      }
+    },
+    "Awake · sleeps after %lld quiet minutes" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva · va in pausa dopo %lld minuti di inattività"
+          }
+        }
+      }
+    },
+    "Built in" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Integrati"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annulla"
+          }
+        }
+      }
+    },
+    "Chat" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat"
+          }
+        }
+      }
+    },
+    "Chats" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat"
+          }
+        }
+      }
+    },
+    "Choose a model" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli un modello"
+          }
+        }
+      }
+    },
+    "Click the icon for the mini window, a small chat that floats above other windows." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai clic sull'icona per la mini finestra, una piccola chat che resta sopra le altre finestre."
+          }
+        }
+      }
+    },
+    "Click to dismiss" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai clic per chiudere"
+          }
+        }
+      }
+    },
+    "Click to see the details" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai clic per vedere i dettagli"
+          }
+        }
+      }
+    },
+    "Click to see the output" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai clic per vedere l'output"
+          }
+        }
+      }
+    },
+    "Collapsed" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiuso"
+          }
+        }
+      }
+    },
+    "Commands" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comandi"
+          }
+        }
+      }
+    },
+    "Compact at %lld%%" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatta al %lld%%"
+          }
+        }
+      }
+    },
+    "Compact Chat" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatta chat"
+          }
+        }
+      }
+    },
+    "Compact now" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatta ora"
+          }
+        }
+      }
+    },
+    "Compacts at %lld%%" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatta al %lld%%"
+          }
+        }
+      }
+    },
+    "config.json stops using it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "config.json smette di usarla."
+          }
+        }
+      }
+    },
+    "Configuration" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configurazione"
+          }
+        }
+      }
+    },
+    "Context" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contesto"
+          }
+        }
+      }
+    },
+    "Context window in tokens" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finestra di contesto in token"
+          }
+        }
+      }
+    },
+    "Context window in tokens (optional)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finestra di contesto in token (facoltativa)"
+          }
+        }
+      }
+    },
+    "Continue" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continua"
+          }
+        }
+      }
+    },
+    "Copied" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiato"
+          }
+        }
+      }
+    },
+    "Copy" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia"
+          }
+        }
+      }
+    },
+    "Couldn't add the model" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile aggiungere il modello"
+          }
+        }
+      }
+    },
+    "Couldn't answer again" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile rispondere di nuovo"
+          }
+        }
+      }
+    },
+    "Couldn't attach the folder" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile allegare la cartella"
+          }
+        }
+      }
+    },
+    "Couldn't change the default model" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile cambiare il modello predefinito"
+          }
+        }
+      }
+    },
+    "Couldn't change the folders" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile cambiare le cartelle"
+          }
+        }
+      }
+    },
+    "Couldn't change the login item: %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile cambiare l'elemento login: %@"
+          }
+        }
+      }
+    },
+    "Couldn't change the memories" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile cambiare i ricordi"
+          }
+        }
+      }
+    },
+    "Couldn't change the sandbox settings" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile cambiare le impostazioni della sandbox"
+          }
+        }
+      }
+    },
+    "Couldn't change the setting" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile cambiare l'impostazione"
+          }
+        }
+      }
+    },
+    "Couldn't change the tasks" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile cambiare le attività"
+          }
+        }
+      }
+    },
+    "Couldn't compact the chat" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile compattare la chat"
+          }
+        }
+      }
+    },
+    "Couldn't continue" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile continuare"
+          }
+        }
+      }
+    },
+    "Couldn't delete the chat" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile eliminare la chat"
+          }
+        }
+      }
+    },
+    "Couldn't list models: %@ You can still type an id." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile elencare i modelli: %@ Puoi comunque scrivere un id."
+          }
+        }
+      }
+    },
+    "Couldn't read the configuration" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile leggere la configurazione"
+          }
+        }
+      }
+    },
+    "Couldn't remove the model" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile rimuovere il modello"
+          }
+        }
+      }
+    },
+    "Couldn't rename the chat" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile rinominare la chat"
+          }
+        }
+      }
+    },
+    "Couldn't save the API key" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile salvare la chiave API"
+          }
+        }
+      }
+    },
+    "Couldn't send the message" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile inviare il messaggio"
+          }
+        }
+      }
+    },
+    "Couldn't set up the sandbox" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile configurare la sandbox"
+          }
+        }
+      }
+    },
+    "Couldn't start a new chat" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile iniziare una nuova chat"
+          }
+        }
+      }
+    },
+    "CPUs" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU"
+          }
+        }
+      }
+    },
+    "Custom…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizzata…"
+          }
+        }
+      }
+    },
+    "Dark" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scuro"
+          }
+        }
+      }
+    },
+    "Data folder" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cartella dei dati"
+          }
+        }
+      }
+    },
+    "default" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "predefinito"
+          }
+        }
+      }
+    },
+    "Delete “%@”?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare “%@”?"
+          }
+        }
+      }
+    },
+    "Delete Chat" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elimina chat"
+          }
+        }
+      }
+    },
+    "Delete Chat…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elimina chat…"
+          }
+        }
+      }
+    },
+    "Deny" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nega"
+          }
+        }
+      }
+    },
+    "Detach" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scollega"
+          }
+        }
+      }
+    },
+    "Detach %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scollega %@"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fatto"
+          }
+        }
+      }
+    },
+    "Double-click to edit" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai doppio clic per modificare"
+          }
+        }
+      }
+    },
+    "Each chat gets its own lightweight VM, started on its first command and stopped when idle. Attached folders are mounted at /work; without one, a scratch folder is. No network." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ogni chat ha una sua VM leggera, avviata al primo comando e fermata quando è inattiva. Le cartelle allegate sono montate in /work; senza, ci va una cartella temporanea. Nessuna rete."
+          }
+        }
+      }
+    },
+    "Earlier messages summarized" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messaggi precedenti riassunti"
+          }
+        }
+      }
+    },
+    "Edit %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifica %@"
+          }
+        }
+      }
+    },
+    "Edit Task" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifica attività"
+          }
+        }
+      }
+    },
+    "Edit…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifica…"
+          }
+        }
+      }
+    },
+    "Estimated context size. Kuri summarizes earlier messages at %lld%%." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dimensione stimata del contesto. Kuri riassume i messaggi precedenti al %lld%%."
+          }
+        }
+      }
+    },
+    "Estimated context size. Set contextWindow for this model in config.json to compact automatically." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dimensione stimata del contesto. Imposta contextWindow per questo modello in config.json per compattare in automatico."
+          }
+        }
+      }
+    },
+    "Every model this server lists is also available, without adding it (discoverModels)." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anche ogni modello elencato da questo server è disponibile, senza aggiungerlo (discoverModels)."
+          }
+        }
+      }
+    },
+    "Exit status %lld" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stato di uscita %lld"
+          }
+        }
+      }
+    },
+    "Expanded" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aperto"
+          }
+        }
+      }
+    },
+    "Failed" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non riuscito"
+          }
+        }
+      }
+    },
+    "Failed with exit status %lld" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non riuscito, stato di uscita %lld"
+          }
+        }
+      }
+    },
+    "Fills up as the chat goes" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si riempie man mano che la chat va avanti"
+          }
+        }
+      }
+    },
+    "Folder" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cartella"
+          }
+        }
+      }
+    },
+    "Forget" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dimentica"
+          }
+        }
+      }
+    },
+    "From $%@; saving moves it to the Keychain" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Da $%@; salvandola passa al Portachiavi"
+          }
+        }
+      }
+    },
+    "General" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generali"
+          }
+        }
+      }
+    },
+    "Generate titles" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Genera i titoli"
+          }
+        }
+      }
+    },
+    "Git" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Git"
+          }
+        }
+      }
+    },
+    "Good afternoon, %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buon pomeriggio, %@."
+          }
+        }
+      }
+    },
+    "Good afternoon." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buon pomeriggio."
+          }
+        }
+      }
+    },
+    "Good evening, %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buonasera, %@."
+          }
+        }
+      }
+    },
+    "Good evening." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buonasera."
+          }
+        }
+      }
+    },
+    "Good morning, %@." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buongiorno, %@."
+          }
+        }
+      }
+    },
+    "Good morning." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buongiorno."
+          }
+        }
+      }
+    },
+    "Hide Inspector" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondi ispettore"
+          }
+        }
+      }
+    },
+    "Hide Sidebar" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondi barra laterale"
+          }
+        }
+      }
+    },
+    "Hide the inspector (⌥⌘I)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondi l'ispettore (⌥⌘I)"
+          }
+        }
+      }
+    },
+    "Hide the sidebar (⌃⌘S)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondi la barra laterale (⌃⌘S)"
+          }
+        }
+      }
+    },
+    "Image" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Immagine"
+          }
+        }
+      }
+    },
+    "In progress" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In corso"
+          }
+        }
+      }
+    },
+    "Included in every chat. The model edits it with the memory tool; you can too." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluso in ogni chat. Il modello lo modifica con lo strumento memory; puoi farlo anche tu."
+          }
+        }
+      }
+    },
+    "Interrupted: Kuri quit during this turn." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotto: Kuri è stato chiuso durante questo turno."
+          }
+        }
+      }
+    },
+    "It's deleted from the Keychain, and config.json stops using it." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Viene eliminata dal Portachiavi e config.json smette di usarla."
+          }
+        }
+      }
+    },
+    "Its messages and steps are deleted. This can't be undone." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I suoi messaggi e passaggi vengono eliminati. L'operazione non si può annullare."
+          }
+        }
+      }
+    },
+    "Joins the turn at its next step" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si unisce al turno al passaggio successivo"
+          }
+        }
+      }
+    },
+    "Kuri" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kuri"
+          }
+        }
+      }
+    },
+    "Kuri couldn't start" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile avviare Kuri"
+          }
+        }
+      }
+    },
+    "Kuri reconnects servers as soon as mcp.json changes. Policies go in config.json under “tools” (any tool, e.g. `memory: \"deny\"`) or in mcp.json inside a server (its own tool names). MCP tools the server marks read-only are allowed; others ask first." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kuri ricollega i server appena mcp.json cambia. Le regole vanno in config.json sotto “tools” (qualsiasi strumento, per esempio `memory: \"deny\"`) o in mcp.json dentro un server (i nomi dei suoi strumenti). Gli strumenti MCP che il server segna come di sola lettura sono consentiti; gli altri chiedono prima."
+          }
+        }
+      }
+    },
+    "Kuri sees your changes at its next step" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kuri vedrà le tue modifiche al prossimo passaggio"
+          }
+        }
+      }
+    },
+    "Kuri summarizes earlier messages here" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kuri riassume qui i messaggi precedenti"
+          }
+        }
+      }
+    },
+    "Kuri's image adds tools for documents and data to Python: PDFs, Word, Excel, images, pandoc, git. Changing the image, CPUs or memory stops running sandboxes; a new image needs setup again. Saved to config.json." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'immagine di Kuri aggiunge a Python strumenti per documenti e dati: PDF, Word, Excel, immagini, pandoc, git. Cambiare immagine, CPU o memoria ferma le sandbox in esecuzione; una nuova immagine va configurata di nuovo. Salvato in config.json."
+          }
+        }
+      }
+    },
+    "Let Kuri work in a folder: it's mounted in the sandbox at /work" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai lavorare Kuri in una cartella: viene montata nella sandbox in /work"
+          }
+        }
+      }
+    },
+    "Let Kuri work in a folder: it's mounted in the sandbox at /work (⇧⌘O)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai lavorare Kuri in una cartella: viene montata nella sandbox in /work (⇧⌘O)"
+          }
+        }
+      }
+    },
+    "Let the model pick up where this turn left off" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai riprendere il modello da dove si è fermato questo turno"
+          }
+        }
+      }
+    },
+    "Light" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiaro"
+          }
+        }
+      }
+    },
+    "Linux sandbox" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sandbox Linux"
+          }
+        }
+      }
+    },
+    "Log" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro"
+          }
+        }
+      }
+    },
+    "Make Read-Only" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendi di sola lettura"
+          }
+        }
+      }
+    },
+    "Mark as done" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segna come fatta"
+          }
+        }
+      }
+    },
+    "Mark as Done" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segna come fatta"
+          }
+        }
+      }
+    },
+    "Mark as not done" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segna come da fare"
+          }
+        }
+      }
+    },
+    "Mark as Not Done" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segna come da fare"
+          }
+        }
+      }
+    },
+    "MCP servers" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Server MCP"
+          }
+        }
+      }
+    },
+    "Meadow" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prato"
+          }
+        }
+      }
+    },
+    "Memory" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memoria"
+          }
+        }
+      }
+    },
+    "Messages" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messaggi"
+          }
+        }
+      }
+    },
+    "Model id" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Id del modello"
+          }
+        }
+      }
+    },
+    "Models" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelli"
+          }
+        }
+      }
+    },
+    "Models served by %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelli offerti da %@"
+          }
+        }
+      }
+    },
+    "New Chat" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuova chat"
+          }
+        }
+      }
+    },
+    "New chats use" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nuove chat usano"
+          }
+        }
+      }
+    },
+    "No changes" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna modifica"
+          }
+        }
+      }
+    },
+    "No MCP servers yet" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancora nessun server MCP"
+          }
+        }
+      }
+    },
+    "No model" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun modello"
+          }
+        }
+      }
+    },
+    "No model set up" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessun modello configurato"
+          }
+        }
+      }
+    },
+    "No plan yet: Kuri makes one for longer work" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancora nessun piano: Kuri ne fa uno per i lavori più lunghi"
+          }
+        }
+      }
+    },
+    "No providers yet" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancora nessun provider"
+          }
+        }
+      }
+    },
+    "None" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuno"
+          }
+        }
+      }
+    },
+    "None: local servers don't need one" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nessuna: ai server locali non serve"
+          }
+        }
+      }
+    },
+    "Not done" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Da fare"
+          }
+        }
+      }
+    },
+    "Not in the Keychain yet" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non ancora nel Portachiavi"
+          }
+        }
+      }
+    },
+    "Not ready" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non pronto"
+          }
+        }
+      }
+    },
+    "Not set up yet: Settings › Sandbox" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non ancora configurata: Impostazioni › Sandbox"
+          }
+        }
+      }
+    },
+    "Not set up yet." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non ancora configurata."
+          }
+        }
+      }
+    },
+    "Nothing yet. Kuri saves durable facts here when you ask it to remember something." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancora niente. Kuri salva qui le informazioni durature quando gli chiedi di ricordare qualcosa."
+          }
+        }
+      }
+    },
+    "of %@ tokens" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "di %@ token"
+          }
+        }
+      }
+    },
+    "Off" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spenta"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "Only the menu bar icon at launch, no main window. Needs the menu bar icon." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All'avvio solo l'icona nella barra dei menu, senza finestra principale. Richiede l'icona nella barra dei menu."
+          }
+        }
+      }
+    },
+    "Open %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri %@"
+          }
+        }
+      }
+    },
+    "Open at login" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri al login"
+          }
+        }
+      }
+    },
+    "Open config.json" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri config.json"
+          }
+        }
+      }
+    },
+    "Open in the main window" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri nella finestra principale"
+          }
+        }
+      }
+    },
+    "Open Kuri" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri Kuri"
+          }
+        }
+      }
+    },
+    "Open mcp.json" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri mcp.json"
+          }
+        }
+      }
+    },
+    "Plain text in config.json; saving moves it to the Keychain" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In chiaro in config.json; salvandola passa al Portachiavi"
+          }
+        }
+      }
+    },
+    "Plan" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piano"
+          }
+        }
+      }
+    },
+    "Providers" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Provider"
+          }
+        }
+      }
+    },
+    "Providers are declared in config.json. Models you add here are written to it; Kuri rewrites the file as tidy JSON5, so comments in it are not kept." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I provider sono dichiarati in config.json. I modelli che aggiungi qui vengono scritti nel file; Kuri lo riscrive come JSON5 ordinato, quindi i commenti non vengono mantenuti."
+          }
+        }
+      }
+    },
+    "Providers, models, tool policies" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Provider, modelli, regole degli strumenti"
+          }
+        }
+      }
+    },
+    "Queue" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metti in coda"
+          }
+        }
+      }
+    },
+    "Queue: joins the turn at its next step" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In coda: si unisce al turno al passaggio successivo"
+          }
+        }
+      }
+    },
+    "Queued" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In coda"
+          }
+        }
+      }
+    },
+    "Quit Kuri" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esci da Kuri"
+          }
+        }
+      }
+    },
+    "Ready" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pronto"
+          }
+        }
+      }
+    },
+    "Ready. The model has a `shell` tool." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pronta. Il modello ha uno strumento `shell`."
+          }
+        }
+      }
+    },
+    "Reconnect" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricollega"
+          }
+        }
+      }
+    },
+    "Reference" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riferimento"
+          }
+        }
+      }
+    },
+    "Refresh" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiorna"
+          }
+        }
+      }
+    },
+    "registry/name:tag" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "registry/nome:tag"
+          }
+        }
+      }
+    },
+    "Remove" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi"
+          }
+        }
+      }
+    },
+    "Remove from the queue" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi dalla coda"
+          }
+        }
+      }
+    },
+    "Remove from the Queue" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi dalla coda"
+          }
+        }
+      }
+    },
+    "Remove Task" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi attività"
+          }
+        }
+      }
+    },
+    "Remove the API key for %@?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovere la chiave API di %@?"
+          }
+        }
+      }
+    },
+    "Rename Chat" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rinomina chat"
+          }
+        }
+      }
+    },
+    "Retry" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riprova"
+          }
+        }
+      }
+    },
+    "Running" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In esecuzione"
+          }
+        }
+      }
+    },
+    "Running a command" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sta eseguendo un comando"
+          }
+        }
+      }
+    },
+    "Sandbox" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sandbox"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salva"
+          }
+        }
+      }
+    },
+    "Saved in the Keychain" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salvata nel Portachiavi"
+          }
+        }
+      }
+    },
+    "Searched past chats" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ha cercato nelle chat passate"
+          }
+        }
+      }
+    },
+    "Searched past chats for “%@”" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ha cercato “%@” nelle chat passate"
+          }
+        }
+      }
+    },
+    "Searching past chats" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sta cercando nelle chat passate"
+          }
+        }
+      }
+    },
+    "Send" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invia"
+          }
+        }
+      }
+    },
+    "Send Answers" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invia risposte"
+          }
+        }
+      }
+    },
+    "Set contextWindow to compact automatically" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imposta contextWindow per compattare in automatico"
+          }
+        }
+      }
+    },
+    "Set Up Sandbox" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configura sandbox"
+          }
+        }
+      }
+    },
+    "Set up the sandbox in Settings › Sandbox to let Kuri work in these folders." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configura la sandbox in Impostazioni › Sandbox per far lavorare Kuri in queste cartelle."
+          }
+        }
+      }
+    },
+    "Settings" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impostazioni"
+          }
+        }
+      }
+    },
+    "Settings…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impostazioni…"
+          }
+        }
+      }
+    },
+    "Setup downloads a Linux kernel release (about 680 MB, of which only the 18 MB kernel is kept), Apple's init image and the container image (about 250 MB for Kuri's, 45 MB for Python's): about 1.6 GB on disk in the end with Kuri's image, 0.8 GB with Python's. After that the sandbox works offline." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La configurazione scarica una release del kernel Linux (circa 680 MB, di cui si tiene solo il kernel da 18 MB), l'immagine init di Apple e l'immagine del container (circa 250 MB per quella di Kuri, 45 MB per quella di Python): alla fine circa 1,6 GB su disco con l'immagine di Kuri, 0,8 GB con quella di Python. Poi la sandbox funziona offline."
+          }
+        }
+      }
+    },
+    "Show all %lld" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra tutti (%lld)"
+          }
+        }
+      }
+    },
+    "Show in Finder" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra nel Finder"
+          }
+        }
+      }
+    },
+    "Show in the menu bar" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra nella barra dei menu"
+          }
+        }
+      }
+    },
+    "Show Inspector" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra ispettore"
+          }
+        }
+      }
+    },
+    "Show Sidebar" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra barra laterale"
+          }
+        }
+      }
+    },
+    "Show the inspector (⌥⌘I)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra l'ispettore (⌥⌘I)"
+          }
+        }
+      }
+    },
+    "Show the sidebar (⌃⌘S)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra la barra laterale (⌃⌘S)"
+          }
+        }
+      }
+    },
+    "Start a new chat (⌘N)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inizia una nuova chat (⌘N)"
+          }
+        }
+      }
+    },
+    "Start in the background" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avvia in background"
+          }
+        }
+      }
+    },
+    "Starting…" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avvio…"
+          }
+        }
+      }
+    },
+    "Startup" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avvio"
+          }
+        }
+      }
+    },
+    "Status: %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stato: %@"
+          }
+        }
+      }
+    },
+    "Steps" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passaggi"
+          }
+        }
+      }
+    },
+    "Still up, %@?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancora in piedi, %@?"
+          }
+        }
+      }
+    },
+    "Still up?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ancora in piedi?"
+          }
+        }
+      }
+    },
+    "Stop" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompi"
+          }
+        }
+      }
+    },
+    "Stop (⌘.)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompi (⌘.)"
+          }
+        }
+      }
+    },
+    "Stopped." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrotto."
+          }
+        }
+      }
+    },
+    "Stops after" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si ferma dopo"
+          }
+        }
+      }
+    },
+    "Summarize earlier messages now" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riassumi ora i messaggi precedenti"
+          }
+        }
+      }
+    },
+    "Summarizing earlier messages" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sta riassumendo i messaggi precedenti"
+          }
+        }
+      }
+    },
+    "System" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sistema"
+          }
+        }
+      }
+    },
+    "Tasks" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attività"
+          }
+        }
+      }
+    },
+    "Theme" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tema"
+          }
+        }
+      }
+    },
+    "Thinking" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sta ragionando"
+          }
+        }
+      }
+    },
+    "this chat's scratch folder" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "la cartella temporanea di questa chat"
+          }
+        }
+      }
+    },
+    "This turn failed." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo turno non è riuscito."
+          }
+        }
+      }
+    },
+    "Thought" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ragionamento"
+          }
+        }
+      }
+    },
+    "Timed out" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tempo scaduto"
+          }
+        }
+      }
+    },
+    "Title" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titolo"
+          }
+        }
+      }
+    },
+    "tokens" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "token"
+          }
+        }
+      }
+    },
+    "tokens, about" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "token, circa"
+          }
+        }
+      }
+    },
+    "Tool calls and commands show up here" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui compaiono le chiamate agli strumenti e i comandi"
+          }
+        }
+      }
+    },
+    "Tool output" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Output degli strumenti"
+          }
+        }
+      }
+    },
+    "Tools" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumenti"
+          }
+        }
+      }
+    },
+    "Try Again" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riprova"
+          }
+        }
+      }
+    },
+    "Updated memory" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ha aggiornato la memoria"
+          }
+        }
+      }
+    },
+    "Updated the plan · %lld/%lld done" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ha aggiornato il piano · %1$lld/%2$lld fatte"
+          }
+        }
+      }
+    },
+    "Updating memory" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sta aggiornando la memoria"
+          }
+        }
+      }
+    },
+    "Updating the plan" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sta aggiornando il piano"
+          }
+        }
+      }
+    },
+    "Use for New Chats" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa per le nuove chat"
+          }
+        }
+      }
+    },
+    "Using %@" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sta usando %@"
+          }
+        }
+      }
+    },
+    "Waiting for your answer" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In attesa della tua risposta"
+          }
+        }
+      }
+    },
+    "What Kuri remembers" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cosa ricorda Kuri"
+          }
+        }
+      }
+    },
+    "When a request would fill this much of the model's context window, earlier messages are summarized. Needs the model's context window, set in Models." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando una richiesta riempirebbe questa parte della finestra di contesto del modello, i messaggi precedenti vengono riassunti. Serve la finestra di contesto del modello, impostata in Modelli."
+          }
+        }
+      }
+    },
+    "Working" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Al lavoro"
+          }
+        }
+      }
+    },
+    "Working in %lld chats" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Working in %lld chat"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Working in %lld chats"
+                }
+              }
+            }
+          }
+        },
+        "it" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Al lavoro in %lld chat"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Al lavoro in %lld chat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "You edited the plan · %lld/%lld done" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hai modificato il piano · %1$lld/%2$lld fatte"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
