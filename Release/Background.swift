@@ -10,7 +10,10 @@ import AppKit
 
 /// The window, in points; make-dmg.sh places the icons on the same grid.
 enum Layout {
-    static let width = 640.0, height = 400.0
+    static let width = 640.0, height = 428.0
+    /// Rows of soil under the meadow, as tall as Finder's path bar: with
+    /// the bar shown it covers them and the grass still shows.
+    static let soilRows = 7
     static let appX = 170.0, applicationsX = 470.0, iconY = 150.0
     static let page = 0xFAF9F5, ink = 0x1F1E1D, accent = 0xA4693D
     /// As on the page (DotGrid in ChatView.swift).
@@ -102,11 +105,24 @@ struct Background {
         let p = MeadowTune.pixel, rows = MeadowTune.rows
         let cols = Int(Layout.width / p)
         let meadow = Meadow(seed: seed)
+        let colors = MeadowColors(dark: false)
         meadow.resize(cols)
         let dt = 1 / MeadowTune.fps
         for _ in 0..<Int((MeadowTune.warmUp + Layout.settle) * MeadowTune.fps) { meadow.step(dt) }
-        let pixels = meadow.pixels(MeadowColors(dark: false))
-        let stripTop = Layout.height - Double(rows) * p
+        let pixels = meadow.pixels(colors)
+        let soilTop = Layout.height - Double(Layout.soilRows) * p
+        let stripTop = soilTop - Double(rows) * p
+        // The earth goes on down, speckled, a little darker the deeper.
+        for y in 0..<Layout.soilRows {
+            for x in 0..<Int(Layout.width / p) {
+                var h = UInt64(truncatingIfNeeded: x &* 73_856_093 ^ y &* 19_349_663 ^ 0x5EED)
+                h = (h ^ (h >> 13)) &* 0x5BD1_E995
+                let speckle = Double((h ^ (h >> 15)) & 0xFF) / 256
+                let dark = speckle < 0.35 + Double(y) * 0.06
+                fill(CGRect(x: Double(x) * p, y: soilTop + Double(y) * p, width: p, height: p),
+                     Int(colors.earth[dark ? 1 : 0]), MeadowTune.opacityLight)
+            }
+        }
         for y in 0..<rows {
             let fade = min(1, (Double(y) + 0.5) / (Double(rows) * MeadowTune.fadeIn))
             for x in 0..<cols {

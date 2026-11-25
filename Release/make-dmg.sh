@@ -23,7 +23,7 @@ OUT="$ROOT/build/release"
 VOLUME="Kuri"
 SEED="${KURI_DMG_SEED:-1}"
 # The window and icon positions match Layout in Background.swift.
-WIDTH=640 HEIGHT=400 ICON_SIZE=112
+WIDTH=640 HEIGHT=428 ICON_SIZE=112
 APP_POSITION="170, 150" APPLICATIONS_POSITION="470, 150"
 # Finder's window bounds include its title bar.
 TITLE_BAR=32
@@ -77,9 +77,10 @@ tell application "Finder"
     tell disk "$VOLUME"
         open
         set current view of container window to icon view
+        -- The path bar and status bar are Finder-wide settings, not the
+        -- window's: setting them here would change the user's Finder and
+        -- not the image. Someone who shows the path bar sees it over the grass.
         set toolbar visible of container window to false
-        set statusbar visible of container window to false
-        set pathbar visible of container window to false
         set the bounds of container window to {200, 120, 200 + $WIDTH, 120 + $HEIGHT + $TITLE_BAR}
         set viewOptions to the icon view options of container window
         set arrangement of viewOptions to not arranged
