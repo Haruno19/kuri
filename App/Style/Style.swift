@@ -7,13 +7,19 @@ import SwiftUI
 // MARK: - Timing
 
 /// Every timing in one place, so motion can be tuned without hunting.
+/// With Reduce Motion on, what moves across the window fades instead
+/// (`Motion.reduced`, `AnyTransition.moving`).
 enum Tune {
     /// Things entering, leaving or moving across the window.
-    static let move = Animation.spring(response: 0.42, dampingFraction: 0.88)
+    static var move: Animation { Motion.reduced ? reducedMove : .spring(response: 0.42, dampingFraction: 0.88) }
+    /// A tool call in the transcript opening to its output.
+    static var snap: Animation { Motion.reduced ? reducedMove : .snappy }
     /// Scrolling a sent message to the top.
-    static let scroll = Animation.spring(response: 0.5, dampingFraction: 0.9)
+    static var scroll: Animation { Motion.reduced ? reducedMove : .spring(response: 0.5, dampingFraction: 0.9) }
     /// Status text swapping while the model works.
     static let status = Animation.spring(response: 0.35, dampingFraction: 0.9)
+    /// In place of springs while Reduce Motion is on: short, no overshoot.
+    static let reducedMove = Animation.easeInOut(duration: 0.2)
     /// A panel making way once something else has finished moving: the
     /// plan above the composer, after the inspector's slide.
     static let fade = Animation.easeOut(duration: 0.18)
@@ -22,19 +28,36 @@ enum Tune {
     /// A control becoming enabled or disabled.
     static let enable = Animation.easeInOut(duration: 0.28)
     /// Pressed buttons.
-    static let press = Animation.spring(response: 0.22, dampingFraction: 0.65)
+    static var press: Animation { Motion.reduced ? .easeOut(duration: 0.1) : .spring(response: 0.22, dampingFraction: 0.65) }
     /// Seconds for the shine to cross the logo.
     static let shine = 0.7
     /// Seconds for the light to cross the status text once.
     static let shimmer = 3.6
 }
 
+/// The system's Reduce Motion setting, read where an animation is made,
+/// so a change applies from the next one. Views that run all the time
+/// (the working dots, the shimmer) read the environment instead.
+enum Motion {
+    static var reduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+}
+
+extension AnyTransition {
+    /// A transition that moves or scales, or just a fade with Reduce Motion.
+    static func moving(_ transition: AnyTransition) -> AnyTransition {
+        Motion.reduced ? .opacity : transition
+    }
+}
+
 // MARK: - Palette
 
 /// Quiet, warm neutrals with a muted chestnut accent; the logo alone keeps
-/// the icon's own gradient.
+/// the icon's own gradient. Text colours reach 4.5:1 on every surface they
+/// sit on; with Increase Contrast each steps up one.
 struct Palette {
     let scheme: ColorScheme
+    /// The system's Increase Contrast.
+    var increased = false
     var dark: Bool { scheme == .dark }
 
     var background: Color { dark ? Color(hex: 0x1C1B1A) : Color(hex: 0xFAF9F5) }
@@ -42,12 +65,31 @@ struct Palette {
     var composer: Color { dark ? Color(hex: 0x141312) : Color(hex: 0xEFEDE6) }
 
     var ink: Color { dark ? Color(hex: 0xECEBE5) : Color(hex: 0x1F1E1D) }
-    var secondary: Color { dark ? Color(hex: 0xA8A59C) : Color(hex: 0x6B6A64) }
-    var faint: Color { dark ? Color(hex: 0x78766F) : Color(hex: 0x9C9A92) }
+    var secondary: Color {
+        increased ? (dark ? Color(hex: 0xC4C1B8) : Color(hex: 0x4A4944))
+                  : (dark ? Color(hex: 0xA8A59C) : Color(hex: 0x5C5B55))
+    }
+    /// The quietest text that still informs: times, counts, status, hints.
+    var dim: Color {
+        increased ? (dark ? Color(hex: 0xA8A59C) : Color(hex: 0x5C5B55))
+                  : (dark ? Color(hex: 0x95928A) : Color(hex: 0x6D6B64))
+    }
+    /// Icons, rules and other marks that sit beside text rather than being
+    /// read: too light for text of its own.
+    var faint: Color {
+        increased ? dim : (dark ? Color(hex: 0x78766F) : Color(hex: 0x9C9A92))
+    }
 
     var accent: Color { dark ? Color(hex: 0xC08452) : Color(hex: 0xA4693D) }
     var accentLight: Color { dark ? Color(hex: 0xD6A06F) : Color(hex: 0xC18A5B) }
-    var accentFill: LinearGradient { LinearGradient(colors: [accentLight, accent], startPoint: .top, endPoint: .bottom) }
+    /// The accent as text (errors): darker in light mode to read at 4.5:1.
+    var accentText: Color { dark ? accent : Color(hex: 0x965C32) }
+    /// Filled controls with a white label (send, New Chat, step numbers):
+    /// deep enough for the label to read at 4.5:1.
+    var accentFill: LinearGradient {
+        dark ? LinearGradient(colors: [Color(hex: 0x9A6236), Color(hex: 0x7E4E2A)], startPoint: .top, endPoint: .bottom)
+             : LinearGradient(colors: [Color(hex: 0xA4693D), Color(hex: 0x8C5730)], startPoint: .top, endPoint: .bottom)
+    }
 
     var iconTop: Color { dark ? Color(.displayP3, red: 0.50, green: 0.31, blue: 0.14) : Color(.displayP3, red: 0.60, green: 0.345, blue: 0.165) }
     var iconBottom: Color { Color(red: 0.733, green: 0.58, blue: 0.341) }
@@ -89,9 +131,10 @@ extension EnvironmentValues {
 /// Sets the palette for the current colour scheme on everything inside.
 struct Themed: ViewModifier {
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
 
     func body(content: Content) -> some View {
-        content.environment(\.palette, Palette(scheme: scheme))
+        content.environment(\.palette, Palette(scheme: scheme, increased: contrast == .increased))
     }
 }
 
@@ -155,7 +198,8 @@ extension HoverWash where S == RoundedRectangle {
 struct Squish: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+            .scaleEffect(configuration.isPressed && !Motion.reduced ? 0.92 : 1)
+            .opacity(configuration.isPressed && Motion.reduced ? 0.7 : 1)
             .animation(Tune.press, value: configuration.isPressed)
     }
 }
@@ -163,7 +207,9 @@ struct Squish: ButtonStyle {
 /// A control that blends into the surface it sits on.
 struct QuietButton: View {
     let glyph: Glyph
-    var label: String? = nil
+    /// What VoiceOver says; shown beside the icon when `showsName` is set.
+    let name: LocalizedStringKey
+    var showsName = false
     let action: () -> Void
     @Environment(\.palette) private var palette
 
@@ -171,13 +217,15 @@ struct QuietButton: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 PencilIcon(glyph: glyph, size: 15, color: palette.secondary)
-                if let label { Text(label).font(Typeface.sans(13)).foregroundStyle(palette.secondary) }
+                if showsName { Text(name).font(Typeface.sans(13)).foregroundStyle(palette.secondary) }
             }
             .padding(.horizontal, 7)
             .padding(.vertical, 5)
+            .frame(minHeight: 28)
             .modifier(HoverWash())
         }
         .buttonStyle(Squish())
+        .accessibilityLabel(name)
     }
 }
 
@@ -186,7 +234,9 @@ struct QuietButton: View {
 /// inspector's are a matching pair in the chat's top corners.
 struct PaneToggle: View {
     let glyph: Glyph
-    let help: String
+    /// What VoiceOver says, like the View menu's item.
+    let label: LocalizedStringKey
+    let help: LocalizedStringKey
     let action: () -> Void
     @Environment(\.palette) private var palette
 
@@ -204,6 +254,7 @@ struct PaneToggle: View {
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: Circle())
         .help(help)
+        .accessibilityLabel(label)
     }
 }
 
@@ -330,10 +381,12 @@ struct OuterShadow<S: Shape>: View {
 struct Orb: View {
     var size: CGFloat = 7
     @Environment(\.palette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var still
 
     var body: some View {
-        TimelineView(.animation) { context in
-            let depth = (sin(context.date.timeIntervalSinceReferenceDate * 2.4) + 1) / 2
+        // Still with Reduce Motion: the near pose, no pulse.
+        TimelineView(.animation(paused: still)) { context in
+            let depth = still ? 1 : (sin(context.date.timeIntervalSinceReferenceDate * 2.4) + 1) / 2
             Circle()
                 .fill(RadialGradient(colors: [palette.accentLight, palette.accent],
                                      center: UnitPoint(x: 0.35, y: 0.3), startRadius: 0, endRadius: size * 0.8))
@@ -342,6 +395,7 @@ struct Orb: View {
                 .opacity(0.55 + 0.45 * depth)
         }
         .frame(width: size * 1.2, height: size * 1.2)
+        .accessibilityHidden(true)
     }
 }
 
@@ -501,5 +555,7 @@ struct PencilIcon: View {
                 .stroke(color.opacity(0.32), style: StrokeStyle(lineWidth: weight * 0.55, lineCap: .round, lineJoin: .round))
         }
         .frame(width: size, height: size)
+        // Decorative: a button carrying only an icon names itself.
+        .accessibilityHidden(true)
     }
 }

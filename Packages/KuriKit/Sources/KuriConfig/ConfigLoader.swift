@@ -71,6 +71,10 @@ public struct ConfigLoader: Sendable {
           // Launch with only the menu bar icon, no main window.
           startInBackground: false,
 
+          // Kuri's icon in the menu bar, which opens the mini window. Off, Kuri
+          // stays in the Dock and startInBackground is ignored.
+          menuBarIcon: true,
+
           // Summarize earlier messages when a request would fill this much of the
           // model's context window, in percent (50 to 95). Needs the model's contextWindow.
           compactAt: 75,

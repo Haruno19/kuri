@@ -88,6 +88,15 @@ public struct ConfigEditor: Sendable {
     }
 
     /// `true` is the default, so it leaves the key out.
+    public func setMenuBarIcon(_ enabled: Bool) throws {
+        try edit { tree in
+            guard case .object(var root) = tree else { return }
+            root["menuBarIcon"] = enabled ? nil : .bool(false)
+            tree = .object(root)
+        }
+    }
+
+    /// `true` is the default, so it leaves the key out.
     public func setMeadow(_ enabled: Bool) throws {
         try edit { tree in
             guard case .object(var root) = tree else { return }

@@ -8,11 +8,10 @@ import SwiftUI
 struct MainView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
-    @State private var columns: NavigationSplitViewVisibility = .detailOnly
 
     var body: some View {
         @Bindable var model = model
-        NavigationSplitView(columnVisibility: $columns) {
+        NavigationSplitView(columnVisibility: columns) {
             Sidebar()
                 // Kuri draws its own, outside the sidebar.
                 .toolbar(removing: .sidebarToggle)
@@ -40,13 +39,15 @@ struct MainView: View {
             // with the sidebar. Its own toggle would sit inside the sidebar.
             .toolbar {
                 ToolbarItem(placement: .navigation) {
-                    PaneToggle(glyph: .sidebar, help: columns == .detailOnly ? "Show the sidebar (⌃⌘S)" : "Hide the sidebar (⌃⌘S)") {
-                        columns = columns == .detailOnly ? .all : .detailOnly
+                    PaneToggle(glyph: .sidebar,
+                               label: model.showsSidebar ? "Hide Sidebar" : "Show Sidebar",
+                               help: model.showsSidebar ? "Hide the sidebar (⌃⌘S)" : "Show the sidebar (⌃⌘S)") {
+                        model.showsSidebar.toggle()
                     }
                     // macOS leaves 4 points after the open sidebar; this
                     // makes it the inspector toggle's inset.
-                    .padding(.leading, columns == .detailOnly ? 0 : PaneToggle.inset - 4)
-                    .animation(Tune.move, value: columns)
+                    .padding(.leading, model.showsSidebar ? PaneToggle.inset - 4 : 0)
+                    .animation(Tune.move, value: model.showsSidebar)
                 }
                 .sharedBackgroundVisibility(.hidden)
             }
@@ -54,7 +55,9 @@ struct MainView: View {
             // would put it over the inspector.
             .overlay(alignment: .topTrailing) {
                 if model.phase.isReady {
-                    PaneToggle(glyph: .inspector, help: model.showsInspector ? "Hide the inspector (⌥⌘I)" : "Show the inspector (⌥⌘I)") {
+                    PaneToggle(glyph: .inspector,
+                               label: model.showsInspector ? "Hide Inspector" : "Show Inspector",
+                               help: model.showsInspector ? "Hide the inspector (⌥⌘I)" : "Show the inspector (⌥⌘I)") {
                         model.toggleInspector()
                     }
                     .padding(.trailing, PaneToggle.inset)
@@ -73,17 +76,51 @@ struct MainView: View {
                     .inspectorColumnWidth(min: 270, ideal: 320, max: 460)
             }
         }
+        // Not drawn, but the Window menu, Mission Control and VoiceOver
+        // name the window by the chat it shows.
+        .navigationTitle(model.selectedConversation.map(\.displayTitle) ?? String(localized: "New Chat"))
         .toolbar(removing: .title)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-        .alert("Something went wrong", isPresented: Binding(
-            get: { model.errorMessage != nil },
-            set: { if !$0 { model.errorMessage = nil } })
-        ) {
-            Button("OK") { model.errorMessage = nil }
-        } message: {
-            Text(model.errorMessage ?? "")
+        .alert(model.problem?.title ?? "", isPresented: Binding(
+            get: { model.problem != nil },
+            set: { if !$0 { model.problem = nil } }),
+            presenting: model.problem
+        ) { _ in
+            Button("OK") { model.problem = nil }
+        } message: { problem in
+            Text(problem.message)
+        }
+        // Deleting a chat can't be undone: its messages and steps go.
+        .confirmationDialog(deletionTitle, isPresented: Binding(
+            get: { model.pendingDeletion != nil },
+            set: { if !$0 { model.pendingDeletion = nil } }),
+            presenting: model.pendingDeletion
+        ) { id in
+            Button("Delete Chat", role: .destructive) {
+                model.pendingDeletion = nil
+                Task { await model.delete(id) }
+            }
+            Button("Cancel", role: .cancel) { model.pendingDeletion = nil }
+        } message: { _ in
+            Text("Its messages and steps are deleted. This can't be undone.")
         }
     }
+
+    /// The split view's columns, from the model's `showsSidebar`.
+    private var columns: Binding<NavigationSplitViewVisibility> {
+        Binding(get: { model.showsSidebar ? .all : .detailOnly },
+                set: { model.showsSidebar = $0 != .detailOnly })
+    }
+
+    private var deletionTitle: String {
+        let title = model.conversations.first { $0.id == model.pendingDeletion }?.displayTitle ?? ""
+        return String(localized: "Delete “\(title)”?")
+    }
+}
+
+extension Conversation {
+    /// The title, or a placeholder until it has one.
+    var displayTitle: String { title.isEmpty ? String(localized: "New Chat") : title }
 }
 
 extension AppModel {
@@ -105,8 +142,6 @@ extension AppModel {
 private struct Sidebar: View {
     @Environment(AppModel.self) private var model
     @Environment(\.palette) private var palette
-    /// The conversation whose title is being edited in place.
-    @State private var renaming: UUID?
 
     var body: some View {
         @Bindable var model = model
@@ -116,32 +151,36 @@ private struct Sidebar: View {
                                 isRunning: model.running.contains(conversation.id),
                                 isAwaitingInput: model.isAwaitingInput(conversation.id),
                                 renaming: Binding(
-                                    get: { renaming == conversation.id },
-                                    set: { if !$0, renaming == conversation.id { renaming = nil } }))
+                                    get: { model.renaming == conversation.id },
+                                    set: { if !$0, model.renaming == conversation.id { model.renaming = nil } }))
                     .tag(conversation.id)
-                    .simultaneousGesture(TapGesture(count: 2).onEnded { renaming = conversation.id })
+                    .simultaneousGesture(TapGesture(count: 2).onEnded { model.renaming = conversation.id })
                     .contextMenu {
-                        Button("Rename") { renaming = conversation.id }
-                        Button("Delete", role: .destructive) {
-                            Task { await model.delete(conversation.id) }
-                        }
+                        Button("Rename Chat") { model.renaming = conversation.id }
+                        Divider()
+                        Button("Delete Chat…", role: .destructive) { model.pendingDeletion = conversation.id }
                     }
             }
         }
         .listStyle(.sidebar)
         // Return renames the selected chat, as in Finder.
         .onKeyPress(.return) {
-            guard renaming == nil, let id = model.selection else { return .ignored }
-            renaming = id
+            guard model.renaming == nil, let id = model.selection else { return .ignored }
+            model.renaming = id
             return .handled
+        }
+        // Delete asks first, as Chat › Delete Chat… does.
+        .onDeleteCommand {
+            guard model.renaming == nil, let id = model.selection else { return }
+            model.pendingDeletion = id
         }
         .safeAreaInset(edge: .top, spacing: 16) {
             VStack(spacing: 6) {
                 Button { model.selection = nil } label: {
-                    SidebarButtonLabel(glyph: .compose, title: "New chat", color: .white)
+                    SidebarButtonLabel(glyph: .compose, title: "New Chat", color: .white)
                 }
                 .buttonStyle(PrimaryButton())
-                .keyboardShortcut("n")
+                .help("Start a new chat (⌘N)")
 
                 SettingsLink {
                     SidebarButtonLabel(glyph: .sliders, title: "Settings", color: palette.ink)
@@ -156,7 +195,7 @@ private struct Sidebar: View {
 
 private struct SidebarButtonLabel: View {
     let glyph: Glyph
-    let title: String
+    let title: LocalizedStringKey
     let color: Color
 
     var body: some View {
@@ -180,7 +219,7 @@ private struct ConversationRow: View {
     @State private var draft = ""
     @FocusState private var focused: Bool
 
-    private var title: String { conversation.title.isEmpty ? "New chat" : conversation.title }
+    private var title: String { conversation.displayTitle }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -211,6 +250,9 @@ private struct ConversationRow: View {
                 Orb().help("Working")
             }
         }
+        // The dot's meaning, for VoiceOver: it's only drawn.
+        .accessibilityElement(children: renaming ? .contain : .combine)
+        .accessibilityValue(isAwaitingInput ? Text("Waiting for your answer") : isRunning ? Text("Working") : Text(""))
     }
 }
 

@@ -58,12 +58,14 @@ enum Dock {
         NSApplication.shared.setActivationPolicy(.regular)
     }
 
-    /// After a window closes: the icon goes if no regular window is left.
+    /// After a window closes: the icon goes if no regular window is left,
+    /// unless there's no menu bar icon to reach Kuri by instead.
     static func update() {
         let open = NSApplication.shared.windows.contains { window in
             window.isVisible && !(window is NSPanel) && window.level == .normal && window.canBecomeMain
         }
-        NSApplication.shared.setActivationPolicy(open ? .regular : .accessory)
+        let reachable = open || !MiniController.shared.showsIcon
+        NSApplication.shared.setActivationPolicy(reachable ? .regular : .accessory)
     }
 
     /// Watches regular windows opening and closing.
@@ -90,6 +92,9 @@ final class MiniController: NSObject, NSWindowDelegate {
     var main: AppModel?
     /// Set at launch from `startInBackground`.
     var startsInBackground = false
+    /// `menuBarIcon`: set at launch, then followed as the config changes.
+    private(set) var showsIcon = true
+    private var installed = false
     private let mini = AppModel()
     private var statusItem: NSStatusItem?
     private var panel: MiniPanel?
@@ -101,6 +106,28 @@ final class MiniController: NSObject, NSWindowDelegate {
     func install() {
         WindowActions.capture()
         Dock.follow()
+        installed = true
+        if showsIcon { addIcon() }
+    }
+
+    /// Shows or hides the menu bar icon (`menuBarIcon`). Without it the mini
+    /// window goes too, and Kuri keeps its Dock icon.
+    func setShowsIcon(_ shows: Bool) {
+        guard shows != showsIcon else { return }
+        showsIcon = shows
+        guard installed else { return }
+        if shows {
+            addIcon()
+        } else {
+            panel?.orderOut(nil)
+            if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
+            statusItem = nil
+        }
+        Dock.update()
+    }
+
+    private func addIcon() {
+        guard statusItem == nil else { return }
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = item.button {
             let image = NSImage(named: "MenuBarIcon")
@@ -110,6 +137,7 @@ final class MiniController: NSObject, NSWindowDelegate {
             button.action = #selector(clicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.toolTip = "Kuri"
+            button.setAccessibilityLabel("Kuri")
         }
         statusItem = item
     }
@@ -126,16 +154,24 @@ final class MiniController: NSObject, NSWindowDelegate {
     /// A native menu, placed and highlighted like any menu bar extra's.
     private func showMenu() {
         let menu = NSMenu()
-        menu.addItem(withTitle: "Open Kuri", action: #selector(openMain), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+        menu.addItem(withTitle: String(localized: "Open Kuri"), action: #selector(openMain), keyEquivalent: "").target = self
+        menu.addItem(withTitle: String(localized: "New Chat"), action: #selector(newChat), keyEquivalent: "n").target = self
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit Kuri", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: String(localized: "Settings…"), action: #selector(openSettings), keyEquivalent: ",").target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: String(localized: "Quit Kuri"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         statusItem?.menu = menu
         statusItem?.button?.performClick(nil)
         statusItem?.menu = nil
     }
 
     @objc private func openMain() { WindowActions.openMain() }
+
+    /// A new chat in the main window, as File › New Chat.
+    @objc private func newChat() {
+        main?.selection = nil
+        WindowActions.openMain()
+    }
 
     /// The mini window's chat in the main window.
     func openInMain() { expand() }
@@ -184,7 +220,7 @@ final class MiniController: NSObject, NSWindowDelegate {
         if let zoom = panel.standardWindowButton(.zoomButton) {
             zoom.target = self
             zoom.action = #selector(expand)
-            zoom.toolTip = "Open in the main window"
+            zoom.toolTip = String(localized: "Open in the main window")
         }
 
         // No corner radius of its own: the window's mask rounds it, so it

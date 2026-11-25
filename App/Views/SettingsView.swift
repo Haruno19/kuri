@@ -9,14 +9,15 @@ import SwiftUI
 
 struct SettingsView: View {
     var body: some View {
+        // Each pane its own height: the window resizes as panes change.
         TabView {
-            Tab("General", systemImage: "gearshape") { GeneralSettings() }
-            Tab("Models", systemImage: "cpu") { ModelsSettings() }
-            Tab("Tools", systemImage: "wrench.and.screwdriver") { ToolsSettings() }
-            Tab("Sandbox", systemImage: "shippingbox") { SandboxSettingsView() }
-            Tab("Memory", systemImage: "bookmark") { MemorySettings() }
+            Tab("General", systemImage: "gearshape") { GeneralSettings().frame(height: 500) }
+            Tab("Models", systemImage: "cpu") { ModelsSettings().frame(height: 540) }
+            Tab("Tools", systemImage: "wrench.and.screwdriver") { ToolsSettings().frame(height: 540) }
+            Tab("Sandbox", systemImage: "shippingbox") { SandboxSettingsView().frame(height: 520) }
+            Tab("Memory", systemImage: "bookmark") { MemorySettings().frame(height: 440) }
         }
-        .frame(width: 560, height: 460)
+        .frame(width: 560)
     }
 }
 
@@ -26,6 +27,8 @@ private struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
     /// macOS keeps this, not config.json: it's the system's login item.
     @State private var loginItem = SMAppService.mainApp.status
+    /// Why the login item couldn't change, under its toggle.
+    @State private var loginError: String?
 
     var body: some View {
         Form {
@@ -49,21 +52,29 @@ private struct GeneralSettings: View {
                 Toggle("Open at login", isOn: Binding(
                     get: { loginItem == .enabled },
                     set: { setOpenAtLogin($0) }))
-                if loginItem == .requiresApproval {
+                if let loginError {
+                    Text(loginError).font(.caption).foregroundStyle(.red)
+                } else if loginItem == .requiresApproval {
                     Text("Allow Kuri in System Settings › General › Login Items.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                Toggle("Show in the menu bar", isOn: Binding(
+                    get: { model.config.menuBarIcon ?? true },
+                    set: { enabled in Task { await model.setMenuBarIcon(enabled) } }))
+                Text("Click the icon for the mini window, a small chat that floats above other windows.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Start in the background", isOn: Binding(
                     get: { model.config.startInBackground ?? false },
                     set: { enabled in Task { await model.setStartInBackground(enabled) } }))
-                Text("Only the menu bar icon at launch, no main window. Click it for the mini window.")
+                    .disabled(!(model.config.menuBarIcon ?? true))
+                Text("Only the menu bar icon at launch, no main window. Needs the menu bar icon.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Conversations") {
+            Section("Chats") {
                 Toggle("Generate titles", isOn: Binding(
                     get: { model.config.generateTitles ?? true },
                     set: { enabled in Task { await model.setGenerateTitles(enabled) } }))
-                Text("After the first answer, the utility model (or the conversation's model) names the conversation.")
+                Text("After the first answer, the utility model (or the chat's model) names the chat.")
                     .font(.caption).foregroundStyle(.secondary)
                 Stepper("Compact at \(compactAt)%", value: Binding(
                     get: { compactAt },
@@ -93,8 +104,9 @@ private struct GeneralSettings: View {
     private func setOpenAtLogin(_ enabled: Bool) {
         do {
             if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+            loginError = nil
         } catch {
-            model.errorMessage = error.localizedDescription
+            loginError = String(localized: "Couldn't change the login item: \(error.localizedDescription)")
         }
         loginItem = SMAppService.mainApp.status
     }
@@ -114,7 +126,7 @@ private struct ModelsSettings: View {
     var body: some View {
         Form {
             Section {
-                Picker("New conversations use", selection: Binding(
+                Picker("New chats use", selection: Binding(
                     get: { model.config.defaultModel },
                     set: { ref in Task { await model.setDefaultModel(ref) } })
                 ) {
@@ -349,7 +361,7 @@ private struct RegisteredModelRow: View {
                 .help("Context window in tokens")
             Text("tokens").font(.caption).foregroundStyle(.secondary)
             Menu {
-                Button("Use for New Conversations") { Task { await model.setDefaultModel(ref) } }
+                Button("Use for New Chats") { Task { await model.setDefaultModel(ref) } }
                 Button("Remove", role: .destructive) {
                     Task { await model.unregister(model: entry.id, provider: provider) }
                 }
@@ -418,7 +430,7 @@ private struct SandboxSettingsView: View {
                 Text("Linux sandbox")
             } footer: {
                 Text("""
-                    Each conversation gets its own lightweight VM, started on its first command and stopped when \
+                    Each chat gets its own lightweight VM, started on its first command and stopped when \
                     idle. Attached folders are mounted at /work; without one, a scratch folder is. No network.
                     """)
                 .foregroundStyle(.secondary)
@@ -712,7 +724,7 @@ private struct MemorySettings: View {
             } header: {
                 Text("What Kuri remembers")
             } footer: {
-                Text("Included in every conversation. The model edits it with the memory tool; you can too.")
+                Text("Included in every chat. The model edits it with the memory tool; you can too.")
                     .foregroundStyle(.secondary)
             }
 

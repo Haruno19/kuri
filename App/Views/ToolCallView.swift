@@ -18,7 +18,7 @@ struct ToolCallView: View {
         let summary = model.summary(of: call)
         VStack(alignment: .leading, spacing: 6) {
             Button {
-                withAnimation(.snappy) { expanded.toggle() }
+                withAnimation(Tune.snap) { expanded.toggle() }
             } label: {
                 HStack(spacing: 8) {
                     PencilIcon(glyph: summary.glyph, size: 14 * scale,
@@ -38,11 +38,13 @@ struct ToolCallView: View {
             .buttonStyle(.plain)
             .font(Typeface.sans(13 * scale))
             .foregroundStyle(palette.secondary)
+            // The icon's colour marks a failure; VoiceOver hears it.
+            .accessibilityValue(result?.isError == true ? Text("Failed") : result == nil && isLive ? Text("Running") : Text(""))
 
             if expanded {
                 ToolDetail(call: call, summary: summary, output: result?.output ?? "")
                     .padding(.leading, 24)
-                    .transition(.opacity.combined(with: .offset(y: -4)))
+                    .transition(.moving(.opacity.combined(with: .offset(y: -4))))
             }
         }
     }
@@ -104,7 +106,7 @@ struct TaskListRows: View {
                         .padding(.top, 1.5)
                     Text(entry.content)
                         .strikethrough(entry.status == .completed, color: palette.faint)
-                        .foregroundStyle(entry.status == .completed ? palette.faint : palette.ink)
+                        .foregroundStyle(entry.status == .completed ? palette.dim : palette.ink)
                         .fontWeight(entry.status == .inProgress ? .medium : .regular)
                 }
             }
@@ -133,5 +135,6 @@ struct TaskCheck: View {
         }
         .frame(width: 14, height: 14)
         .contentShape(Circle())
+        .accessibilityHidden(true)
     }
 }
