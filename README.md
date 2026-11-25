@@ -6,7 +6,7 @@
 
 A lightweight, macOS native, human-designed & Claude-coded app for working with language models, that can chat, think, and act on your files from a sandbox.
 
-Kuri is a single app that contains both the engine and the interface. It runs offline with local models, talks to any hosted provider when you want it to, discovers MCP servers at runtime, and runs the model's commands inside a lightweight Linux VM. 
+Kuri runs offline with local models, talks to any hosted provider when you want it to, discovers MCP servers at runtime, and runs the model's commands inside a lightweight Linux VM. 
 
 <p align="center">
   <img height="320" alt="Main window" src="docs/images/main-window.png" />
@@ -15,12 +15,11 @@ Kuri is a single app that contains both the engine and the interface. It runs of
 
 ## Principles
 
-- **Essential.** Few features, done well. Few dependencies, and only official ones (Apple, or the protocol's own SDK).
+- **Essential.** Few features, just the ones you need. Few dependencies, and only official ones (Apple, or official SDKs).
 - **Local-first.** Works with no network. Hosted providers are opt-in.
 - **Mac-only, Mac-native.** SwiftUI + AppKit, Apple frameworks, macOS conventions. No cross-platform abstractions.
-- **Hackable.** Providers, models and MCP servers live in plain JSON5 files you can edit by hand. The database is a plain SQLite file with a small, readable schema.
+- **Hackable.** Providers, models and MCP servers live in plain JSON5 files you can edit by hand.
 - **Provider-agnostic.** Every major wire format is a first-class adapter. Switching model mid-conversation just works.
-- **One mode.** There is no "chat mode" or "code mode". Every conversation has the same tools; attaching a folder lets the model work on your files.
 
 ## Gallery
 <p align="center">
@@ -45,8 +44,6 @@ Releases aren't notarized by Apple yet, so the first time you open Kuri macOS sa
 xattr -dr com.apple.quarantine /Applications/Kuri.app
 ```
 
-To build a release yourself: `Release/make-dmg.sh` (what it does, and how to sign and notarize, is at the top of the script).
-
 ## Architecture
 
 ```
@@ -70,7 +67,7 @@ To build a release yourself: `Release/make-dmg.sh` (what it does, and how to sig
 
 **The engine is in-process.** The SwiftUI layer talks to `Engine` directly and subscribes to its event stream. Any other client would be just another subscriber to the same stream; the local UI never goes through HTTP.
 
-**Stateless towards providers.** Every request carries the history it needs, rebuilt from Kuri's database, as a list of items (messages, reasoning, tool calls and results, summaries) rather than chat messages. That keeps behaviour identical across providers, works offline, and makes switching model mid-conversation trivial.
+**Stateless towards providers.** Every request carries the history it needs, rebuilt from Kuri's database, as a list of items (messages, reasoning, tool calls and results, summaries) rather than pre-formatted chat messages. That keeps behaviour identical across providers, works offline, and makes switching model mid-conversation trivial.
 
 **Configuration in files, data in SQLite.** Providers, models, tool policies and MCP servers live in JSON5 files in `~/.config/kuri`; conversations live in one small SQLite file; secrets in the Keychain.
 
@@ -139,7 +136,7 @@ Any other provider works the same way with its own `format` and, if it isn't the
 
 ## Footprint
 
-Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows for conversations, LaTeX, the mini window, the inspector and the meadow on the 23rd), as the memory figure Activity Monitor shows (physical footprint).
+Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) as the memory figure Activity Monitor shows (physical footprint).
 
 | | Kuri |
 |---|---|
@@ -158,12 +155,10 @@ Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) in November 2026 (the rows
 2. The Linux guest doesn't hand freed memory back to macOS, so a VM holds its peak until it stops: after `idleMinutes` (10 by default), on Stop, or on quit. `sandbox.memoryMiB` (2 GB by default) caps it.
 3. Measured by rendering the app's own reply views in an offscreen window, with 40 and with 120 Markdown-heavy answers (text, a list, a code block and a table each): both ≈ 32 MB. The transcript only builds the messages near the visible area; built in full, the same answers took ≈ 217 MB and ≈ 611 MB.
 4. MathJax loads the first time a formula appears; with 40 answers holding formulas the transcript came to ≈ 56 MB.
-5. Measured like (3), with the app's own mini window views in an off-screen panel: its second model on the engine adds under 1 MB, the empty glass window ≈ 18 MB, and a chat of 40 or of 120 Markdown-heavy answers ≈ 10 MB more (its transcript is lazy too). It has no LaTeX, so MathJax never loads for it.
+5. Measured like (3), with the app's own mini window views in an off-screen panel: its second model on the engine adds under 1 MB, the empty glass window ≈ 18 MB, and a chat of 40 or of 120 Markdown-heavy answers ≈ 10 MB more (its transcript is lazy too). It has no LaTeX rendering, so MathJax never loads for it.
 6. Measured like (3), with the app's own main window in an off-screen window, opening the inspector on a chat of 8 commands, on one of 204 commands with output, and on the same with a repository of 150 changed files: + 2.4, + 2.8 and + 3.8 MB. Steps shows the latest few and lists the rest lazily on Show all (built in full, the 204 took ≈ 12 MB), and Git the first 12 changes of each repository (all 150 took ≈ 18 MB). Git status runs `git` in separate, short-lived processes. At rest, open or closed, the inspector takes no CPU.
 7. Measured with `python:3-slim` (a 45 MB download). Kuri's image is a 254 MB download; its total is estimated from the layer sizes, not yet measured.
 8. Memory measured like (3), the app's new chat page with `meadow` on and off; CPU measured in its sketch (`Sketches/Meadow.swift`) at 12 frames a second. It stops while the window is hidden and with Reduce Motion.
-
-None of this includes a model's weights. A local model runs in its own process (`qwen3.5:2b` takes about 3 GB in Ollama); a hosted one costs nothing locally.
 
 ## Documentation
 
@@ -187,18 +182,18 @@ None of this includes a model's weights. A local model runs in its own process (
 | [MathJax](https://github.com/mathjax/MathJax) 3.2.2 | Typesetting LaTeX in replies, run in JavaScriptCore and bundled in `App/MathJax` (Apache 2.0; [decision 0019](docs/decisions/0019-latex-with-mathjax.md)) |
 | [Literata](https://github.com/googlefonts/literata), [DM Sans](https://github.com/googlefonts/dm-fonts), [iA Writer Mono](https://github.com/iaolo/iA-Fonts) | The reply, interface and code faces, bundled under the SIL Open Font License (licences in `App/Fonts`; decisions [0015](docs/decisions/0015-typography.md), [0018](docs/decisions/0018-literata.md)) |
 
-The sandbox's default image is Kuri's own ([`Sandbox/Dockerfile`](Sandbox/Dockerfile), published to `ghcr.io/haruno19/kuri-sandbox` by a GitHub Actions workflow; [decision 0022](docs/decisions/0022-kuri-sandbox-image.md)). It runs inside the VM, not in Kuri: the official `python:3-slim`, plus poppler-utils, pandoc, ImageMagick, ripgrep, jq, git and sqlite3 from Debian, and pypdf, pdfplumber, pandas, openpyxl, python-docx, Pillow and matplotlib from PyPI, so the model can work with PDFs, Office files, images and data without a network.
+The sandbox's default image is Kuri's own ([`Sandbox/Dockerfile`](Sandbox/Dockerfile), published to `ghcr.io/haruno19/kuri-sandbox` by a GitHub Actions workflow. It runs inside the VM, not in Kuri: the official `python:3-slim`, plus `poppler-utils`, `pandoc`, `ImageMagick`, `ripgrep`, `jq`, `git` and `sqlite3` from Debian, and `pypdf`, `pdfplumber`, `pandas`, `openpyxl`, `python-docx`, `Pillow` and `matplotlib` from PyPI, so the model can work with PDFs, Office files, images and data locally, without a network.
 
 The inspector's git status runs the host's `git` when one is installed (Homebrew's or the developer tools'); nothing is bundled for it.
 
 The MCP SDK brings in, transitively, `apple/swift-system`, `apple/swift-log` and `mattt/eventsource` (SSE parsing for its HTTP transport); those are what end up linked into Kuri. SwiftPM also fetches `apple/swift-nio` and friends, used only by the SDK's own sample executables.
 
-Containerization is the heavy one: it brings gRPC (`grpc/grpc-swift-2` and friends, to talk to the VM's init process), SwiftNIO, swift-crypto, swift-protobuf, `swift-server/async-http-client` and `facebook/zstd`. All come from Apple, the Swift server workgroup, gRPC or Meta; no personal libraries.
+Containerization is the heavy one: it brings gRPC (`grpc/grpc-swift-2` and friends, to talk to the VM's init process), `SwiftNIO`, `swift-crypto`, `swift-protobuf`, `swift-server/async-http-client` and `facebook/zstd`. 
 
 ## Contributing
 
-Kuri means to stay small: bug fixes, performance and usability improvements to what already exists, and specialised sandbox images are welcome; ideas for new features or UI are open to discussion, and forks are encouraged. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Kuri means to stay small and essential: bug fixes, performance and usability improvements to what already exists, and specialized sandbox images are welcome; ideas for new features or UI are open to discussion, and forks are encouraged. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Copyright 2026 Stefano Gini. Kuri is licensed under the [Apache License 2.0](LICENSE). Bundled fonts and MathJax keep their own licences, listed above.
+Kuri is licensed under the [Apache License 2.0](LICENSE). Bundled fonts and MathJax keep their own licences, listed above.
