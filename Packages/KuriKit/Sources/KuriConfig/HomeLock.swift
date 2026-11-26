@@ -52,7 +52,8 @@ public final class HomeLock: Sendable {
     public static func executable(of pid: Int32) -> URL? {
         var path = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
         guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { return nil }
-        return URL(filePath: String(cString: path))
+        let bytes = path.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        return URL(filePath: String(decoding: bytes, as: UTF8.self))
     }
 
     /// Lets the next engine open this home. Closing the descriptor is what
