@@ -34,10 +34,10 @@ enum Tune {
     /// The logo turning into kuri's hero and back: seconds for each pixel
     /// wipe, for the burr to stay between them, for the light to cross it
     /// and for its twinkle.
-    static let turnWipe = 0.34
-    static let turnHold = 0.78
-    static let turnShine = 0.5
-    static let twinkle = 0.36
+    static let turnWipe = 0.46
+    static let turnHold = 0.95
+    static let turnShine = 0.65
+    static let twinkle = 0.45
     /// A running chat's bead in the sidebar: seconds for a glint to roll
     /// across it, and from one glint to the next.
     static let glint = 1.1
