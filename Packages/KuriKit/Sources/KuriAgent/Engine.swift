@@ -24,6 +24,13 @@ public actor Engine {
     /// 4,096-token context can't spare the schema, and it writes JSON
     /// unreliably.
     public nonisolated let blocks: Set<ReplyBlockKind>
+    /// Whether a conversation's first completed turn gets a generated
+    /// title. `kuri -p` exits as its turn ends, so it turns them off rather
+    /// than start a request it would cancel (decision 0028).
+    public nonisolated let titles: Bool
+    /// The home folder's lock, held until `shutdown`: one engine at a time
+    /// (decision 0028). Engines made directly, in tests, take none.
+    private nonisolated let lock: HomeLock?
 
     private let registry: ToolRegistry
     private let mcp: MCPManager
@@ -46,15 +53,22 @@ public actor Engine {
 
     /// Opens `~/.config/kuri` (creating it on first launch), loads the
     /// config and the database, and starts watching the config files.
-    public static func open(home: KuriHome = .resolve(), blocks: Set<ReplyBlockKind> = []) async throws -> Engine {
+    /// Throws `KuriError.homeInUse` while another engine has it open.
+    public static func open(home: KuriHome = .resolve(), blocks: Set<ReplyBlockKind> = [],
+                            titles: Bool = true) async throws -> Engine {
         try home.prepare()
+        // Before anything reads the database: recovery below would mark the
+        // other engine's running turns as interrupted.
+        let lock = try HomeLock.acquire(home)
         let loader = ConfigLoader(home: home)
         let engine = Engine(
             home: home,
             store: try Store(url: home.database),
             config: try loader.loadConfig(),
             mcpConfig: try loader.loadMCP(),
-            blocks: blocks)
+            blocks: blocks,
+            titles: titles,
+            lock: lock)
         try await engine.store.recoverInterruptedTurns()
         await engine.start()
         return engine
@@ -62,7 +76,7 @@ public actor Engine {
 
     init(home: KuriHome, store: Store, config: Config, mcpConfig: MCPConfig,
          tools: [any Tool] = BuiltInTools.all, factory: ProviderFactory = ProviderFactory(),
-         blocks: Set<ReplyBlockKind> = []) {
+         blocks: Set<ReplyBlockKind> = [], titles: Bool = true, lock: HomeLock? = nil) {
         let broadcaster = EventBroadcaster()
         let registry = ToolRegistry(tools)
         self.home = home
@@ -81,6 +95,8 @@ public actor Engine {
         self.broker = InteractionBroker(emit: { broadcaster.emit($0) })
         self.factory = factory
         self.blocks = blocks
+        self.titles = titles
+        self.lock = lock
     }
 
     /// Hooks up observers, applies the loaded configuration and connects
@@ -94,7 +110,8 @@ public actor Engine {
         startWatching()
     }
 
-    /// Disconnects MCP servers and stops their processes. Call on quit.
+    /// Disconnects MCP servers, stops their processes and the sandbox's
+    /// VMs, then lets another engine open the home folder. Call on quit.
     public func shutdown() async {
         watcher?.cancel()
         discovery?.cancel()
@@ -102,6 +119,7 @@ public actor Engine {
         for task in titling.values { task.cancel() }
         await mcp.shutdown()
         await sandbox.stopAll()
+        lock?.release()
     }
 
     public nonisolated func events() -> AsyncStream<EngineEvent> {
@@ -596,7 +614,7 @@ public actor Engine {
     /// first line of the first message) with a generated one. In the
     /// background; a failure just leaves the provisional title.
     private func generateTitleIfNeeded(_ conversationID: UUID) async {
-        guard config.generateTitles != false,
+        guard titles, config.generateTitles != false,
               let conversation = try? await store.conversation(conversationID),
               let model = conversation.model ?? config.defaultModel,
               let completed = try? await store.turns(of: conversationID).filter({ $0.status == .completed }),

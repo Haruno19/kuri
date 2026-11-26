@@ -76,7 +76,7 @@ xattr -dr com.apple.quarantine /Applications/Kuri.app
 | Module | Responsibility | Depends on |
 |---|---|---|
 | `KuriCore` | `Item`, `Message`, `ToolCall`, `ToolSpec`, `InferenceEvent`, `Usage`, `ModelRef`, `JSONValue` | — |
-| `KuriConfig` | Resolves `~/.config/kuri`, loads and watches `config.json` / `mcp.json`, edits `config.json` for the UI, resolves secrets from the Keychain or the environment and keeps API keys in the Keychain | Core |
+| `KuriConfig` | Resolves `~/.config/kuri` and locks it (one engine at a time), loads and watches `config.json` / `mcp.json`, edits `config.json` for the UI, resolves secrets from the Keychain or the environment and keeps API keys in the Keychain | Core |
 | `KuriStore` | SQLite wrapper, migrations, conversations, turns, items, full-text search, memories | Core |
 | `KuriInference` | `InferenceProvider` protocol, SSE parser, one adapter per wire format, model discovery | Core, Config |
 | `KuriTools` | `Tool` protocol, `ToolRegistry`, permission policy, built-in tools | Core, Store |

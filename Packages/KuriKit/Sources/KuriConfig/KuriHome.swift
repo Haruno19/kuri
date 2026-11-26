@@ -26,6 +26,8 @@ public struct KuriHome: Sendable {
     public var mcpFile: URL { root.appending(path: "mcp.json") }
     public var database: URL { root.appending(path: "kuri.sqlite") }
     public var scratch: URL { root.appending(path: "scratch", directoryHint: .isDirectory) }
+    /// Held by the running engine (`HomeLock`).
+    public var lockFile: URL { root.appending(path: "kuri.lock") }
 
     public func scratchFolder(for conversationID: UUID) -> URL {
         scratch.appending(path: conversationID.uuidString.lowercased(), directoryHint: .isDirectory)

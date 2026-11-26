@@ -28,7 +28,7 @@ Guards against runaway turns: a round limit per turn, detection of identical rep
 
 **Fallback models.** A model can list `fallbacks` in `config.json`. When a request fails before the model produced anything, the round is sent again to the next fallback, with that model's provider, settings and instructions (no tools mentioned if it can't use them), and `.modelFallback` tells the app which model took over and why. The fallback keeps the rest of the turn; the next turn starts with the conversation's model again. A request that fails after storing output isn't retried, since that would store it twice, and Stop never falls back. Only the conversation's model has fallbacks: titles and summaries don't.
 
-**Titles.** A conversation starts with a provisional title, the first line of its first message. After its first completed turn, if `generateTitles` is on and the title is still the provisional one, the utility model (or the conversation's model) writes a 2-to-6-word title from the first exchange, in the background; labels, quotes and trailing punctuation are cleaned off. A title the user changed meanwhile is left alone, a failure keeps the provisional one, and quitting cancels any title still being written.
+**Titles.** A conversation starts with a provisional title, the first line of its first message. After its first completed turn, if `generateTitles` is on and the title is still the provisional one, the utility model (or the conversation's model) writes a 2-to-6-word title from the first exchange, in the background; labels, quotes and trailing punctuation are cleaned off. A title the user changed meanwhile is left alone, a failure keeps the provisional one, and quitting cancels any title still being written. A client can turn titles off for its engine (`Engine.open(titles: false)`): `kuri -p` does, since it exits as its turn ends.
 
 **Messages sent during a turn are queued.** While a conversation is busy (a turn or a compaction), `Engine.send` queues the message instead of failing. The running turn takes the queue at each step boundary: after a tool round, and when its answer would otherwise end the turn, so the message joins the same turn and the next request includes it. A message that arrives after the turn has ended, or was queued before Stop, starts the next turn as soon as the conversation is free. Queued messages can be removed before delivery; they live in memory only.
 
@@ -115,9 +115,12 @@ Everything lives in `~/.config/kuri`. The location resolves in this order: the `
 ├─ config.json     providers, models, defaults, tool policies, sandbox settings
 ├─ mcp.json        MCP servers
 ├─ kuri.sqlite     conversations, turns, items, memories
+├─ kuri.lock       held by the running engine: one at a time
 ├─ scratch/        per-conversation working folders (mounted when no folder is attached)
 └─ sandbox/        Linux kernel, images and snapshots for the sandbox
 ```
+
+**One engine at a time.** The app and `kuri` in a terminal each open an engine of their own on this folder, so `Engine.open` takes an exclusive `flock` on `kuri.lock` before it touches the database, and fails with `homeInUse` naming the process that holds it ("kuri (process 4242) is already using ~/.config/kuri"). Running turns, queues, open questions and VMs live in an engine's memory, and its startup marks turns left `running` as interrupted, so two engines would trip over each other. The kernel drops the lock when the process exits, so a crash leaves nothing stale ([decision 0028](decisions/0028-command-line-client.md)).
 
 Every key is documented in [config.md](config.md). Both config files are **JSON5**: comments, unquoted keys and trailing commas are fine (decoded with Foundation's `JSONDecoder.allowsJSON5`, no extra dependency). Kuri writes a commented template on first launch. The files are the only source of truth for providers, models and MCP servers; nothing about them is copied into the database.
 

@@ -61,6 +61,6 @@ xcodebuild -project Kuri.xcodeproj -scheme Kuri -configuration Debug build
 
 ## Where things live
 
-- `~/.config/kuri/`: `config.json`, `mcp.json`, `kuri.sqlite`, `scratch/<conversation>/`, `sandbox/` (kernel, images, snapshots).
+- `~/.config/kuri/`: `config.json`, `mcp.json`, `kuri.sqlite`, `kuri.lock` (one engine at a time), `scratch/<conversation>/`, `sandbox/` (kernel, images, snapshots).
 - `Packages/KuriKit/Sources/`: `KuriCore` (types) → `KuriConfig`, `KuriStore`, `KuriInference`, `KuriTools` → `KuriMCP`, `KuriSandbox` → `KuriAgent` (the engine).
 - `App/`: the SwiftUI shell (folder-synchronized in the Xcode project: new files are picked up automatically).

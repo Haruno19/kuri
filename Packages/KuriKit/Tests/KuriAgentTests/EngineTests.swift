@@ -184,3 +184,21 @@ final class StubResponsesProtocol: URLProtocol, @unchecked Sendable {
         #expect(tools.contains { $0["name"] == "memory" })
     }
 }
+
+@Suite struct HomeLockEngineTests {
+    @Test func oneEngineAtATimePerHome() async throws {
+        let home = KuriHome(root: FileManager.default.temporaryDirectory.appending(path: "kuri-engine-lock-\(UUID().uuidString)"))
+        defer { try? FileManager.default.removeItem(at: home.root) }
+        let first = try await Engine.open(home: home)
+
+        await #expect {
+            _ = try await Engine.open(home: home)
+        } throws: { error in
+            if case .homeInUse = error as? KuriError { true } else { false }
+        }
+
+        await first.shutdown()
+        let second = try await Engine.open(home: home)
+        await second.shutdown()
+    }
+}
