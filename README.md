@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/56c09707-d1ec-466f-88b1-f9454fdf3280" width="128" alt="Kuri app icon">
+  <img src="docs/images/app-icon.png" width="128" alt="Kuri app icon">
 </p>
 
 <h1 align="center">Kuri</h1>
