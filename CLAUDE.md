@@ -44,18 +44,19 @@ cd Packages/KuriKit && KURI_LIVE_MODEL=ollama/qwen3.5:2b swift test --filter Liv
 # The same over the Anthropic format (Ollama speaks it too); KURI_LIVE_API_KEY for a hosted API
 cd Packages/KuriKit && KURI_LIVE_MODEL=ollama/qwen3.5:2b KURI_LIVE_FORMAT=anthropic-messages swift test --filter LiveTests
 
-# App
+# App (builds and embeds the `kuri` CLI too)
 xcodebuild -project Kuri.xcodeproj -scheme Kuri -configuration Debug build
 ```
 
 - Tests use Swift Testing. Fixture servers are Python scripts using only the standard library.
 - Starting a sandbox VM needs the `com.apple.security.virtualization` entitlement on the running executable, which `swift test` can't have. To exercise real VMs, build a small executable that depends on `KuriKit` by path, sign it (`codesign -f -s - --entitlements <plist> <binary>`), and drive `Sandbox` or `Engine` from it. Use a separate `KURI_HOME` (symlinking its `sandbox/` to the installed one) so real conversations aren't touched.
+- To try `kuri`, run it from the built app (`…/Debug/Kuri.app/Contents/Helpers/kuri`) with its own `KURI_HOME`, like a VM test, and with the app closed: one engine at a time. Interactive behaviour (prompts, Ctrl-C) needs a terminal, so drive it through a pseudo-terminal (Python's `pty`).
 - Live tests use small local models, which aren't deterministic: assert on what the plumbing guarantees, print transcripts for the rest.
 
 ## Code conventions
 
 - Swift 6 with strict concurrency. Shared mutable state lives in actors (`Engine`, `Store`, `ToolRegistry`, `MCPManager`, `Sandbox`); cross-actor callbacks carry a generation number when stale ones must be ignored.
-- The app target uses main-actor default isolation; the package doesn't.
+- The app and CLI targets use main-actor default isolation; the package doesn't.
 - Doc comments explain *why*, not what the next line does.
 - Errors meant for people are `KuriError` cases with readable descriptions.
 
@@ -64,3 +65,4 @@ xcodebuild -project Kuri.xcodeproj -scheme Kuri -configuration Debug build
 - `~/.config/kuri/`: `config.json`, `mcp.json`, `kuri.sqlite`, `kuri.lock` (one engine at a time), `scratch/<conversation>/`, `sandbox/` (kernel, images, snapshots).
 - `Packages/KuriKit/Sources/`: `KuriCore` (types) → `KuriConfig`, `KuriStore`, `KuriInference`, `KuriTools` → `KuriMCP`, `KuriSandbox` → `KuriAgent` (the engine).
 - `App/`: the SwiftUI shell (folder-synchronized in the Xcode project: new files are picked up automatically).
+- `CLI/`: the `kuri` command-line client, a tool target embedded in the app at `Contents/Helpers` (decision 0028), folder-synchronized the same way.

@@ -49,9 +49,14 @@ DMG="$OUT/Kuri-$VERSION.dmg"
 
 if [ -n "${KURI_SIGN_IDENTITY:-}" ]; then
     step "Signing with $KURI_SIGN_IDENTITY"
+    # Inside out: the command-line tool first (it starts VMs too, so it
+    # carries the same entitlement), then the app that seals it.
+    codesign --force --options runtime --timestamp \
+        --entitlements "$ROOT/App/Kuri.entitlements" --sign "$KURI_SIGN_IDENTITY" "$APP/Contents/Helpers/kuri"
     codesign --force --options runtime --timestamp \
         --entitlements "$ROOT/App/Kuri.entitlements" --sign "$KURI_SIGN_IDENTITY" "$APP"
 fi
+codesign --verify --strict "$APP/Contents/Helpers/kuri"
 codesign --verify --strict "$APP"
 
 step "Drawing the background"

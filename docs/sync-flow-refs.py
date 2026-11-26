@@ -18,7 +18,7 @@ REF = re.compile(r"'(?P<path>[\w/.]+\.swift):(?P<line>\d+): (?P<code>(?:[^'\\]|\
 
 
 def source(path):
-    base = ROOT if path.startswith("App/") else ROOT / "Packages" / "KuriKit" / "Sources"
+    base = ROOT if path.startswith(("App/", "CLI/")) else ROOT / "Packages" / "KuriKit" / "Sources"
     return base / path
 
 

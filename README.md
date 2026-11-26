@@ -44,14 +44,25 @@ Releases aren't notarized by Apple yet, so the first time you open Kuri macOS sa
 xattr -dr com.apple.quarantine /Applications/Kuri.app
 ```
 
+### In the terminal
+
+Kuri also ships `kuri`, a command-line client, inside the app. Put it on your `PATH` once:
+
+```bash
+sudo ln -sf /Applications/Kuri.app/Contents/Helpers/kuri /usr/local/bin/kuri
+```
+
+`kuri` starts a session in the current folder, `kuri -p "…"` answers once and exits (piped input joins the prompt), `-c` continues this folder's latest conversation and `-r` picks an older one; `kuri --help` has the rest. It uses the same configuration and conversations as the app, so set up providers and keys in the app first. One runs at a time: quit Kuri to use `kuri`, and the other way round.
+
 ## Architecture
 
 ```
 +------------------------------------- Kuri.app -------------------------------------+
 |                                                                                    |
-|  App (SwiftUI)   main window, mini window (menu bar), settings                     |
-|        |  observes EngineEvents, calls Engine methods                              |
-|        v                                                                           |
+|  App (SwiftUI)   main window, mini window       kuri (CLI)   in Contents/Helpers,  |
+|                  (menu bar), settings                       a session or one turn  |
+|        |  observes EngineEvents, calls Engine methods  |   the same, with an       |
+|        v                                               v   engine of its own       |
 |  KuriAgent       Engine (actor), TurnRunner, InteractionBroker                     |
 |        |                                                                           |
 |        +------------+------------+------------+------------+------------+          |
@@ -65,7 +76,7 @@ xattr -dr com.apple.quarantine /Applications/Kuri.app
 +------------------------------------------------------------------------------------+
 ```
 
-**The engine is in-process.** The SwiftUI layer talks to `Engine` directly and subscribes to its event stream. Any other client would be just another subscriber to the same stream; the local UI never goes through HTTP.
+**The engine is in-process.** The SwiftUI layer talks to `Engine` directly and subscribes to its event stream; the local UI never goes through HTTP. `kuri`, the command-line client, does the same with an engine of its own on the same files, so only one of the two runs at a time ([decision 0028](docs/decisions/0028-command-line-client.md)).
 
 **Stateless towards providers.** Every request carries the history it needs, rebuilt from Kuri's database, as a list of items (messages, reasoning, tool calls and results, summaries) rather than pre-formatted chat messages. That keeps behaviour identical across providers, works offline, and makes switching model mid-conversation trivial.
 
@@ -90,6 +101,7 @@ Dependencies point one way: down towards `KuriCore`. Nothing in the package impo
 Kuri/
 ├─ Kuri.xcodeproj         The app target (sources are a folder-synchronized group)
 ├─ App/                   SwiftUI app
+├─ CLI/                   The `kuri` command-line client, embedded in the app
 ├─ Packages/KuriKit/      Everything that isn't UI: the modules above, and their tests
 ├─ docs/                  Design, flows, configuration, UI brief, decisions
 ├─ CLAUDE.md              Working agreements and commands

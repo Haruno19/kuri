@@ -96,7 +96,7 @@
   <div class="card">
     <h3>Reading the diagrams</h3>
     <p class="summary">Columns are participants, top to bottom is time. The second line of each box is the module it lives in.</p>
-    <p class="summary">Arrows are numbered. Under each diagram, <em>Code</em> lists every step with the line that does it: for a call, where it's made; for a return or an event, where it's produced; for a step from outside Kuri, the code that receives it. Package paths start at <code>Packages/KuriKit/Sources</code>, app paths at the repository root; each comes with the code on that line.</p>
+    <p class="summary">Arrows are numbered. Under each diagram, <em>Code</em> lists every step with the line that does it: for a call, where it's made; for a return or an event, where it's produced; for a step from outside Kuri, the code that receives it. Package paths start at <code>Packages/KuriKit/Sources</code>, app and CLI paths at the repository root; each comes with the code on that line.</p>
     <div class="legend" id="legend"></div>
   </div>
 
@@ -193,6 +193,9 @@ const P = {
   repostatus:["RepositoryStatus", "KuriAgent", "agent"],
   git:       ["git", "the host's", "external"],
   appmodel:  ["AppModel", "App", "ui"],
+  climain:   ["Main", "CLI", "ui"],
+  session:   ["Session", "CLI", "ui"],
+  tty:       ["Terminal", "stdin, stdout, /dev/tty", "external"],
   engine:    ["Engine", "KuriAgent", "agent"],
   runner:    ["TurnRunner", "KuriAgent", "agent"],
   compactor: ["Compactor", "KuriAgent", "agent"],
@@ -875,6 +878,97 @@ const FLOWS = [
     ],
     notes: ["The model's edits go through the memory tool (with a 4,000-character budget) and arrive as <code>.toolFinished</code> → <code>.memoriesChanged</code>.",
             "Active memories are part of every request's instructions, in <code>&lt;user_memory&gt;</code>, with their ids."] },
+  { group: "Command line", id: "cli-session", title: "A kuri session",
+    summary: "kuri is a second client with its own engine on the same home folder (decision 0028). It subscribes like the app does; typed lines, engine events and signals then reach the session as one stream, handled in order on the main actor.",
+    participants: ["user", "tty", "climain", "session", "engine", "store"],
+    steps: [
+      ["user", "climain", "`kuri [options] [prompt]`", 'CLI/Main.swift:11: exit(await run(Array(CommandLine.arguments.dropFirst())))'],
+      ["climain", "climain", "`Invocation.parse(arguments)`", 'CLI/Main.swift:21: invocation = try Invocation.parse(arguments)'],
+      ["climain", "engine", "`Engine.open(blocks: [], titles:)` — see Startup", 'CLI/Main.swift:56: engine = try await Engine.open(blocks: [], titles: !invocation.print)'],
+      { note: "takes kuri.lock: with Kuri open,\nit fails with `homeInUse`", over: "engine", ref: 'KuriAgent/Engine.swift:62: let lock = try HomeLock.acquire(home)' },
+      ["climain", "session", "`Session(…).run()`", 'CLI/Main.swift:64: default: await Session(engine: engine, invocation: invocation, prompt: prompt).run()'],
+      ["session", "engine", "`events()`, before anything starts", 'CLI/Session.swift:82: events = engine.events()'],
+      { alt: [
+        ["-c", [["session", "store", "latest conversation attached to this folder", 'CLI/Session.swift:139: conversation = try await Conversations.latest(attachedTo: Folders.current, in: engine)']]],
+        ["-r <id>", [["session", "store", "the one whose id starts so", 'CLI/Session.swift:146: conversation = try await Conversations.find(prefix, in: engine)']]],
+        ["-r", [["session", "tty", "the ten most recent; read a number", 'CLI/Session.swift:143: guard let picked = try await Conversations.pick(in: engine) else { throw Cancelled() }']]],
+      ]},
+      ["session", "tty", "header (the hero's place), last exchange, `›`", 'CLI/Session.swift:107: await showHeader()'],
+      ["tty", "session", "a typed line, read on a thread of its own", "a", 'CLI/Session.swift:109: for await line in LineReader.stdin() { feed.yield(.line(line)) }'],
+      { opt: "the first message", steps: [
+        ["session", "engine", "`newConversation(model:)`, `setFolders(…)`", 'CLI/Session.swift:296: let created = try await engine.newConversation(model: newModel)'],
+      ]},
+      ["session", "engine", "`send(text, to:)` — see A turn", 'CLI/Session.swift:279: try await engine.send(text, to: id)'],
+      ["engine", "session", "`.inference`, `.itemAdded`, `.toolOutput`", "e", 'CLI/Session.swift:88: Task { for await event in events { feed.yield(.event(event)) } }'],
+      ["session", "tty", "the answer as it streams; `$ command`\nwith its first lines of output", 'CLI/Session.swift:357: answer.write(text)'],
+      ["engine", "session", "`.turnFinished`, then `›` again", "e", 'KuriAgent/TurnRunner.swift:73: emit(.turnFinished(conversationID: conversationID, turnID: turn.id, outcome))'],
+      ["tty", "session", "Ctrl-D: end of input", "a", 'CLI/Session.swift:110: feed.yield(.endOfInput)'],
+      ["climain", "engine", "`shutdown()`: VMs, MCP servers, the lock", 'CLI/Main.swift:66: await engine.shutdown()'],
+    ],
+    notes: ["The conversation is made with the first message, so a session left without one leaves nothing behind. New ones get the current folder, read-write, unless it's the whole home folder or disk.",
+            "The CLI never calls <code>resumePendingTurns()</code>: questions left open in the app wait for the app.",
+            "Ctrl-D during a turn lets it finish first; Ctrl-C stops it (see Ctrl-C in kuri)."] },
+
+  { group: "Command line", id: "cli-print", title: "kuri -p",
+    summary: "One turn, for scripts and pipes: the answer goes to stdout and nothing else does. Activity goes to stderr, and only when it's a terminal. The exit code says how the turn ended.",
+    participants: ["user", "tty", "climain", "session", "engine", "broker"],
+    steps: [
+      ["user", "climain", "`kuri -p <prompt>`, stdin maybe piped", 'CLI/Main.swift:11: exit(await run(Array(CommandLine.arguments.dropFirst())))'],
+      ["climain", "tty", "read piped stdin to its end, add it to the prompt", 'CLI/Main.swift:42: let piped = String(data: FileHandle.standardInput.readDataToEndOfFile(), encoding: .utf8)?'],
+      ["climain", "engine", "`Engine.open(blocks: [], titles: false)`", 'CLI/Main.swift:56: engine = try await Engine.open(blocks: [], titles: !invocation.print)'],
+      { loop: "while a server is connecting, 10 s at most", steps: [
+        ["session", "engine", "`mcpServers()`", 'CLI/Session.swift:204: while await engine.mcpServers().contains(where: { $0.state == .connecting }) {'],
+      ]},
+      ["session", "engine", "`send(prompt, to:)`", 'CLI/Session.swift:279: try await engine.send(text, to: id)'],
+      ["engine", "session", "`.inference(.textDelta)`", "e", 'CLI/Session.swift:88: Task { for await event in events { feed.yield(.event(event)) } }'],
+      ["session", "tty", "the answer, on stdout", 'CLI/Session.swift:357: answer.write(text)'],
+      { opt: "a tool whose policy is ask", steps: [
+        ["broker", "session", "`.inputRequested(.approval)`", "e", 'KuriAgent/InteractionBroker.swift:43: emit(.inputRequested(request))'],
+        { alt: [
+          ["a terminal", [["session", "tty", "`Allow …? [y/N]` on /dev/tty, in a task\nof its own so Ctrl-C still gets through", 'CLI/Session.swift:560: let reply = await TTY.ask(prompt) ?? ""']]],
+          ["none", [["session", "session", "decline, and say so on stderr", 'CLI/Session.swift:543: guard TTY.isAvailable else {']]],
+        ]},
+        ["session", "engine", "`respond(to:with: .approved(…))`", 'CLI/Session.swift:561: await engine.respond(to: asked.id, with: .approved(["y", "yes"].contains(reply.lowercased())))'],
+      ]},
+      ["engine", "session", "`.turnFinished(outcome)`", "e", 'KuriAgent/TurnRunner.swift:73: emit(.turnFinished(conversationID: conversationID, turnID: turn.id, outcome))'],
+      ["session", "climain", "exit code: 0 done, 1 failed, 130 stopped", "r", 'CLI/Session.swift:481: if oneTurn { exitCode = 130 }'],
+      ["climain", "engine", "`shutdown()`", 'CLI/Main.swift:66: await engine.shutdown()'],
+    ],
+    notes: ["<code>titles: false</code>: <code>-p</code> exits as its turn ends, so it doesn't start a title request it would only cancel.",
+            "Each run starts the MCP servers from cold, so it waits for them: the model should see their tools. There's no flag to approve everything; policies live in <code>config.json</code>."] },
+
+  { group: "Command line", id: "cli-approval", title: "An approval in a kuri session",
+    summary: "The same request the app shows as a panel, asked as a line: the next typed line answers it instead of being sent.",
+    participants: ["user", "tty", "session", "engine", "broker", "runner"],
+    steps: [
+      ["runner", "broker", "`approve(request)`", 'KuriAgent/TurnRunner.swift:372: try await waiting { try await base.approve(request) }'],
+      ["broker", "session", "`.inputRequested(.approval)`", "e", 'KuriAgent/InteractionBroker.swift:43: emit(.inputRequested(request))'],
+      ["session", "tty", "`Allow …? [y/N]`", 'CLI/Session.swift:503: answer.write("Allow \\(describe(approval))? " + answer.style("[y/N]", .dim) + " ")'],
+      ["tty", "session", "y or n", "a", 'CLI/Session.swift:260: await answerQuestion(line)'],
+      ["session", "engine", "`respond(to:with: .approved(…))`", 'CLI/Session.swift:524: await engine.respond(to: asked.id, with: .approved(["y", "yes"].contains(text.lowercased())))'],
+      ["engine", "broker", "`respond(…)`", 'KuriAgent/Engine.swift:475: await broker.respond(to: requestID, with: response)'],
+      ["broker", "runner", "resumes the call", "r", 'KuriAgent/InteractionBroker.swift:30: func respond(to id: UUID, with response: InputResponse) {'],
+    ],
+    notes: ["A clarify question works the same way, one question at a time: a number picks an offered answer, anything else is the answer as typed.",
+            "Anything but y or yes declines."] },
+
+  { group: "Command line", id: "cli-interrupt", title: "Ctrl-C in kuri",
+    summary: "Ctrl-C stops the running turn, as Stop does in the app; at the prompt it only reminds you that Ctrl-D quits.",
+    participants: ["user", "tty", "session", "engine", "runner"],
+    steps: [
+      ["user", "session", "Ctrl-C: SIGINT, watched by a dispatch source", "a", 'CLI/Terminal.swift:160: source.setEventHandler { MainActor.assumeIsolated { handler() } }'],
+      { alt: [
+        ["a turn running", [
+          ["session", "engine", "`cancel(id)`", 'CLI/Session.swift:246: await engine.cancel(id)'],
+          ["engine", "runner", "`task.cancel()` — see Cancel", 'KuriAgent/Engine.swift:471: running[conversationID]?.cancel()'],
+          ["runner", "runner", "`checkCancellation()`: the stream just ends", 'KuriAgent/TurnRunner.swift:186: try Task.checkCancellation()'],
+          ["runner", "session", "`.turnFinished(.cancelled)`", "e", 'KuriAgent/TurnRunner.swift:73: emit(.turnFinished(conversationID: conversationID, turnID: turn.id, outcome))'],
+          ["session", "tty", "Stopped.", 'CLI/Session.swift:480: note("Stopped.")'],
+        ]],
+        ["at the prompt", [["session", "tty", "Ctrl-D quits.", 'CLI/Session.swift:253: note("Ctrl-D quits.")']]],
+      ]},
+    ],
+    notes: ["SIGINT's default action is ignored, so it never kills the process mid-write. A second Ctrl-C while the first is still stopping leaves at once."] },
 ];
 
 // ─── Renderer ────────────────────────────────────────────────────────────────

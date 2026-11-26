@@ -27,7 +27,7 @@ import Testing
             let path = String(match.output[1].substring!)
             let line = Int(match.output[2].substring!)!
             let code = String(match.output[3].substring!).replacing(#/\\(.)/#) { String($0.output.1) }
-            let base = path.hasPrefix("App/") ? Self.root : Self.root.appending(path: "Packages/KuriKit/Sources")
+            let base = path.hasPrefix("App/") || path.hasPrefix("CLI/") ? Self.root : Self.root.appending(path: "Packages/KuriKit/Sources")
             guard let lines = try files[path] ?? (try? String(contentsOf: base.appending(path: path), encoding: .utf8))
                 .map({ $0.components(separatedBy: "\n") })
             else {
