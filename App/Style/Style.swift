@@ -114,6 +114,12 @@ struct Palette {
     /// grey), and its boxes, solid so nothing shows through them.
     var inspector: Color { dark ? Color(hex: 0x211F1D) : Color(hex: 0xF3F1EA) }
     var inspectorBox: Color { dark ? Color(hex: 0x292724) : Color(hex: 0xFFFDF8) }
+    /// Secondary buttons: the inspector's box colour, shaded a little
+    /// towards the bottom so they read as raised, like the filled ones.
+    var raisedFill: LinearGradient {
+        dark ? LinearGradient(colors: [Color(hex: 0x312E2B), Color(hex: 0x262421)], startPoint: .top, endPoint: .bottom)
+             : LinearGradient(colors: [Color(hex: 0xFFFDF8), Color(hex: 0xF5F2EA)], startPoint: .top, endPoint: .bottom)
+    }
 
     /// User cards and other panels resting on the surface.
     var card: Color { dark ? Color(hex: 0x2F2B26) : Color(hex: 0xFFFDF8) }
@@ -312,7 +318,8 @@ struct PrimaryButton: ButtonStyle {
     }
 }
 
-/// A secondary action: outlined, washed on hover.
+/// A secondary action: raised like the primary one, in the colour of the
+/// inspector's boxes.
 struct SecondaryButton: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         Outlined(configuration: configuration)
@@ -327,10 +334,17 @@ struct SecondaryButton: ButtonStyle {
             let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
             configuration.label
                 .foregroundStyle(palette.ink)
-                .background(shape.fill(palette.wash).opacity(hovering ? 1 : 0))
-                // Solid underneath, so nothing scrolling behind shows through.
-                .background(shape.fill(palette.sidebar))
-                .overlay(shape.strokeBorder(palette.faint.opacity(0.45), lineWidth: 1))
+                .background {
+                    // Solid, so nothing scrolling behind shows through.
+                    ZStack {
+                        shape.fill(palette.raisedFill)
+                        shape.strokeBorder(LinearGradient(colors: [.white.opacity(palette.dark ? 0.12 : 0.9), .clear],
+                                                          startPoint: .top, endPoint: .center), lineWidth: 1)
+                        shape.strokeBorder(palette.ink.opacity(0.1), lineWidth: 0.5)
+                    }
+                    .shadow(color: palette.shadow.opacity(palette.dark ? 0.4 : 0.12), radius: 2, y: 1)
+                }
+                .brightness(configuration.isPressed ? -0.04 : hovering ? (palette.dark ? 0.03 : -0.015) : 0)
                 .contentShape(shape)
                 .scaleEffect(configuration.isPressed ? 0.97 : 1)
                 .onHover { hovering = $0 }
