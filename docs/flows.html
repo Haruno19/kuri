@@ -896,7 +896,7 @@ const FLOWS = [
         ["-r", [["session", "tty", "the ten most recent; read a number", 'CLI/Session.swift:163: guard let picked = try await Conversations.pick(in: engine) else { throw Cancelled() }']]],
       ]},
       ["session", "tty", "a clean screen, the header (the hero's place),\nlast exchange", 'CLI/Session.swift:114: await showHeader(lastExchange: true)'],
-      ["session", "tty", "raw mode: keys reach kuri unechoed", 'CLI/Session.swift:863: reader.switchTo(.keys) { TerminalInput.keys() }'],
+      ["session", "tty", "raw mode: keys reach kuri unechoed", 'CLI/Session.swift:951: reader.switchTo(.keys) { TerminalInput.keys() }'],
       ["session", "editor", "`begin(›)`: the prompt, a free row under it", 'CLI/LineEditor.swift:65: func begin(_ prompt: Prompt, commands: Bool) {'],
       { loop: "each key, read on a thread of its own", steps: [
         ["tty", "session", "`.keys(bytes)`", "a", 'CLI/Session.swift:254: guard let action = editor?.feed(keys) else { return }'],
@@ -970,7 +970,7 @@ const FLOWS = [
     participants: ["user", "tty", "session", "editor", "engine", "runner"],
     steps: [
       { alt: [
-        ["during a turn", [["user", "session", "Ctrl-C: SIGINT, watched by a dispatch source", "a", 'CLI/Terminal.swift:379: source.setEventHandler { MainActor.assumeIsolated { handler() } }']]],
+        ["during a turn", [["user", "session", "Ctrl-C: SIGINT, watched by a dispatch source", "a", 'CLI/Terminal.swift:391: source.setEventHandler { MainActor.assumeIsolated { handler() } }']]],
         ["at a prompt", [
           ["user", "editor", "Ctrl-C: a key, in raw mode", "a", 'CLI/LineEditor.swift:196: case 0x03:  // Ctrl-C: clears what\'s typed; with nothing typed, it\'s the session\'s'],
           ["editor", "session", "nothing typed: `.interrupt`", "r", 'CLI/Session.swift:258: case .interrupt: await interrupt()'],
@@ -992,17 +992,17 @@ const FLOWS = [
     summary: "A command in your own shell, in the session's folder, without a second terminal tab. It runs on the terminal itself, as a shell runs a foreground job, and nothing of it reaches the conversation.",
     participants: ["user", "tty", "session", "reader", "shell"],
     steps: [
-      ["user", "session", "`/shell <command>`", 'CLI/Session.swift:695: await runShell(argument)'],
-      ["session", "reader", "`switchTo(.paused)`: the command gets the keys", 'CLI/Session.swift:801: reader?.switchTo(.paused)'],
-      ["session", "shell", "`posix_spawn($SHELL -c …)` in kuri's process group,\nsignals back to their defaults", 'CLI/Terminal.swift:318: guard posix_spawn(&pid, arguments[0], &actions, &attributes, argv, environ) == 0 else {'],
-      ["shell", "tty", "reads and writes the terminal directly", "a", 'CLI/Terminal.swift:325: while waitpid(child, &status, 0) < 0, errno == EINTR {}'],
+      ["user", "session", "`/shell <command>`", 'CLI/Session.swift:702: await runShell(argument)'],
+      ["session", "reader", "`switchTo(.paused)`: the command gets the keys", 'CLI/Session.swift:889: reader?.switchTo(.paused)'],
+      ["session", "shell", "`posix_spawn($SHELL -c …)` in kuri's process group,\nsignals back to their defaults", 'CLI/Terminal.swift:330: guard posix_spawn(&pid, arguments[0], &actions, &attributes, argv, environ) == 0 else {'],
+      ["shell", "tty", "reads and writes the terminal directly", "a", 'CLI/Terminal.swift:337: while waitpid(child, &status, 0) < 0, errno == EINTR {}'],
       { opt: "Ctrl-C", steps: [
-        ["user", "shell", "SIGINT stops the command", "a", 'CLI/Terminal.swift:304: posix_spawnattr_setsigdefault(&attributes, &defaults)'],
+        ["user", "shell", "SIGINT stops the command", "a", 'CLI/Terminal.swift:316: posix_spawnattr_setsigdefault(&attributes, &defaults)'],
         ["user", "session", "SIGINT, dropped while the command runs", "a", 'CLI/Session.swift:292: guard !shellRunning else { return }'],
       ]},
-      ["shell", "session", "exit status", "r", 'CLI/Session.swift:803: let ending = await ForegroundCommand.run([shell, "-c", command], in: Folders.current)'],
-      ["session", "reader", "`switchTo(.lines)`", 'CLI/Session.swift:805: reader?.switchTo(.lines)'],
-      ["session", "tty", "`✗ exit n` if it failed, then `›`", 'CLI/Session.swift:803: let ending = await ForegroundCommand.run([shell, "-c", command], in: Folders.current)'],
+      ["shell", "session", "exit status", "r", 'CLI/Session.swift:891: let ending = await ForegroundCommand.run([shell, "-c", command], in: Folders.current)'],
+      ["session", "reader", "`switchTo(.lines)`", 'CLI/Session.swift:893: reader?.switchTo(.lines)'],
+      ["session", "tty", "`✗ exit n` if it failed, then `›`", 'CLI/Session.swift:891: let ending = await ForegroundCommand.run([shell, "-c", command], in: Folders.current)'],
     ],
     notes: ["Foundation's <code>Process</code> would put the command in a process group of its own: the terminal treats that as a background job and stops it at its first read of a key.",
             "Engine events wait while the command runs, so a running turn's output can't land in the middle of the command's."] },

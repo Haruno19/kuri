@@ -664,10 +664,10 @@ final class Session {
 
     /// Name, arguments, what it does: as `/help` lists them.
     static let commands = [
-        ("/model", "[provider/model]", "show the models, or switch this conversation's"),
-        ("/folders", "[add|remove <path>]", "show the attached folders, or change them (add --read-only <path>)"),
-        ("/context", "", "show what fills the model's context window"),
-        ("/shell", "<command>", "run a command in your own shell, in this folder"),
+        ("/model", "[provider/model]", "show the models, or switch to one"),
+        ("/folders", "[add|remove <path>]", "show the attached folders, or change them"),
+        ("/context", "", "show what fills the context window"),
+        ("/shell", "<command>", "run a command in your shell, in this folder"),
         ("/compact", "", "summarise the conversation to make room"),
         ("/retry", "", "answer the last message again"),
         ("/new", "", "start a new conversation"),
@@ -684,10 +684,16 @@ final class Session {
             switch name {
             case "/help":
                 begin(.activity, on: answer)
-                let width = Self.commands.map { $0.0.count + 1 + $0.1.count }.max() ?? 0
+                // Summaries line up in a column, and wrap within it in a narrow window.
+                let column = (Self.commands.map { $0.0.count + 1 + $0.1.count }.max() ?? 0) + 3
+                let room = max(Self.helpMinimumRoom, answer.columns - column - 1)
                 for (name, arguments, summary) in Self.commands {
-                    let padding = String(repeating: " ", count: width - name.count - 1 - arguments.count + 3)
-                    answer.line(command(name) + " " + arguments + padding + answer.style(summary, .dim))
+                    let padding = String(repeating: " ", count: column - name.count - 1 - arguments.count)
+                    let lines = Self.wrap(summary, to: room)
+                    answer.line(command(name) + " " + arguments + padding + answer.style(lines[0], .dim))
+                    for line in lines.dropFirst() {
+                        answer.line(String(repeating: " ", count: column) + answer.style(line, .dim))
+                    }
                 }
             case "/clear":
                 await showHeader(lastExchange: false)
@@ -804,30 +810,50 @@ final class Session {
         let usage = try await engine.contextUsage(id)
         let threshold = await engine.config.compactionThreshold
         let parts: [(name: String, tokens: Int, style: Style)] = [
-            ("System", usage.system, .dim), ("Memory", usage.memory, .yellow),
+            ("System", usage.system, .grey), ("Memory", usage.memory, .yellow),
             ("Messages", usage.messages, .accentLight), ("Tool output", usage.toolOutput, .accent),
         ]
         begin(.activity, on: answer)
         if let window = usage.window, window > 0 {
             let share = Int((Double(usage.tokens) / Double(window) * 100).rounded())
-            answer.line(answer.style(Self.tokens(usage.tokens), .bold)
-                        + answer.style(" of \(Self.tokens(window)) tokens · \(share)%", .dim))
+            answer.line(answer.style("\(share)% used", .bold)
+                        + answer.style(" · \(Self.tokens(usage.tokens)) of \(Self.tokens(window)) tokens", .dim))
             answer.line(contextBar(parts.map { ($0.tokens, $0.style) }, window: window, threshold: threshold))
         } else {
             answer.line(answer.style("≈ " + Self.tokens(usage.tokens), .bold) + answer.style(" tokens", .dim))
         }
-        answer.line(parts.map { answer.style("●", $0.style) + " \($0.name) " + answer.style(Self.tokens($0.tokens), .dim) }
+        answer.line(parts.map { answer.style("■", $0.style) + " \($0.name) " + answer.style(Self.tokens($0.tokens), .dim) }
             .joined(separator: "   "))
+        answer.blankLine()
         answer.line(answer.style(usage.window == nil
             ? "Set contextWindow in config.json to compact automatically."
             : "Compacts at \(Int(threshold * 100))% · /compact summarises now.", .dim))
     }
 
     /// How wide `/context`'s bar is, at most.
-    static let contextBarWidth = 48
+    static let contextBarWidth = 60
+    /// The bar's cells: squares, a row of them read as one bar.
+    static let contextBarCell = "■"
+    /// Narrower than this, `/help`'s summaries wrap anyway rather than
+    /// stacking a word per line.
+    static let helpMinimumRoom = 20
+
+    /// Words into lines of at most `width` characters.
+    static func wrap(_ text: String, to width: Int) -> [String] {
+        var lines: [String] = []
+        var current = ""
+        for word in text.split(separator: " ") {
+            if !current.isEmpty, current.count + 1 + word.count > width {
+                lines.append(current)
+                current = ""
+            }
+            current += (current.isEmpty ? "" : " ") + word
+        }
+        return lines + [current]
+    }
 
     /// Each part as a run of its colour, in proportion to the window, then
-    /// what's left; a mark where compaction starts.
+    /// what's left, faint; a mark where compaction starts.
     private func contextBar(_ parts: [(tokens: Int, style: Style)], window: Int, threshold: Double) -> String {
         let width = min(Self.contextBarWidth, answer.columns - 2)
         var cells: [Style?] = []
@@ -840,9 +866,10 @@ final class Session {
         cells += Array(repeating: nil, count: width - cells.count)
         let mark = min(width - 1, Int(Double(width) * threshold))
         return cells.enumerated().map { index, style in
+            let cell = Self.contextBarCell
             if index == mark, style == nil { return answer.style("┃", .dim) }
-            guard let style else { return answer.style("─", .dim) }
-            return answer.style("━", style)
+            guard let style else { return answer.style(cell, .dim, .grey) }
+            return answer.style(cell, style)
         }.joined()
     }
 

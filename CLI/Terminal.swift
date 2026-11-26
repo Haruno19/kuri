@@ -111,6 +111,8 @@ final class Stream {
 
 enum Style {
     case bold, dim, italic, red, green, yellow
+    /// Grey that reads on dark and light backgrounds alike.
+    case grey
     /// Kuri's chestnut, for commands.
     case accent
     /// Its lighter tone, as the inspector's context bar uses for messages.
@@ -124,6 +126,7 @@ enum Style {
         case .red: "31"
         case .green: "32"
         case .yellow: "33"
+        case .grey: "38;5;245"
         case .accent: Self.accentCode
         case .accentLight: Self.accentLightCode
         }

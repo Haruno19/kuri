@@ -4,46 +4,6 @@
     "" : {
 
     },
-    "Hide Sidebar" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nascondi barra laterale"
-          }
-        }
-      }
-    },
-    "Hide the sidebar (⌃⌘S)" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nascondi la barra laterale (⌃⌘S)"
-          }
-        }
-      }
-    },
-    "Show Sidebar" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostra barra laterale"
-          }
-        }
-      }
-    },
-    "Show the sidebar (⌃⌘S)" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mostra la barra laterale (⌃⌘S)"
-          }
-        }
-      }
-    },
     "“%@”" : {
       "shouldTranslate" : false
     },
@@ -1421,12 +1381,32 @@
         }
       }
     },
+    "Hide Sidebar" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondi barra laterale"
+          }
+        }
+      }
+    },
     "Hide the inspector (⌥⌘I)" : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nascondi l'ispettore (⌥⌘I)"
+          }
+        }
+      }
+    },
+    "Hide the sidebar (⌃⌘S)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondi la barra laterale (⌃⌘S)"
           }
         }
       }
@@ -1523,6 +1503,12 @@
           }
         }
       }
+    },
+    "Kuri is already running" : {
+
+    },
+    "kuri is running in a terminal" : {
+
     },
     "Kuri reconnects servers as soon as mcp.json changes. Policies go in config.json under “tools” (any tool, e.g. `memory: \"deny\"`) or in mcp.json inside a server (its own tool names). MCP tools the server marks read-only are allowed; others ask first." : {
       "localizations" : {
@@ -2084,6 +2070,9 @@
         }
       }
     },
+    "Quit kuri" : {
+
+    },
     "Quit Kuri" : {
       "localizations" : {
         "it" : {
@@ -2093,6 +2082,15 @@
           }
         }
       }
+    },
+    "Quit kuri?" : {
+
+    },
+    "Quit kuri…" : {
+
+    },
+    "Quitting kuri…" : {
+
     },
     "Ready" : {
       "localizations" : {
@@ -2434,12 +2432,32 @@
         }
       }
     },
+    "Show Sidebar" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra barra laterale"
+          }
+        }
+      }
+    },
     "Show the inspector (⌥⌘I)" : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mostra l'ispettore (⌥⌘I)"
+          }
+        }
+      }
+    },
+    "Show the sidebar (⌃⌘S)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra la barra laterale (⌃⌘S)"
           }
         }
       }
@@ -2846,6 +2864,9 @@
           }
         }
       }
+    },
+    "Whatever it's doing in its terminal stops, as if you'd quit it there." : {
+
     },
     "When a request would fill this much of the model's context window, earlier messages are summarized. Needs the model's context window, set in Models." : {
       "localizations" : {
