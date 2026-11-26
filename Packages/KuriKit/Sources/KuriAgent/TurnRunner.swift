@@ -181,6 +181,9 @@ struct TurnRunner {
                 break
             }
         }
+        // A stream returns nil to a cancelled consumer rather than throwing:
+        // without this, Stop would end the turn as if the model had finished.
+        try Task.checkCancellation()
         return (calls, stop)
     }
 
