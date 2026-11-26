@@ -32,6 +32,9 @@ Kuri runs offline with local models, talks to any hosted provider when you want 
   <img width="48%" alt="Light theme chat with both sidebars" src="docs/images/chat-light-sidebars.png" />
   <img width="48%" alt="Dark theme chat with a codeblock and sidebar" src="docs/images/chat-dark-code.png" />
 
+  <img width="48%" alt="kuri in the terminal, switching models and saying hello" src="docs/images/cli-model.png" />
+  <img width="48%" alt="kuri in the terminal, listing a folder's files with a shell command" src="docs/images/cli-shell.png" />
+
 </p>
 
 ## Install
@@ -46,13 +49,13 @@ xattr -dr com.apple.quarantine /Applications/Kuri.app
 
 ### In the terminal
 
-Kuri also ships `kuri`, a command-line client, inside the app. Put it on your `PATH` once:
+Kuri also ships `kuri`, a command-line client, inside the app. Put it on your `PATH` once; the link points into the app, so it keeps working when you update Kuri:
 
 ```bash
 sudo ln -sf /Applications/Kuri.app/Contents/Helpers/kuri /usr/local/bin/kuri
 ```
 
-`kuri` starts a session in the current folder, `kuri -p "…"` answers once and exits (piped input joins the prompt), `-c` continues this folder's latest conversation and `-r` picks an older one; `kuri --help` has the rest. It uses the same configuration and conversations as the app, so set up providers and keys in the app first. One runs at a time: quit Kuri to use `kuri`, and the other way round.
+`kuri` starts a session in the current folder, `kuri -p "…"` answers once and exits (piped input joins the prompt), `-c` continues this folder's latest conversation and `-r` picks an older one; `kuri --help` has the rest. It uses the same configuration and conversations as the app, so set up providers and keys in the app first. One runs at a time: start one while the other is open and it offers to quit the other.
 
 ## Architecture
 
