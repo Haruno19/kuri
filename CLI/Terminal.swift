@@ -113,6 +113,8 @@ enum Style {
     case bold, dim, italic, red, green, yellow
     /// Kuri's chestnut, for commands.
     case accent
+    /// Its lighter tone, as the inspector's context bar uses for messages.
+    case accentLight
 
     var code: String {
         switch self {
@@ -123,18 +125,25 @@ enum Style {
         case .green: "32"
         case .yellow: "33"
         case .accent: Self.accentCode
+        case .accentLight: Self.accentLightCode
         }
     }
 
     /// Between the app's light and dark accents (#A4693D, #C08452), since a
     /// terminal's background may be either; terminals without 24-bit colour
     /// get the nearest of the 256 (#AF875F).
-    static let accentRGB = (red: 0xB2, green: 0x77, blue: 0x48)
-    static let accentCode: String = {
+    static let accentCode = color(red: 0xB2, green: 0x77, blue: 0x48, else: 137)
+    /// Between #C18A5B and #D6A06F, the same way; else #D7875F.
+    static let accentLightCode = color(red: 0xCB, green: 0x95, blue: 0x65, else: 173)
+
+    private static let truecolor: Bool = {
         let colorterm = ProcessInfo.processInfo.environment["COLORTERM"] ?? ""
-        guard colorterm == "truecolor" || colorterm == "24bit" else { return "38;5;137" }
-        return "38;2;\(accentRGB.red);\(accentRGB.green);\(accentRGB.blue)"
+        return colorterm == "truecolor" || colorterm == "24bit"
     }()
+
+    private static func color(red: Int, green: Int, blue: Int, else fallback: Int) -> String {
+        truecolor ? "38;2;\(red);\(green);\(blue)" : "38;5;\(fallback)"
+    }
 }
 
 /// The session's opening lines. The left column belongs to a hero, a small

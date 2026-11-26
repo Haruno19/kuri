@@ -666,6 +666,7 @@ final class Session {
     static let commands = [
         ("/model", "[provider/model]", "show the models, or switch this conversation's"),
         ("/folders", "[add|remove <path>]", "show the attached folders, or change them (add --read-only <path>)"),
+        ("/context", "", "show what fills the model's context window"),
         ("/shell", "<command>", "run a command in your own shell, in this folder"),
         ("/compact", "", "summarise the conversation to make room"),
         ("/retry", "", "answer the last message again"),
@@ -706,6 +707,8 @@ final class Session {
                 note("New conversation.")
             case "/model":
                 try await model(argument)
+            case "/context":
+                try await context()
             case "/folders":
                 try await folders(argument)
             case "/compact":
@@ -788,6 +791,64 @@ final class Session {
             newFolders = folders
         }
         note(folders.isEmpty ? "No folders attached." : "Folders: " + folders.map(Folders.describe).joined(separator: ", "))
+    }
+
+    /// What fills the context window, as the inspector's Context pane
+    /// shows it: the total, a bar of its parts with the point where
+    /// compaction starts, and the parts by name.
+    private func context() async throws {
+        guard let id = conversation?.id else {
+            note("Fills up as the conversation goes.")
+            return
+        }
+        let usage = try await engine.contextUsage(id)
+        let threshold = await engine.config.compactionThreshold
+        let parts: [(name: String, tokens: Int, style: Style)] = [
+            ("System", usage.system, .dim), ("Memory", usage.memory, .yellow),
+            ("Messages", usage.messages, .accentLight), ("Tool output", usage.toolOutput, .accent),
+        ]
+        begin(.activity, on: answer)
+        if let window = usage.window, window > 0 {
+            let share = Int((Double(usage.tokens) / Double(window) * 100).rounded())
+            answer.line(answer.style(Self.tokens(usage.tokens), .bold)
+                        + answer.style(" of \(Self.tokens(window)) tokens · \(share)%", .dim))
+            answer.line(contextBar(parts.map { ($0.tokens, $0.style) }, window: window, threshold: threshold))
+        } else {
+            answer.line(answer.style("≈ " + Self.tokens(usage.tokens), .bold) + answer.style(" tokens", .dim))
+        }
+        answer.line(parts.map { answer.style("●", $0.style) + " \($0.name) " + answer.style(Self.tokens($0.tokens), .dim) }
+            .joined(separator: "   "))
+        answer.line(answer.style(usage.window == nil
+            ? "Set contextWindow in config.json to compact automatically."
+            : "Compacts at \(Int(threshold * 100))% · /compact summarises now.", .dim))
+    }
+
+    /// How wide `/context`'s bar is, at most.
+    static let contextBarWidth = 48
+
+    /// Each part as a run of its colour, in proportion to the window, then
+    /// what's left; a mark where compaction starts.
+    private func contextBar(_ parts: [(tokens: Int, style: Style)], window: Int, threshold: Double) -> String {
+        let width = min(Self.contextBarWidth, answer.columns - 2)
+        var cells: [Style?] = []
+        for part in parts where part.tokens > 0 {
+            let share = Double(part.tokens) / Double(window) * Double(width)
+            // A part too small to show still gets a cell, as the inspector gives it a sliver.
+            cells += Array(repeating: part.style, count: max(1, Int(share.rounded())))
+        }
+        cells = Array(cells.prefix(width))
+        cells += Array(repeating: nil, count: width - cells.count)
+        let mark = min(width - 1, Int(Double(width) * threshold))
+        return cells.enumerated().map { index, style in
+            if index == mark, style == nil { return answer.style("┃", .dim) }
+            guard let style else { return answer.style("─", .dim) }
+            return answer.style("━", style)
+        }.joined()
+    }
+
+    /// As the app writes token counts: 840, 12.3k.
+    static func tokens(_ count: Int) -> String {
+        count < 1_000 ? "\(count)" : String(format: "%.1fk", Double(count) / 1_000)
     }
 
     /// Runs `command` with your login shell's binary, in this folder, on the
