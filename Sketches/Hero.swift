@@ -10,7 +10,14 @@
 // Needs a terminal with 24-bit colour (Ghostty, iTerm, Terminal).
 //
 // Pixel art in half blocks: two pixels a cell, one above the other, so they
-// come out about square. 10 by 10 pixels: ten columns, five rows. Tried and
+// come out about square. 12 by 10 pixels: twelve columns, five rows.
+//
+// Round two: the open burr, the nut rising out of it, chosen from a closed
+// burr, a star and a swirl (in this file's history). Its spikes are what's
+// tried here. Long ones pointing down read as legs, a bug rather than a
+// burr; short ones spaced evenly round it, with a gap, read as spines.
+//
+// Round one also tried and
 // dropped: braille (too faint at this size), box-drawing lines (too thin, a
 // sun more than a burr), and burrs drawn from a formula (blobby: the nut
 // took over and it read as a donut).
@@ -27,6 +34,7 @@ let palette: [Character: (Int, Int, Int)] = [
     "n": (0x8A, 0x4F, 0x2A),  // nut, dark
     "h": (0xD9, 0xA0, 0x6F),  // nut, highlight
     "c": (0xE6, 0xD3, 0xA3),  // the nut's pale base
+    "p": (0xCB, 0xCF, 0x86),  // burr, pale: fresh spines
 ]
 
 func fg(_ c: (Int, Int, Int)) -> String { "\u{1B}[38;2;\(c.0);\(c.1);\(c.2)m" }
@@ -73,53 +81,53 @@ func pixels(_ name: String, _ note: String, _ grid: [String], on background: (In
 
 func options(on background: (Int, Int, Int)?) -> [Art] {
     [
-        pixels("1 · Burr", "closed and round, the nut glimpsed through a split", [
-            "...g..g...",
-            ".g..GG..g.",
-            "..GGGGGg..",
-            "g.GGGGgg.g",
-            ".GGGhNggg.",
-            ".GGGNnggg.",
-            "g.GGgggg.g",
-            "..Gggggg..",
-            ".g..gg..g.",
-            "...g..g...",
+        pixels("1 · Halo", "short spikes all round, the valves' tips beside the nut", [
+            ".....hN.....",
+            ".g..hNNn..g.",
+            "..GNNNNNng..",
+            "g.GnNNNNng.g",
+            "..GGccccgg..",
+            "g.GGGGgggg.g",
+            "..GGGggggg..",
+            ".g.GGgggg.g.",
+            "............",
+            "....g..g....",
         ], on: background),
-        pixels("2 · Open", "the burr split open, the nut rising out of it", [
-            "....hN....",
-            "...hNNn...",
-            "..NNNNNn..",
-            ".gnNNNNng.",
-            "gGGccccggg",
-            ".GGGGgggg.",
-            "gGGGgggggg",
-            ".GGgggggg.",
-            "..g.gg.g..",
-            ".g......g.",
+        pixels("2 · Halo, shaded", "the same, its spikes lit like the body: light left, dark right", [
+            ".....hN.....",
+            ".G..hNNn..g.",
+            "..GNNNNNng..",
+            "G.GnNNNNng.g",
+            "..GGccccgg..",
+            "G.GGGGgggg.g",
+            "..GGGggggg..",
+            ".G.GGgggg.g.",
+            "............",
+            "....G..g....",
         ], on: background),
-        pixels("3 · Star", "long spikes all round, a mark more than a picture", [
-            "....gg....",
-            ".g..Gg..g.",
-            "..gGGGgg..",
-            "..GGGGgg..",
-            "gGGGhNgggg",
-            "gGGGNngggg",
-            "..GGgggg..",
-            "..ggggggg.",
-            ".g..gg..g.",
-            "....gg....",
+        pixels("3 · Halo, pale", "spikes paler than the body, as a fresh burr's are", [
+            ".....hN.....",
+            ".p..hNNn..p.",
+            "..GNNNNNng..",
+            "p.GnNNNNng.p",
+            "..GGccccgg..",
+            "p.GGGGgggg.p",
+            "..GGGggggg..",
+            ".p.GGgggg.p.",
+            "............",
+            "....p..p....",
         ], on: background),
-        pixels("4 · Swirl", "four spikes sweeping round, like a spiral", [
-            "......gg..",
-            ".....G....",
-            "g..GGGG...",
-            "g.GGGGGg..",
-            ".gGGhNgg..",
-            "..GGNnggg.",
-            "..GGgggg.g",
-            "...Gggg..g",
-            "....g.....",
-            "..gg......",
+        pixels("4 · Tight", "spikes against the body: one jagged shape, more of a mark", [
+            ".....hN.....",
+            "...ghNNng...",
+            "..GNNNNNng..",
+            ".GGnNNNNngg.",
+            "..GGccccgg..",
+            ".GGGGGggggg.",
+            "..GGGggggg..",
+            ".G.GGgggg.g.",
+            "....G..g....",
+            "............",
         ], on: background),
     ]
 }
