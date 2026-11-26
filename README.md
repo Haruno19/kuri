@@ -152,7 +152,7 @@ Measured on a MacBook Pro (M1 Pro, 16 GB, macOS 27.2) as the memory figure Activ
 
 | | Kuri |
 |---|---|
-| On disk | 67 MB (Apple silicon), plus ≈ 1.6 GB for the sandbox once it's set up with Kuri's image, ≈ 0.8 GB with `python:3-slim` (7) |
+| On disk | 58 MB (Apple silicon): 27 MB for the app and 25 MB for `kuri`, each with the whole engine in it, plus ≈ 1.6 GB for the sandbox once it's set up with Kuri's image, ≈ 0.8 GB with `python:3-slim` (7) |
 | Running, idle | ≈ 40 MB |
 | Running, during an agent turn | ≈ 40–65 MB (1) |
 | A conversation open | + ≈ 30 MB for the transcript, however long it is (3) |

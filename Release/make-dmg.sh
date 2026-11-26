@@ -40,8 +40,12 @@ mkdir -p "$OUT/stage/.background" "$OUT/work"
 step "Building Kuri (Release, Apple silicon)"
 # Apple silicon only: the sandbox (Virtualization) and Apple's on-device
 # model need it, and an Intel slice would double the download.
+# Stripped as an archive would be: a plain build keeps local symbols, about
+# half of each binary (the app and kuri both link the whole engine). The
+# dSYMs keep the symbols for crash reports.
 xcodebuild -project "$ROOT/Kuri.xcodeproj" -scheme Kuri -configuration Release \
     -destination 'generic/platform=macOS' ARCHS=arm64 \
+    DEPLOYMENT_POSTPROCESSING=YES STRIP_INSTALLED_PRODUCT=YES \
     -derivedDataPath "$OUT/DerivedData" -quiet build
 APP="$OUT/DerivedData/Build/Products/Release/Kuri.app"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")"
