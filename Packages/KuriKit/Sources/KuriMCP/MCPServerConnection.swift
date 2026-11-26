@@ -17,7 +17,7 @@ actor MCPServerConnection {
     static let connectTimeout: Duration = .seconds(60)
 
     let name: String
-    private let client = Client(name: "Kuri", version: "0.2.0")
+    private let client = Client(name: "Kuri", version: "0.2.1")
     private var transport: (any Transport)?
 
     init(name: String) {
