@@ -420,8 +420,14 @@ final class AppModel {
         let loadedTurns = (try? await engine.store.turns(of: id)) ?? []
         // Picked another chat meanwhile: its own load takes over.
         guard selection == id else { return }
+        // Items that arrived as events while this ran are newer than the
+        // snapshot: a first message sent as the chat opens is stored while
+        // the engine is still busy (on a Keychain prompt, say), and would
+        // otherwise be dropped until the chat is opened again.
+        let known = Set(loadedItems.map(\.id))
+        let arrived = items.filter { $0.conversationID == id && !known.contains($0.id) }
         // All at once, with no suspension in between: one update.
-        items = loadedItems
+        items = loadedItems + arrived
         folders = loadedFolders
         if sandboxRunning { sandboxUp.insert(id) } else { sandboxUp.remove(id) }
         lastTurn = loadedTurns.last
