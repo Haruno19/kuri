@@ -14,6 +14,7 @@ final class Session {
     enum Input: Sendable {
         case event(EngineEvent)
         case line(String)
+        case keys([UInt8])
         case endOfInput
         case interrupt
         case terminate(Int32)
@@ -43,8 +44,10 @@ final class Session {
     private let feed: AsyncStream<Input>.Continuation
     private let events: AsyncStream<EngineEvent>
     private let signals = Signals()
-    /// Typed lines, in a session; paused while a `/shell` command runs.
+    /// What's typed, in a session; paused while a `/shell` command runs.
     private var reader: InputReader?
+    /// Draws what's typed while kuri waits for it, when both ends are a terminal.
+    private var editor: LineEditor?
     /// A `/shell` command has the terminal: Ctrl-C is its, not the session's.
     private var shellRunning = false
 
@@ -109,10 +112,19 @@ final class Session {
             await submit(prompt ?? "")
         } else {
             await showHeader(lastExchange: true)
+            if typing, answer.isTerminal {
+                _ = TerminalInput.original
+                editor = LineEditor(stream: answer, commands: Set(Self.commands.map(\.0) + ["/help", "/quit"]))
+            }
             let reader = InputReader()
             self.reader = reader
             Task {
-                for await line in reader.lines { feed.yield(.line(line)) }
+                for await typed in reader.typed {
+                    switch typed {
+                    case .line(let line): feed.yield(.line(line))
+                    case .keys(let keys): feed.yield(.keys(keys))
+                    }
+                }
                 feed.yield(.endOfInput)
             }
             if let prompt {
@@ -128,6 +140,8 @@ final class Session {
             await handle(input)
             if done { break }
         }
+        editor?.finish()
+        stopListening()
         farewell()
         return exitCode
     }
@@ -229,11 +243,33 @@ final class Session {
     private func handle(_ input: Input) async {
         switch input {
         case .event(let event):
+            // Output goes where the prompt was, and the prompt under it.
+            editor?.hide()
             await handle(event)
+            editor?.show()
         case .line(let line):
             if typing { answer.inputEnded() }
             await handle(line: line)
+        case .keys(let keys):
+            guard let action = editor?.feed(keys) else { return }
+            stopListening()
+            switch action {
+            case .submit(let line): await handle(line: line)
+            case .interrupt: await interrupt()
+            case .endOfInput: await handle(.endOfInput)
+            }
         case .endOfInput:
+            if let asked = request {
+                // Quitting declines the question, so the turn can end.
+                request = nil
+                switch asked.kind {
+                case .approval:
+                    await engine.respond(to: asked.id, with: .approved(false))
+                case .clarify(let clarify):
+                    let none = Dictionary(uniqueKeysWithValues: clarify.questions.map { ($0.id, "") })
+                    await engine.respond(to: asked.id, with: .answers(none))
+                }
+            }
             if running {
                 quitAfterTurn = true
                 note("Finishing this turn first; Ctrl-C stops it.")
@@ -351,6 +387,8 @@ final class Session {
         case .inputResolved(let requestID) where requestID == request?.id:
             // Answered elsewhere, or the turn was stopped.
             request = nil
+            editor?.finish()
+            stopListening()
         case .modelFallback(let id, let from, let to, let reason) where id == ours:
             note("\(from) failed (\(reason)); \(to) takes over.")
         case .compacting(let id, let on) where id == ours && running:
@@ -522,7 +560,8 @@ final class Session {
         switch asked.kind {
         case .approval(let approval):
             begin(.activity, on: answer)
-            answer.write("Allow \(describe(approval))? " + answer.style("[y/N]", .dim) + " ")
+            answer.line(answer.style("?", .yellow) + " Allow \(describe(approval))? " + answer.style("[y/N]", .dim))
+            listenForAnswer()
         case .clarify(let clarify):
             showQuestion(clarify.questions[0])
         }
@@ -534,7 +573,11 @@ final class Session {
         for (index, option) in (question.options ?? []).enumerated() {
             answer.line(answer.style("  \(index + 1).", .dim) + " " + option)
         }
-        answer.write(answer.style("  ›", .bold) + " ")
+        listenForAnswer()
+    }
+
+    private func listenForAnswer() {
+        listen(LineEditor.Prompt(text: "  › ", styled: answer.style("  ›", .bold) + " "), commands: false)
     }
 
     private func answerQuestion(_ line: String) async {
@@ -755,11 +798,11 @@ final class Session {
     private func runShell(_ command: String) async {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         answer.blankLine()
-        reader?.pause()
+        reader?.switchTo(.paused)
         shellRunning = true
         let ending = await ForegroundCommand.run([shell, "-c", command], in: Folders.current)
         shellRunning = false
-        reader?.resume()
+        reader?.switchTo(.lines)
         answer.othersWrote()
         switch ending {
         case nil:
@@ -806,8 +849,25 @@ final class Session {
         // During a turn its end shows the prompt.
         guard !oneTurn, typing, !done, !running else { return }
         answer.blankLine()
-        answer.write(answer.style("›", .bold) + " ")
         lastBlock = nil
+        listen(LineEditor.Prompt(text: "› ", styled: answer.style("›", .bold) + " "), commands: true)
+    }
+
+    /// Waits for a line after `prompt`: in the line editor, or, when it
+    /// can't draw, with the terminal echoing as it does.
+    private func listen(_ prompt: LineEditor.Prompt, commands: Bool) {
+        guard let editor, let reader else {
+            answer.write(prompt.styled)
+            return
+        }
+        reader.switchTo(.keys) { TerminalInput.keys() }
+        editor.begin(prompt, commands: commands)
+        if let keys = editor.takeTypeahead() { feed.yield(.keys(keys)) }
+    }
+
+    /// The terminal back to its own line editing, as kuri found it.
+    private func stopListening() {
+        reader?.switchTo(.lines) { TerminalInput.lines() }
     }
 
     private func farewell() {

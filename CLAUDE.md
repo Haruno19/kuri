@@ -50,7 +50,7 @@ xcodebuild -project Kuri.xcodeproj -scheme Kuri -configuration Debug build
 
 - Tests use Swift Testing. Fixture servers are Python scripts using only the standard library.
 - Starting a sandbox VM needs the `com.apple.security.virtualization` entitlement on the running executable, which `swift test` can't have. To exercise real VMs, build a small executable that depends on `KuriKit` by path, sign it (`codesign -f -s - --entitlements <plist> <binary>`), and drive `Sandbox` or `Engine` from it. Use a separate `KURI_HOME` (symlinking its `sandbox/` to the installed one) so real conversations aren't touched.
-- To try `kuri`, run the build in DerivedData (`…/Build/Products/Debug/kuri`, built by either scheme) with its own `KURI_HOME`, like a VM test, and with the app closed: one engine at a time. Interactive behaviour (prompts, Ctrl-C) needs a terminal, so drive it through a pseudo-terminal (Python's `pty`). To debug it, Run the `KuriCLI` scheme: it waits for `kuri` to be started from a terminal and attaches.
+- To try `kuri`, run the build in DerivedData (`…/Build/Products/Debug/kuri`, built by either scheme) with its own `KURI_HOME`, like a VM test, and with the app closed: one engine at a time. Interactive behaviour (prompts, Ctrl-C) needs a terminal, so drive it through a pseudo-terminal (Python's `pty`); at a prompt the terminal is in raw mode, so send Return as `\r` (`\n` is Ctrl-J, a new line in the message). To debug it, Run the `KuriCLI` scheme: it waits for `kuri` to be started from a terminal and attaches.
 - Live tests use small local models, which aren't deterministic: assert on what the plumbing guarantees, print transcripts for the rest.
 
 ## Code conventions

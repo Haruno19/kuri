@@ -14,7 +14,7 @@ final class Stream {
     /// How many newlines the output ends with, so blocks can be kept one
     /// blank line apart without counting what came before. Nothing written
     /// yet counts as a blank line: no block starts with an empty one.
-    private var trailingNewlines = 2
+    private(set) var trailingNewlines = 2
 
     private init(fd: Int32) {
         self.fd = fd
@@ -58,6 +58,31 @@ final class Stream {
         trailingNewlines = 0
     }
 
+    /// Writes cursor movements and other control sequences, which leave
+    /// the count of trailing newlines as it was.
+    func writeControl(_ text: String) {
+        let kept = trailingNewlines
+        write(text)
+        trailingNewlines = kept
+    }
+
+    /// Something drawn and then erased (the prompt, hidden to write output
+    /// above it) left the output ending as it did before.
+    func restoreTrailingNewlines(_ count: Int) {
+        trailingNewlines = count
+    }
+
+    /// The terminal's size; 80 by 24 when it can't tell.
+    var size: (columns: Int, rows: Int) {
+        var size = winsize()
+        guard isTerminal, withUnsafeMutablePointer(to: &size, { ioctl(fd, TIOCGWINSZ, $0) }) == 0,
+              size.ws_col > 0, size.ws_row > 0
+        else { return (80, 24) }
+        return (Int(size.ws_col), Int(size.ws_row))
+    }
+
+    var columns: Int { size.columns }
+
     func line(_ text: String = "") {
         endLine()
         write(text + "\n")
@@ -72,9 +97,7 @@ final class Stream {
     /// the top: like `clear`, without throwing the terminal's history away.
     func clearScreen() {
         guard isTerminal else { return }
-        var size = winsize()
-        let rows = withUnsafeMutablePointer(to: &size) { ioctl(fd, TIOCGWINSZ, $0) } == 0 && size.ws_row > 0
-            ? Int(size.ws_row) : 24
+        let rows = size.rows
         write("\u{1B}[\(rows);1H" + String(repeating: "\n", count: rows) + "\u{1B}[H")
         trailingNewlines = 2
     }
@@ -144,31 +167,52 @@ enum Header {
     }
 }
 
-/// Typed lines, read on a thread of their own: a read blocks until a line
-/// is typed, and the main actor has events to handle meanwhile. It can be
-/// paused, so that a command run with `/shell` has the terminal's input to
+/// What's typed, read on a thread of their own: a read blocks until a key
+/// or line arrives, and the main actor has events to handle meanwhile.
+/// Lines, as the terminal edits and echoes them, while kuri isn't waiting
+/// for input; keys, for the line editor, while it is (the terminal in raw
+/// mode); or nothing, while a `/shell` command has the terminal's input to
 /// itself instead of racing this thread for every key.
 nonisolated final class InputReader: Sendable {
+    enum Mode: Sendable {
+        case lines, keys, paused
+    }
+
+    enum Typed: Sendable {
+        case line(String)
+        case keys([UInt8])
+    }
+
     /// How often a paused or idle reader looks again.
     static let pollInterval: Int32 = 50
 
-    let lines: AsyncStream<String>
-    private let paused = Mutex(false)
+    let typed: AsyncStream<Typed>
+    /// The mode, and a count of switches, so a read never mixes two modes.
+    private let state = Mutex((mode: Mode.lines, switches: 0))
 
     init() {
-        let (lines, continuation) = AsyncStream.makeStream(of: String.self)
-        self.lines = lines
+        let (typed, continuation) = AsyncStream.makeStream(of: Typed.self)
+        self.typed = typed
         Thread { [self] in read(into: continuation) }.start()
     }
 
-    func pause() { paused.withLock { $0 = true } }
-    func resume() { paused.withLock { $0 = false } }
+    /// Switches mode, running `apply` (the terminal's settings) while no
+    /// read is under way: what's read next is read in the new mode.
+    func switchTo(_ mode: Mode, _ apply: () -> Void = {}) {
+        state.withLock { state in
+            guard state.mode != mode else { return }
+            state.mode = mode
+            state.switches += 1
+            apply()
+        }
+    }
 
-    private func read(into continuation: AsyncStream<String>.Continuation) {
+    private func read(into continuation: AsyncStream<Typed>.Continuation) {
         var pending: [UInt8] = []
         var buffer = [UInt8](repeating: 0, count: 4096)
         while true {
-            if paused.withLock({ $0 }) {
+            let (mode, switches) = state.withLock { $0 }
+            if mode == .paused {
                 usleep(useconds_t(Self.pollInterval) * 1000)
                 continue
             }
@@ -176,22 +220,60 @@ nonisolated final class InputReader: Sendable {
             let ready = poll(&descriptor, 1, Self.pollInterval)
             if ready < 0, errno != EINTR { break }
             guard ready > 0 else { continue }
-            // Checked again under the lock: once `pause` returns, no read is
-            // under way or about to start.
-            let count = paused.withLock { isPaused in
-                isPaused ? nil : buffer.withUnsafeMutableBytes { Darwin.read(STDIN_FILENO, $0.baseAddress, $0.count) }
+            // Read under the lock, and only if the mode hasn't changed since
+            // the poll: a line read now can't block on a terminal that was
+            // meanwhile put back into line mode.
+            let count = state.withLock { state in
+                state.switches == switches
+                    ? buffer.withUnsafeMutableBytes { Darwin.read(STDIN_FILENO, $0.baseAddress, $0.count) }
+                    : nil
             }
             guard let count else { continue }
             if count < 0, errno == EINTR { continue }
             guard count > 0 else { break }
             pending += buffer[..<count]
+            if mode == .keys {
+                continuation.yield(.keys(pending))
+                pending = []
+                continue
+            }
             while let end = pending.firstIndex(of: UInt8(ascii: "\n")) {
-                continuation.yield(String(decoding: pending[..<end], as: UTF8.self))
+                continuation.yield(.line(String(decoding: pending[..<end], as: UTF8.self)))
                 pending.removeSubrange(...end)
             }
         }
-        if !pending.isEmpty { continuation.yield(String(decoding: pending, as: UTF8.self)) }
+        if !pending.isEmpty { continuation.yield(.line(String(decoding: pending, as: UTF8.self))) }
         continuation.finish()
+    }
+}
+
+/// The terminal's input settings: as found, or raw for the line editor.
+nonisolated enum TerminalInput {
+    /// As kuri found them; read before anything changes them.
+    static let original: termios? = {
+        var settings = termios()
+        return tcgetattr(STDIN_FILENO, &settings) == 0 ? settings : nil
+    }()
+
+    /// Every key as it's typed, unechoed: Ctrl-C and Ctrl-D become keys
+    /// like the others, and Return stays a carriage return, apart from
+    /// Ctrl-J's newline.
+    static func keys() {
+        guard var settings = original else { return }
+        settings.c_lflag &= ~tcflag_t(ICANON | ECHO | ISIG | IEXTEN)
+        settings.c_iflag &= ~tcflag_t(ICRNL | IXON)
+        withUnsafeMutablePointer(to: &settings.c_cc) {
+            $0.withMemoryRebound(to: cc_t.self, capacity: Int(NCCS)) { characters in
+                characters[Int(VMIN)] = 1
+                characters[Int(VTIME)] = 0
+            }
+        }
+        tcsetattr(STDIN_FILENO, TCSANOW, &settings)
+    }
+
+    static func lines() {
+        guard var settings = original else { return }
+        tcsetattr(STDIN_FILENO, TCSANOW, &settings)
     }
 }
 
