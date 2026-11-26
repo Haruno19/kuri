@@ -176,7 +176,7 @@ private struct StatusLine: View {
     private var text: String {
         switch model.phase {
         case .starting: return String(localized: "Starting…")
-        case .failed: return String(localized: "Not ready")
+        case .failed, .inUse: return String(localized: "Not ready")
         case .ready:
             let others = model.running.count
             if others > 0 { return String(localized: "Working in \(others) chats") }

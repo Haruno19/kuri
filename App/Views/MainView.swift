@@ -31,6 +31,8 @@ struct MainView: View {
                     .padding(40)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(palette.background)
+                case .inUse(let message, let kuri):
+                    InUseView(message: message, kuri: kuri)
                 case .ready:
                     ChatView()
                 }
@@ -210,6 +212,59 @@ private struct Sidebar: View {
             .padding(.horizontal, 10)
             .padding(.top, 2)
         }
+    }
+}
+
+/// Another client has the home folder, and only one runs at a time
+/// (decision 0028): try again once it's quit, or, when it's kuri in a
+/// terminal, quit it from here.
+private struct InUseView: View {
+    let message: String
+    let kuri: Int32?
+    @Environment(AppModel.self) private var model
+    @Environment(\.palette) private var palette
+    @State private var confirming = false
+    /// The message wraps under the title rather than across the window.
+    static let messageWidth: CGFloat = 460
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text(kuri == nil ? "Kuri is already running" : "kuri is running in a terminal")
+                .font(Typeface.serif(22)).foregroundStyle(palette.ink)
+            Text(message).font(Typeface.sans(13)).foregroundStyle(palette.secondary).textSelection(.enabled)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: Self.messageWidth)
+            HStack(spacing: 10) {
+                if kuri != nil {
+                    Button { confirming = true } label: {
+                        label(model.quittingKuri ? "Quitting kuri…" : "Quit kuri…")
+                    }
+                    .buttonStyle(PrimaryButton())
+                    .disabled(model.quittingKuri)
+                }
+                Button { Task { await model.start() } } label: { label("Try Again") }
+                    .buttonStyle(SecondaryButton())
+                    .disabled(model.quittingKuri)
+            }
+            .padding(.top, 14)
+        }
+        .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(palette.background)
+        .confirmationDialog("Quit kuri?", isPresented: $confirming) {
+            Button("Quit kuri") {
+                if let kuri { Task { await model.quitKuri(kuri) } }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Whatever it's doing in its terminal stops, as if you'd quit it there.")
+        }
+    }
+
+    private func label(_ title: LocalizedStringKey) -> some View {
+        Text(title).font(Typeface.sans(13.5))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
     }
 }
 

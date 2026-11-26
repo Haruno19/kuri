@@ -13,13 +13,13 @@ import Testing
     @Test func secondLockNamesTheHolder() throws {
         let home = try makeHome()
         defer { try? FileManager.default.removeItem(at: home.root) }
-        let first = try HomeLock.acquire(home, holder: "kuri (process 4242)")
+        let first = try HomeLock.acquire(home, holder: "kuri (process 4242)", pid: 4242)
 
         #expect {
-            try HomeLock.acquire(home, holder: "Kuri (process 812)")
+            try HomeLock.acquire(home, holder: "Kuri (process 812)", pid: 812)
         } throws: { error in
-            guard case .homeInUse(_, let holder) = error as? KuriError else { return false }
-            return holder == "kuri (process 4242)"
+            guard case .homeInUse(_, let holder, let pid) = error as? KuriError else { return false }
+            return holder == "kuri (process 4242)" && pid == 4242
         }
         first.release()
     }
@@ -30,8 +30,8 @@ import Testing
         let first = try HomeLock.acquire(home)
         first.release()
         first.release()  // twice is harmless
-        let second = try HomeLock.acquire(home, holder: "kuri (process 1)")
-        #expect(try String(contentsOf: home.lockFile, encoding: .utf8) == "kuri (process 1)\n")
+        let second = try HomeLock.acquire(home, holder: "kuri (process 1)", pid: 1)
+        #expect(try String(contentsOf: home.lockFile, encoding: .utf8) == "kuri (process 1)\n1\n")
         second.release()
     }
 
@@ -40,6 +40,26 @@ import Testing
         defer { try? FileManager.default.removeItem(at: home.root) }
         do { _ = try HomeLock.acquire(home) }
         try HomeLock.acquire(home).release()
+    }
+
+    @Test func aLockWithoutAnIdStillNamesItsHolder() throws {
+        let home = try makeHome()
+        defer { try? FileManager.default.removeItem(at: home.root) }
+        let first = try HomeLock.acquire(home)
+        // As a 0.1 build wrote it.
+        try "Kuri (process 812)\n".write(to: home.lockFile, atomically: false, encoding: .utf8)
+        #expect {
+            try HomeLock.acquire(home)
+        } throws: { error in
+            guard case .homeInUse(_, let holder, let pid) = error as? KuriError else { return false }
+            return holder == "Kuri (process 812)" && pid == nil
+        }
+        first.release()
+    }
+
+    @Test func findsAProcessProgram() {
+        #expect(HomeLock.executable(of: ProcessInfo.processInfo.processIdentifier) != nil)
+        #expect(HomeLock.executable(of: -1) == nil)
     }
 
     @Test func messageSaysWhoToQuit() {

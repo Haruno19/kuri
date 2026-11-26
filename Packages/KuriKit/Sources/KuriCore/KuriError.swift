@@ -19,8 +19,9 @@ public enum KuriError: Error, LocalizedError, Sendable {
     case memoryNotFound(Int)
     case memoryFull(total: Int, limit: Int)
     /// Another engine (the app, or `kuri` in a terminal) holds the home
-    /// folder: only one runs at a time (decision 0028).
-    case homeInUse(home: String, holder: String?)
+    /// folder: only one runs at a time (decision 0028). `pid` is the
+    /// holder's, so a client can offer to quit the other.
+    case homeInUse(home: String, holder: String?, pid: Int32? = nil)
 
     public var errorDescription: String? {
         switch self {
@@ -43,7 +44,7 @@ public enum KuriError: Error, LocalizedError, Sendable {
         case .memoryNotFound(let number): "There is no active memory m\(number)."
         case .memoryFull(let total, let limit):
             "Memory would hold \(total) characters, over the \(limit) limit. Remove or shorten entries in the same call."
-        case .homeInUse(let home, let holder):
+        case .homeInUse(let home, let holder, _):
             "\(holder ?? "Another process") is already using \(home). Quit it, then try again."
         }
     }

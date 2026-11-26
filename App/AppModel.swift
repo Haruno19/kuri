@@ -17,6 +17,9 @@ final class AppModel {
         case starting
         case ready
         case failed(String)
+        /// Another client has the home folder (decision 0028). `kuri` is its
+        /// process id when it's kuri in a terminal, which Kuri can offer to quit.
+        case inUse(String, kuri: Int32?)
 
         var isReady: Bool {
             if case .ready = self { true } else { false }
@@ -24,6 +27,11 @@ final class AppModel {
     }
 
     private(set) var phase: Phase = .starting
+    /// Kuri asked kuri to quit, and waits for the home folder.
+    private(set) var quittingKuri = false
+    /// How long Kuri waits for kuri to quit before saying it's still running.
+    static let kuriQuitWait: Duration = .seconds(10)
+    static let lockPoll: Duration = .milliseconds(250)
     private(set) var engine: Engine?
 
     private(set) var conversations: [Conversation] = []
@@ -182,9 +190,35 @@ final class AppModel {
             let engine = try await Engine.open(blocks: Set(ReplyBlockKind.allCases))
             try await attach(to: engine)
             await engine.resumePendingTurns()
+        } catch KuriError.homeInUse(let home, let holder, let pid) {
+            let error = KuriError.homeInUse(home: home, holder: holder, pid: pid)
+            phase = .inUse(error.localizedDescription, kuri: pid.flatMap { Self.isKuri($0) ? $0 : nil })
         } catch {
             phase = .failed(error.localizedDescription)
         }
+    }
+
+    /// The id came from the lock file: make sure it's still kuri's before
+    /// signalling it.
+    private static func isKuri(_ pid: Int32) -> Bool {
+        HomeLock.executable(of: pid)?.lastPathComponent == "kuri"
+    }
+
+    /// Asks kuri to quit, as Ctrl-D would (it ends its session cleanly on
+    /// SIGTERM), and starts once it has. SIGCONT too, in case it was
+    /// suspended with Ctrl-Z: it couldn't act on SIGTERM until resumed.
+    func quitKuri(_ pid: Int32) async {
+        guard !quittingKuri else { return }
+        guard Self.isKuri(pid) else { return await start() }
+        quittingKuri = true
+        defer { quittingKuri = false }
+        kill(pid, SIGTERM)
+        kill(pid, SIGCONT)
+        let deadline = ContinuousClock.now + Self.kuriQuitWait
+        repeat {
+            try? await Task.sleep(for: Self.lockPoll)
+            await start()
+        } while !phase.isReady && ContinuousClock.now < deadline
     }
 
     /// A second model on an engine that's already running, with a

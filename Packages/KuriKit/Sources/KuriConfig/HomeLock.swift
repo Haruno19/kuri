@@ -9,7 +9,8 @@ import Synchronization
 ///
 /// An exclusive `flock` on `kuri.lock`: the kernel drops it when the
 /// process exits, however it exits, so a crash never leaves a stale lock.
-/// The file only names the holder, for the error the next one sees.
+/// The file only names the holder and its process id, for the error the
+/// next one sees: with the id, a client can offer to quit the other.
 public final class HomeLock: Sendable {
     private let descriptor: Mutex<Int32>
 
@@ -19,7 +20,8 @@ public final class HomeLock: Sendable {
 
     /// Takes the lock, or throws `KuriError.homeInUse` naming the process
     /// that holds it.
-    public static func acquire(_ home: KuriHome, holder: String = defaultHolder) throws -> HomeLock {
+    public static func acquire(_ home: KuriHome, holder: String = defaultHolder,
+                               pid: Int32 = ProcessInfo.processInfo.processIdentifier) throws -> HomeLock {
         let path = home.lockFile.path
         let fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0o644)
         guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
@@ -27,13 +29,14 @@ public final class HomeLock: Sendable {
             let code = errno
             close(fd)
             guard code == EWOULDBLOCK else { throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO) }
-            let current = (try? String(contentsOfFile: path, encoding: .utf8))?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let lines = ((try? String(contentsOfFile: path, encoding: .utf8)) ?? "")
+                .split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
             throw KuriError.homeInUse(home: (home.root.path as NSString).abbreviatingWithTildeInPath,
-                                      holder: current?.isEmpty == false ? current : nil)
+                                      holder: lines.first.flatMap { $0.isEmpty ? nil : $0 },
+                                      pid: lines.count > 1 ? Int32(lines[1]) : nil)
         }
         ftruncate(fd, 0)
-        let label = Array("\(holder)\n".utf8)
+        let label = Array("\(holder)\n\(pid)\n".utf8)
         _ = label.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
         return HomeLock(descriptor: fd)
     }
@@ -42,6 +45,14 @@ public final class HomeLock: Sendable {
     public static var defaultHolder: String {
         let process = ProcessInfo.processInfo
         return "\(process.processName) (process \(process.processIdentifier))"
+    }
+
+    /// The program a process runs, so a client offering to quit the other
+    /// can make sure the id it read from the lock is still that client's.
+    public static func executable(of pid: Int32) -> URL? {
+        var path = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+        guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { return nil }
+        return URL(filePath: String(cString: path))
     }
 
     /// Lets the next engine open this home. Closing the descriptor is what
