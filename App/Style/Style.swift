@@ -31,6 +31,13 @@ enum Tune {
     static var press: Animation { Motion.reduced ? .easeOut(duration: 0.1) : .spring(response: 0.22, dampingFraction: 0.65) }
     /// Seconds for the shine to cross the logo.
     static let shine = 0.7
+    /// The logo turning into kuri's hero and back: seconds for each pixel
+    /// wipe, for the burr to stay between them, for the light to cross it
+    /// and for its twinkle.
+    static let turnWipe = 0.34
+    static let turnHold = 0.78
+    static let turnShine = 0.5
+    static let twinkle = 0.36
     /// A running chat's bead in the sidebar: seconds for a glint to roll
     /// across it, and from one glint to the next.
     static let glint = 1.1

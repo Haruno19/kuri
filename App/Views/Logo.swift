@@ -1,41 +1,33 @@
 import SwiftUI
 
 /// The chestnut from the app icon, in frosted glass tinted with the icon's
-/// gradient. Still at rest; clicks cycle through a hop, a shine and a shake.
+/// gradient. Still at rest; each click sets off a hop, a shine, a shake or
+/// a turn into kuri's hero, picked at random, never the same twice running.
 ///
 /// The glass is a material, not `glassEffect`: Liquid Glass is drawn in a
 /// separate pass that trails the shape while it's scaled or moved, which
 /// shows as a ghost outline during the reactions.
 struct Logo: View {
     let size: CGFloat
-    @Environment(\.palette) private var palette
     @State private var hops = 0
     @State private var shines = 0
     @State private var shakes = 0
-    @State private var clicks = 0
+    @State private var turns = 0
+    @State private var last: Reaction?
+
+    private enum Reaction: CaseIterable { case hop, shine, shake, turn }
 
     /// `r` turns around the centre; `tilt` around the bottom centre, like an
     /// upside-down pendulum.
     struct Pose { var sx = 1.0, sy = 1.0, y = 0.0, r = 0.0, tilt = 0.0 }
 
     var body: some View {
-        let shape = ChestnutShape()
-        ZStack {
-            shape.fill(.ultraThinMaterial)
-            // The icon's gradient, thin enough that the frost shows through.
-            shape.fill(palette.iconGradient).opacity(palette.dark ? 0.7 : 0.6)
-            // Depth: the glass thickens toward the bottom...
-            shape.fill(LinearGradient(colors: [.clear, palette.iconTop.opacity(0.35)], startPoint: .center, endPoint: .bottom))
-            // ...and catches the light at the top.
-            shape.fill(LinearGradient(colors: [.white.opacity(palette.dark ? 0.16 : 0.32), .clear], startPoint: .top, endPoint: .center))
-            Shine(trigger: shines).mask(shape)
-            shape.stroke(LinearGradient(colors: [.white.opacity(palette.dark ? 0.4 : 0.8), .white.opacity(0.1)],
-                                        startPoint: .top, endPoint: .bottom), lineWidth: 1)
+        KeyframeAnimator(initialValue: LogoTurn(), trigger: turns) { turn in
+            LogoFace(size: size, shines: shines, turn: turn)
+        } keyframes: { _ in
+            Self.turn
         }
-        .frame(width: size, height: size)
-        .compositingGroup()
-        .shadow(color: palette.shadow.opacity(palette.dark ? 0.35 : 0.1), radius: 4, y: 2)
-        .contentShape(shape)
+        .contentShape(ChestnutShape())
         .keyframeAnimator(initialValue: Pose(), trigger: hops, content: { Self.pose($0, $1) }) { _ in Self.hop }
         .keyframeAnimator(initialValue: Pose(), trigger: shakes, content: { Self.pose($0, $1) }) { _ in Self.shake }
         .onTapGesture {
@@ -44,14 +36,37 @@ struct Logo: View {
                 shines += 1
                 return
             }
-            switch clicks % 3 {
-            case 0: hops += 1
-            case 1: shines += 1
-            default: shakes += 1
+            let next = Reaction.allCases.filter { $0 != last }.randomElement() ?? .hop
+            last = next
+            switch next {
+            case .hop: hops += 1
+            case .shine: shines += 1
+            case .shake: shakes += 1
+            case .turn: turns += 1
             }
-            clicks += 1
         }
         .accessibilityHidden(true)
+    }
+
+    /// Glass to pixels, a shine and a twinkle on the burr, pixels to glass.
+    @KeyframesBuilder<LogoTurn> static var turn: some Keyframes<LogoTurn> {
+        KeyframeTrack(\LogoTurn.wave) {
+            MoveKeyframe(0)
+            LinearKeyframe(1, duration: Tune.turnWipe)
+            LinearKeyframe(1, duration: Tune.turnHold)
+            LinearKeyframe(2, duration: Tune.turnWipe)
+        }
+        KeyframeTrack(\LogoTurn.shine) {
+            MoveKeyframe(LogoTurn.shineStart)
+            LinearKeyframe(LogoTurn.shineStart, duration: Tune.turnWipe * 0.7)
+            CubicKeyframe(LogoTurn.shineEnd, duration: Tune.turnShine)
+        }
+        KeyframeTrack(\LogoTurn.twinkle) {
+            MoveKeyframe(0)
+            LinearKeyframe(0, duration: Tune.turnWipe * 0.7 + Tune.turnShine * 0.55)
+            LinearKeyframe(1, duration: Tune.twinkle * 0.45)
+            LinearKeyframe(0, duration: Tune.twinkle * 0.55)
+        }
     }
 
     /// Nonisolated: the animator calls it from a @Sendable closure.
@@ -101,6 +116,231 @@ struct Logo: View {
             CubicKeyframe(-12, duration: 0.32)
             CubicKeyframe(10, duration: 0.5)
             SpringKeyframe(0, duration: 0.55, spring: .smooth(duration: 0.5, extraBounce: 0.15))
+        }
+    }
+}
+
+/// The logo as drawn at one moment of a turn: the glass chestnut, the burr,
+/// or tiles of each midway. Apart from `Logo` so a sketch can draw any
+/// moment without running the animation.
+struct LogoFace: View {
+    let size: CGFloat
+    var shines = 0
+    var turn = LogoTurn()
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        let shape = ChestnutShape()
+        let grid = Burr.Grid(size: size)
+        ZStack {
+            ZStack {
+                shape.fill(.ultraThinMaterial)
+                // The icon's gradient, thin enough that the frost shows through.
+                shape.fill(palette.iconGradient).opacity(palette.dark ? 0.7 : 0.6)
+                // Depth: the glass thickens toward the bottom...
+                shape.fill(LinearGradient(colors: [.clear, palette.iconTop.opacity(0.35)], startPoint: .center, endPoint: .bottom))
+                // ...and catches the light at the top.
+                shape.fill(LinearGradient(colors: [.white.opacity(palette.dark ? 0.16 : 0.32), .clear], startPoint: .top, endPoint: .center))
+                Shine(trigger: shines).mask(shape)
+                shape.stroke(LinearGradient(colors: [.white.opacity(palette.dark ? 0.4 : 0.8), .white.opacity(0.1)],
+                                            startPoint: .top, endPoint: .bottom), lineWidth: 1)
+            }
+            .mask {
+                Canvas { context, _ in
+                    // Whole, unless it's turning: then the glass's tiles.
+                    guard turn.isTurning else {
+                        context.fill(Path(CGRect(x: -2, y: -2, width: size + 4, height: size + 4)), with: .color(.black))
+                        return
+                    }
+                    var tiles = Path()
+                    for (col, row) in grid.cells {
+                        let left = turn.glass(at: grid.order(col, row))
+                        if left > 0 { tiles.addRect(grid.tile(col, row, share: left)) }
+                    }
+                    context.fill(tiles, with: .color(.black))
+                }
+            }
+            if turn.isTurning {
+                Canvas { context, _ in
+                    for (col, row, hex) in Burr.pixels {
+                        let shown = turn.burr(at: grid.order(col, row))
+                        guard shown > 0 else { continue }
+                        let tile = Path(grid.tile(col, row, share: shown))
+                        context.fill(tile, with: .color(Color(hex: hex)))
+                        let lit = turn.light(at: grid.diagonal(col, row))
+                        if lit > 0 { context.fill(tile, with: .color(.white.opacity(lit))) }
+                    }
+                    if turn.twinkle > 0.05 { context.fill(grid.twinkle(turn.twinkle), with: .color(.white.opacity(0.95))) }
+                }
+            }
+        }
+        .frame(width: size, height: size)
+        .compositingGroup()
+        .shadow(color: palette.shadow.opacity(palette.dark ? 0.35 : 0.1), radius: 4, y: 2)
+    }
+}
+
+/// How far through a turn into the burr the logo is. `wave` runs 0 to 1
+/// (glass to burr) and 1 to 2 (back), each tile a moment after the one
+/// above it, like a terminal printing; `shine` is where the band of light
+/// is along the burr's diagonal; `twinkle` the sparkle's life.
+nonisolated struct LogoTurn {
+    var wave = 0.0
+    var shine = LogoTurn.shineStart
+    var twinkle = 0.0
+
+    static let shineStart = -0.3
+    static let shineEnd = 1.3
+    /// How much of a wipe the tiles are spread over, and how long a burr
+    /// pixel waits after the glass under it has gone.
+    static let spread = 1.3
+    static let lag = 0.45
+    /// The band's half width, along the diagonal.
+    static let band = 0.13
+
+    var isTurning: Bool { wave > 0 && wave < 2 }
+
+    /// A tile's progress through its own part of a wipe.
+    private func local(_ w: Double, _ order: Double, lag: Double) -> Double {
+        min(max(w * (1 + Self.spread + Self.lag) - order * Self.spread - lag, 0), 1)
+    }
+
+    /// How much of a glass tile is left: 1 whole, 0 gone.
+    func glass(at order: Double) -> Double {
+        guard isTurning else { return 1 }
+        if wave <= 1 {
+            let t = local(wave, order, lag: 0)
+            return 1 - t * t
+        }
+        let t = local(wave - 1, order, lag: Self.lag)
+        return 1 - (1 - t) * (1 - t)
+    }
+
+    /// How much of a burr pixel shows: it pops in a little past its size
+    /// and settles; it leaves without one.
+    func burr(at order: Double) -> Double {
+        guard isTurning else { return 0 }
+        if wave <= 1 {
+            let t = local(wave, order, lag: Self.lag) - 1, s = 2.2
+            return 1 + (s + 1) * t * t * t + s * t * t
+        }
+        let t = local(wave - 1, order, lag: 0)
+        return 1 - t * t
+    }
+
+    /// White over a pixel as the band crosses it, in two steps, as pixel
+    /// art would shade it.
+    func light(at diagonal: Double) -> Double {
+        let k = 1 - abs(diagonal - shine) / Self.band
+        return k > 0.5 ? 0.5 : k > 0 ? 0.22 : 0
+    }
+}
+
+/// kuri's hero: a chestnut burr split open, the nut rising out of it, in
+/// the meadow's colours. The same pixels as `Header.hero` in
+/// CLI/Terminal.swift; keep the two in step.
+nonisolated enum Burr {
+    static let art = [
+        ".....hN.....",
+        "...ghNNng...",
+        "..GNNNNNng..",
+        ".GGnNNNNngg.",
+        "..GGccccgg..",
+        ".GGGGGggggg.",
+        "..GGGggggg..",
+        ".G.GGgggg.g.",
+        "....G..g....",
+    ]
+
+    static let colours: [Character: UInt32] = [
+        "G": 0xA4AE58,  // burr, light
+        "g": 0x7E8A3C,  // burr, dark
+        "N": 0xB0703F,  // nut
+        "n": 0x8A4F2A,  // nut, in shadow
+        "h": 0xD9A06F,  // nut, lit
+        "c": 0xE6D3A3,  // the nut's pale base
+    ]
+
+    static let columns = art.map(\.count).max() ?? 0
+    static let rows = art.count
+
+    /// Every coloured pixel: column, row, colour.
+    static let pixels: [(Int, Int, UInt32)] = art.enumerated().flatMap { row, line in
+        line.enumerated().compactMap { col, c in colours[c].map { (col, row, $0) } }
+    }
+
+    /// Where the sparkle shines: just off the nut's lit side.
+    static let twinkleAt = (col: 3, row: 0)
+
+    /// The burr's pixels laid over a logo of a given size: square, on half
+    /// points so they land on whole Retina pixels, centred on the drawing's
+    /// coloured part. The glass is cut into tiles on the same grid.
+    struct Grid {
+        let size: CGFloat
+        let pixel: CGFloat
+        let origin: CGPoint
+
+        init(size: CGFloat) {
+            self.size = size
+            let cols = Burr.pixels.map(\.0), rows = Burr.pixels.map(\.1)
+            let minCol = cols.min() ?? 0, maxCol = cols.max() ?? 0
+            let minRow = rows.min() ?? 0, maxRow = rows.max() ?? 0
+            pixel = max(1, (size / CGFloat(Burr.columns) * 2).rounded() / 2)
+            let x = (size - CGFloat(maxCol - minCol + 1) * pixel) / 2 - CGFloat(minCol) * pixel
+            let y = (size - CGFloat(maxRow - minRow + 1) * pixel) / 2 - CGFloat(minRow) * pixel
+            origin = CGPoint(x: (x * 2).rounded() / 2, y: (y * 2).rounded() / 2)
+        }
+
+        /// The cells covering the whole logo, some outside the drawing.
+        var cells: [(Int, Int)] {
+            let first = (col: Int((-origin.x / pixel).rounded(.down)), row: Int((-origin.y / pixel).rounded(.down)))
+            let last = (col: Int(((size - origin.x) / pixel).rounded(.up)), row: Int(((size - origin.y) / pixel).rounded(.up)))
+            return (first.row..<last.row).flatMap { row in (first.col..<last.col).map { ($0, row) } }
+        }
+
+        func centre(_ col: Int, _ row: Int) -> CGPoint {
+            CGPoint(x: origin.x + (CGFloat(col) + 0.5) * pixel, y: origin.y + (CGFloat(row) + 0.5) * pixel)
+        }
+
+        /// A cell's square, shrunk to a share of its side. Whole ones reach
+        /// a hair past the cell, so neighbours leave no seam.
+        func tile(_ col: Int, _ row: Int, share: Double) -> CGRect {
+            let side = pixel * CGFloat(share) + (share >= 1 ? 0.3 : 0)
+            let c = centre(col, row)
+            return CGRect(x: c.x - side / 2, y: c.y - side / 2, width: side, height: side)
+        }
+
+        /// When a cell turns, 0 first to 1 last: mostly top to bottom, a
+        /// little left to right, and a little at random, so the wipe reads
+        /// as pixels rather than a line.
+        func order(_ col: Int, _ row: Int) -> Double {
+            let c = centre(col, row)
+            var h = UInt32(truncatingIfNeeded: col &* 73_856_093 ^ row &* 19_349_663)
+            h = h &* 2_654_435_761
+            let noise = Double((h >> 8) & 0xFFFF) / 65535
+            return min(max(0.6 * Double(c.y / size) + 0.2 * Double(c.x / size) + 0.2 * noise, 0), 1)
+        }
+
+        /// Where a pixel sits along the burr's diagonal, 0 top left to 1
+        /// bottom right, for the shine.
+        func diagonal(_ col: Int, _ row: Int) -> Double {
+            Double(col + row) / Double(Burr.columns + Burr.rows - 2)
+        }
+
+        /// The sparkle, in half pixels: a dot, then a cross growing arms
+        /// and losing them as it fades.
+        func twinkle(_ life: Double) -> Path {
+            let q = pixel / 2
+            let c = centre(Burr.twinkleAt.col, Burr.twinkleAt.row)
+            let arms = Int((life * 2.99).rounded(.down))
+            var path = Path(CGRect(x: c.x - q / 2, y: c.y - q / 2, width: q, height: q))
+            for step in stride(from: 1, through: arms, by: 1) {
+                let d = CGFloat(step) * q
+                for (dx, dy) in [(d, 0), (-d, 0), (0, d), (0, -d)] {
+                    path.addRect(CGRect(x: c.x + dx - q / 2, y: c.y + dy - q / 2, width: q, height: q))
+                }
+            }
+            return path
         }
     }
 }

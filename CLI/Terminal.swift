@@ -156,7 +156,8 @@ enum Header {
     /// A chestnut burr split open, the nut rising out of it, in the meadow's
     /// colours (sketched in Sketches/Hero.swift). One letter a pixel, `.`
     /// for none; drawn in half blocks, two pixels to a cell, one above the
-    /// other, so they come out about square.
+    /// other, so they come out about square. The app's logo turns into
+    /// the same pixels (`Burr` in App/Views/Logo.swift); keep the two in step.
     static let hero = [
         ".....hN.....",
         "...ghNNng...",
