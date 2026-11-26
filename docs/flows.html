@@ -955,7 +955,7 @@ const FLOWS = [
       ["runner", "broker", "`approve(request)`", 'KuriAgent/TurnRunner.swift:372: try await waiting { try await base.approve(request) }'],
       ["broker", "session", "`.inputRequested(.approval)`", "e", 'KuriAgent/InteractionBroker.swift:43: emit(.inputRequested(request))'],
       ["session", "tty", "`? Allow …? [y/N]`", 'CLI/Session.swift:567: answer.line(answer.style("?", .yellow) + " Allow \\(describe(approval))? " + answer.style("[y/N]", .dim))'],
-      ["session", "editor", "`begin(  ›)`, without command styling", 'CLI/Session.swift:568: listenForAnswer()'],
+      ["session", "editor", "`begin(  ›)`, without command styling", 'CLI/Session.swift:580: listenForAnswer()'],
       ["editor", "session", "y or n, then Return", "r", 'CLI/LineEditor.swift:193: return .submit(line)'],
       ["session", "session", "`answerQuestion(line)`", 'CLI/Session.swift:322: await answerQuestion(line)'],
       ["session", "engine", "`respond(to:with: .approved(…))`", 'CLI/Session.swift:593: await engine.respond(to: asked.id, with: .approved(["y", "yes"].contains(text.lowercased())))'],
@@ -970,7 +970,7 @@ const FLOWS = [
     participants: ["user", "tty", "session", "editor", "engine", "runner"],
     steps: [
       { alt: [
-        ["during a turn", [["user", "session", "Ctrl-C: SIGINT, watched by a dispatch source", "a", 'CLI/Terminal.swift:451: source.setEventHandler { MainActor.assumeIsolated { handler() } }']]],
+        ["during a turn", [["user", "session", "Ctrl-C: SIGINT, watched by a dispatch source", "a", 'CLI/Terminal.swift:453: source.setEventHandler { MainActor.assumeIsolated { handler() } }']]],
         ["at a prompt", [
           ["user", "editor", "Ctrl-C: a key, in raw mode", "a", 'CLI/LineEditor.swift:196: case 0x03:  // Ctrl-C: clears what\'s typed; with nothing typed, it\'s the session\'s'],
           ["editor", "session", "nothing typed: `.interrupt`", "r", 'CLI/Session.swift:262: case .interrupt: await interrupt()'],
@@ -994,10 +994,10 @@ const FLOWS = [
     steps: [
       ["user", "session", "`/shell <command>`", 'CLI/Session.swift:706: await runShell(argument)'],
       ["session", "reader", "`switchTo(.paused)`: the command gets the keys", 'CLI/Session.swift:893: reader?.switchTo(.paused)'],
-      ["session", "shell", "`posix_spawn($SHELL -c …)` in kuri's process group,\nsignals back to their defaults", 'CLI/Terminal.swift:390: guard posix_spawn(&pid, arguments[0], &actions, &attributes, argv, environ) == 0 else {'],
-      ["shell", "tty", "reads and writes the terminal directly", "a", 'CLI/Terminal.swift:397: while waitpid(child, &status, 0) < 0, errno == EINTR {}'],
+      ["session", "shell", "`posix_spawn($SHELL -c …)` in kuri's process group,\nsignals back to their defaults", 'CLI/Terminal.swift:392: guard posix_spawn(&pid, arguments[0], &actions, &attributes, argv, environ) == 0 else {'],
+      ["shell", "tty", "reads and writes the terminal directly", "a", 'CLI/Terminal.swift:399: while waitpid(child, &status, 0) < 0, errno == EINTR {}'],
       { opt: "Ctrl-C", steps: [
-        ["user", "shell", "SIGINT stops the command", "a", 'CLI/Terminal.swift:376: posix_spawnattr_setsigdefault(&attributes, &defaults)'],
+        ["user", "shell", "SIGINT stops the command", "a", 'CLI/Terminal.swift:378: posix_spawnattr_setsigdefault(&attributes, &defaults)'],
         ["user", "session", "SIGINT, dropped while the command runs", "a", 'CLI/Session.swift:296: guard !shellRunning else { return }'],
       ]},
       ["shell", "session", "exit status", "r", 'CLI/Session.swift:895: let ending = await ForegroundCommand.run([shell, "-c", command], in: Folders.current)'],

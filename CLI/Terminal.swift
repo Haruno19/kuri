@@ -93,12 +93,13 @@ final class Stream {
         return "\u{1B}[\(styles.map(\.code).joined(separator: ";"))m\(text)\u{1B}[0m"
     }
 
-    /// Scrolls what's on screen up into the scrollback and starts again at
-    /// the top: like `clear`, without throwing the terminal's history away.
+    /// Clears the screen and the scrollback, as `clear` does: the session
+    /// starts on a blank terminal, and `/clear` goes back to one. `ESC [ 3 J`
+    /// empties the scrollback; after `ESC [ 2 J`, since some terminals keep
+    /// what that erases there.
     func clearScreen() {
         guard isTerminal else { return }
-        let rows = size.rows
-        write("\u{1B}[\(rows);1H" + String(repeating: "\n", count: rows) + "\u{1B}[H")
+        write("\u{1B}[H\u{1B}[2J\u{1B}[3J")
         trailingNewlines = 2
     }
 
@@ -347,6 +348,7 @@ nonisolated enum TerminalInput {
         guard var settings = original else { return }
         tcsetattr(STDIN_FILENO, TCSANOW, &settings)
     }
+
 }
 
 /// A command run on the terminal itself, as a shell runs a foreground job.
