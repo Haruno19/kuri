@@ -31,6 +31,10 @@ enum Tune {
     static var press: Animation { Motion.reduced ? .easeOut(duration: 0.1) : .spring(response: 0.22, dampingFraction: 0.65) }
     /// Seconds for the shine to cross the logo.
     static let shine = 0.7
+    /// A running chat's bead in the sidebar: seconds for a glint to roll
+    /// across it, and from one glint to the next.
+    static let glint = 1.1
+    static let glintEvery = 2.6
     /// Seconds for the light to cross the status text once.
     static let shimmer = 3.6
     /// Seconds for a block's placeholder to breathe in and out once, while
@@ -432,6 +436,97 @@ struct Orb: View {
         }
         .frame(width: size * 1.2, height: size * 1.2)
         .accessibilityHidden(true)
+    }
+}
+
+/// A running chat in the sidebar: a glossy bead in the accent colour, lit
+/// from the top left, turning slowly under the light. Now and then a glint
+/// rolls across it, curving round it as a line on a sphere does, brightest
+/// as it faces you.
+struct Bead: View {
+    var size: CGFloat = 10
+    @Environment(\.palette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var still
+
+    /// Degrees the glint's path leans, as if the bead spun on a tilted axis.
+    static let axis = 24.0
+    /// The glint's half width, in degrees of longitude.
+    static let glintWidth = 26.0
+
+    var body: some View {
+        // Still with Reduce Motion: lit, no glint.
+        TimelineView(.animation(paused: still)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: Tune.glintEvery)
+            Self.Drawing(size: size, glint: still ? nil : t / Tune.glint, palette: palette)
+        }
+        .frame(width: size + 2, height: size + 2)
+        .accessibilityHidden(true)
+    }
+
+    /// The bead at one moment; `glint` runs 0 to 1 while one crosses.
+    struct Drawing: View {
+        let size: CGFloat
+        let glint: Double?
+        let palette: Palette
+
+        var body: some View {
+            Canvas { context, canvas in
+                let r = size / 2
+                let c = CGPoint(x: canvas.width / 2, y: canvas.height / 2)
+                let ball = Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: size, height: size))
+                let deep = palette.dark ? Color(hex: 0x5E3618) : Color(hex: 0x6E3F1E)
+                let lit = palette.dark ? Color(hex: 0xF0C79C) : Color(hex: 0xE2B184)
+                // Resting on nothing, a soft shadow just below.
+                context.drawLayer { layer in
+                    layer.addFilter(.shadow(color: palette.shadow.opacity(palette.dark ? 0.6 : 0.3), radius: size * 0.1, y: size * 0.08))
+                    layer.fill(ball, with: .radialGradient(Gradient(colors: [lit, palette.accent, deep]),
+                                                            center: CGPoint(x: c.x - r * 0.3, y: c.y - r * 0.4),
+                                                            startRadius: 0, endRadius: size * 0.82))
+                }
+                context.clip(to: ball)
+                // Light bouncing back onto the shaded side.
+                context.fill(ball, with: .radialGradient(Gradient(colors: [palette.accentLight.opacity(0.45), .clear]),
+                                                          center: CGPoint(x: c.x + r * 0.45, y: c.y + r * 0.6),
+                                                          startRadius: 0, endRadius: r * 0.7))
+                if let glint, glint < 1 { draw(glint: glint, in: &context, centre: c, radius: r) }
+                // The window's reflection, top left.
+                context.drawLayer { layer in
+                    layer.addFilter(.blur(radius: size * 0.04))
+                    layer.fill(Path(ellipseIn: CGRect(x: c.x - r * 0.55, y: c.y - r * 0.68, width: r * 0.58, height: r * 0.4)),
+                               with: .color(.white.opacity(palette.dark ? 0.8 : 0.9)))
+                }
+            }
+        }
+
+        /// A band between two lines of longitude, `glint` of the way across
+        /// the side facing you; each line is half an ellipse as wide as the
+        /// sine of its longitude.
+        private func draw(glint: Double, in context: inout GraphicsContext, centre c: CGPoint, radius r: CGFloat) {
+            let eased = glint * glint * (3 - 2 * glint)
+            let middle = -110 + 220 * eased
+            let from = max(middle - Bead.glintWidth, -90), to = min(middle + Bead.glintWidth, 90)
+            guard from < to else { return }
+            let facing = cos(middle * .pi / 180)
+            guard facing > 0 else { return }
+            let steps = 16
+            var band = Path()
+            for k in 0...steps {
+                let y = -r + 2 * r * CGFloat(k) / CGFloat(steps)
+                let x = CGFloat(sin(to * .pi / 180)) * (r * r - y * y).squareRoot()
+                k == 0 ? band.move(to: CGPoint(x: x, y: y)) : band.addLine(to: CGPoint(x: x, y: y))
+            }
+            for k in stride(from: steps, through: 0, by: -1) {
+                let y = -r + 2 * r * CGFloat(k) / CGFloat(steps)
+                band.addLine(to: CGPoint(x: CGFloat(sin(from * .pi / 180)) * (r * r - y * y).squareRoot(), y: y))
+            }
+            band.closeSubpath()
+            let placed = band.applying(CGAffineTransform(rotationAngle: Bead.axis * .pi / 180)
+                .concatenating(CGAffineTransform(translationX: c.x, y: c.y)))
+            context.drawLayer { layer in
+                layer.addFilter(.blur(radius: r * 0.1))
+                layer.fill(placed, with: .color(.white.opacity(0.85 * facing)))
+            }
+        }
     }
 }
 

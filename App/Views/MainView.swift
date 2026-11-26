@@ -317,12 +317,16 @@ private struct ConversationRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
+            // Both marks on one centre line, clear of the row's edge.
             if isAwaitingInput {
                 Circle().strokeBorder(palette.accent, lineWidth: 1.5)
                     .frame(width: 8, height: 8)
+                    .frame(width: 12, height: 12)
+                    .padding(.trailing, 4)
                     .help("Waiting for your answer")
             } else if isRunning {
-                Orb().help("Working")
+                Bead().help("Working")
+                    .padding(.trailing, 4)
             }
         }
         // The dot's meaning, for VoiceOver: it's only drawn.

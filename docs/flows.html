@@ -477,7 +477,7 @@ const FLOWS = [
     participants: ["user", "sidebar", "appmodel", "engine", "store"],
     steps: [
       ["user", "sidebar", "Rename Chat, double-click, or Return", 'App/Views/MainView.swift:181: Button("Rename Chat") { model.renaming = conversation.id }'],
-      ["sidebar", "appmodel", "Return or click away: `rename(id, to:)`", 'App/Views/MainView.swift:339: Task { await model.rename(id, to: text) }'],
+      ["sidebar", "appmodel", "Return or click away: `rename(id, to:)`", 'App/Views/MainView.swift:343: Task { await model.rename(id, to: text) }'],
       ["appmodel", "engine", "`rename(id, to:)`", 'App/AppModel.swift:358: await attempt("Couldn\'t rename the chat") { try await $0.rename(id, to: title) }'],
       ["engine", "engine", "drop a title still being generated", 'KuriAgent/Engine.swift:337: titling[conversationID]?.cancel()'],
       ["engine", "store", "`updateConversation` — `updatedAt` unchanged", 'KuriAgent/Engine.swift:327: try await store.updateConversation(conversation)'],

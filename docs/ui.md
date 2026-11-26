@@ -45,7 +45,7 @@ The brief for the redesign. Every app change is checked against it. Directions a
 
 1. Full Markdown, including LaTeX (deferred earlier), with code blocks highlighted in the Everforest colours. *(done)*
 2. Layout and styling of the main window, from the Autumn sketch, with conversation management: rename *(done)*, archive, delete; maybe projects / groups, or grouping by root folder.
-   - **Running chats** show a status indicator in the sidebar: a single orb in the accent colour, with the same 3D feel as the working dots.
+   - **Running chats** show a status indicator in the sidebar: a glossy bead in the accent colour, lit from the top left, a glint rolling across it now and then as if it turned under the light.
    - **Sidebar snaps shut**: dragging its edge past a threshold collapses it, if SwiftUI allows it.
 3. **Menu bar icon and mini window** *(done)*: left click opens a small chat in Liquid Glass that floats like picture in picture; right click a native menu (Open Kuri, New Chat, Settings, Quit). `menuBarIcon: false` removes it; Kuri then stays in the Dock. This also covers the floating window, item 5.
 4. Settings window (compact, retro, dense).
