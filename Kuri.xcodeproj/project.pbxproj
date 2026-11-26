@@ -18,7 +18,7 @@
 			containerPortal = C0FFEE000000000000000009 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = C0FFEE000000000000000046;
-			remoteInfo = kuri;
+			remoteInfo = KuriCLI;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -120,9 +120,9 @@
 			productReference = C0FFEE000000000000000001 /* Kuri.app */;
 			productType = "com.apple.product-type.application";
 		};
-		C0FFEE000000000000000046 /* kuri */ = {
+		C0FFEE000000000000000046 /* KuriCLI */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = C0FFEE000000000000000047 /* Build configuration list for PBXNativeTarget "kuri" */;
+			buildConfigurationList = C0FFEE000000000000000047 /* Build configuration list for PBXNativeTarget "KuriCLI" */;
 			buildPhases = (
 				C0FFEE000000000000000045 /* Sources */,
 				C0FFEE000000000000000042 /* Frameworks */,
@@ -134,7 +134,7 @@
 			fileSystemSynchronizedGroups = (
 				C0FFEE000000000000000041 /* CLI */,
 			);
-			name = kuri;
+			name = KuriCLI;
 			packageProductDependencies = (
 				C0FFEE000000000000000044 /* KuriKit */,
 			);
@@ -179,7 +179,7 @@
 			projectRoot = "";
 			targets = (
 				C0FFEE000000000000000006 /* Kuri */,
-				C0FFEE000000000000000046 /* kuri */,
+				C0FFEE000000000000000046 /* KuriCLI */,
 			);
 		};
 /* End PBXProject section */
@@ -214,7 +214,7 @@
 /* Begin PBXTargetDependency section */
 		C0FFEE00000000000000004C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = C0FFEE000000000000000046 /* kuri */;
+			target = C0FFEE000000000000000046 /* KuriCLI */;
 			targetProxy = C0FFEE00000000000000004D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -329,7 +329,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.haruno19.Kuri.cli;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = KuriCLI;
+				PRODUCT_NAME = kuri;
 				SKIP_INSTALL = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -348,7 +349,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.haruno19.Kuri.cli;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = KuriCLI;
+				PRODUCT_NAME = kuri;
 				SKIP_INSTALL = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -376,7 +378,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		C0FFEE000000000000000047 /* Build configuration list for PBXNativeTarget "kuri" */ = {
+		C0FFEE000000000000000047 /* Build configuration list for PBXNativeTarget "KuriCLI" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				C0FFEE000000000000000048 /* Debug */,
