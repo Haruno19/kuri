@@ -33,3 +33,4 @@ To change one, write a new record that supersedes it, and mark the old one *Supe
 | [0025](0025-pane-toggles-in-the-chat.md) | The panes' toggles are drawn by the chat, with system symbols (amends 0021) |
 | [0026](0026-reply-blocks.md) | Key figures and charts as fenced blocks of JSON, drawn natively |
 | [0027](0027-releases.md) | Releases are a disk image made by one script, ad-hoc signed until there's a Developer ID |
+| [0028](0028-command-line-client.md) | A command-line client in the app's bundle, one engine at a time |
