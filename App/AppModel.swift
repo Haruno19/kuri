@@ -84,7 +84,10 @@ final class AppModel {
     private(set) var memories: [Memory] = []
     private(set) var mcpServers: [MCPServerStatus] = []
     private(set) var sandboxStatus: SandboxStatus = .notInstalled
-    /// Folders attached to the selected conversation.
+    /// Folders attached to the selected conversation. On the new-chat page,
+    /// the ones picked there: they're kept here, not saved, until the first
+    /// message creates the conversation, so attaching alone leaves no empty
+    /// chat behind.
     private(set) var folders: [ConversationFolder] = []
     /// Git status of attached folders that are repositories, by path. Kept
     /// here, not in the inspector, so the Git box is already there when the
@@ -233,7 +236,10 @@ final class AppModel {
         guard !text.isEmpty else { return }
         do {
             if selection == nil {
-                selection = try await engine.newConversation(model: draftModel).id
+                let id = try await engine.newConversation(model: draftModel).id
+                // Before selecting it, so its first load already has them.
+                if !folders.isEmpty { try await engine.setFolders(folders, for: id) }
+                selection = id
             }
             guard let id = selection else { return }
             try await engine.send(text, to: id)
@@ -468,19 +474,12 @@ final class AppModel {
         await attempt("Couldn't set up the sandbox") { try await $0.setUpSandbox() }
     }
 
-    /// Adds folders to the selected conversation, creating one if needed.
+    /// Adds folders to the selected conversation, or to the new chat's draft.
     func attach(_ urls: [URL]) async {
-        guard let engine else { return }
-        do {
-            if selection == nil { selection = try await engine.newConversation(model: draftModel).id }
-            guard let id = selection else { return }
-            var updated = folders
-            for url in urls where !updated.contains(where: { $0.path == url.path(percentEncoded: false) }) {
-                updated.append(ConversationFolder(path: url.path(percentEncoded: false)))
+        await updateFolders(failure: "Couldn't attach the folder") { folders in
+            for url in urls where !folders.contains(where: { $0.path == url.path(percentEncoded: false) }) {
+                folders.append(ConversationFolder(path: url.path(percentEncoded: false)))
             }
-            try await engine.setFolders(updated, for: id)
-        } catch {
-            report("Couldn't attach the folder", error)
         }
     }
 
@@ -494,14 +493,19 @@ final class AppModel {
         }
     }
 
-    private func updateFolders(_ change: (inout [ConversationFolder]) -> Void) async {
-        guard let engine, let id = selection else { return }
+    private func updateFolders(failure: LocalizedStringResource = "Couldn't change the folders",
+                               _ change: (inout [ConversationFolder]) -> Void) async {
+        guard let engine else { return }
         var updated = folders
         change(&updated)
+        guard let id = selection else {
+            folders = updated
+            return
+        }
         do {
             try await engine.setFolders(updated, for: id)
         } catch {
-            report("Couldn't change the folders", error)
+            report(failure, error)
         }
     }
 
