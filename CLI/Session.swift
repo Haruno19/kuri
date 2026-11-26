@@ -43,6 +43,10 @@ final class Session {
     private let feed: AsyncStream<Input>.Continuation
     private let events: AsyncStream<EngineEvent>
     private let signals = Signals()
+    /// Typed lines, in a session; paused while a `/shell` command runs.
+    private var reader: InputReader?
+    /// A `/shell` command has the terminal: Ctrl-C is its, not the session's.
+    private var shellRunning = false
 
     private var conversation: Conversation?
     /// For the conversation made on the first message.
@@ -86,7 +90,7 @@ final class Session {
         let feed = feed
         let events = events
         Task { for await event in events { feed.yield(.event(event)) } }
-        signals.on(SIGINT) { feed.yield(.interrupt) }
+        signals.on(SIGINT) { [weak self] in self?.interruptRequested() }
         signals.on(SIGTERM) { feed.yield(.terminate(143)) }
         signals.on(SIGHUP) { feed.yield(.terminate(129)) }
 
@@ -104,9 +108,11 @@ final class Session {
             await waitForMCP()
             await submit(prompt ?? "")
         } else {
-            await showHeader()
+            await showHeader(lastExchange: true)
+            let reader = InputReader()
+            self.reader = reader
             Task {
-                for await line in LineReader.stdin() { feed.yield(.line(line)) }
+                for await line in reader.lines { feed.yield(.line(line)) }
                 feed.yield(.endOfInput)
             }
             if let prompt {
@@ -158,21 +164,29 @@ final class Session {
         }
     }
 
-    private func showHeader() async {
+    /// On a clean screen: the session starts there, and `/clear` goes back
+    /// to it. Only the start shows a resumed conversation's last exchange.
+    private func showHeader(lastExchange: Bool) async {
         let config = await engine.config
         let model = conversation?.model ?? newModel ?? config.defaultModel
         let folders = (try? await currentFolders()) ?? []
         if answer.isTerminal {
             let place = folders.isEmpty ? "no folder" : folders.map(Folders.describe).joined(separator: ", ")
-            let lines = Header.lines([
+            answer.clearScreen()
+            answer.write(Header.text([
                 answer.style("Kuri", .bold) + " " + answer.style(Main.version, .dim),
                 (model?.description ?? "no model: set defaultModel in config.json") + answer.style(" · ", .dim) + place,
-                answer.style("/help for commands · Ctrl-C stops a turn · Ctrl-D quits", .dim),
-            ], on: answer)
-            answer.write(lines.joined(separator: "\n") + "\n")
+                command("/help") + answer.style(" for commands · Ctrl-C stops a turn · Ctrl-D quits", .dim),
+            ], on: answer))
         }
+        guard lastExchange else { return }
         for note in notes { self.note(note) }
         if let conversation { await showLastExchange(of: conversation) }
+    }
+
+    /// A command's name, as `/help` and the header show it.
+    private func command(_ name: String) -> String {
+        answer.style(name, .bold, .accent)
     }
 
     /// What a resumed conversation was last about: its last message and the answer to it.
@@ -233,6 +247,14 @@ final class Session {
             exitCode = code
             done = true
         }
+    }
+
+    /// Ctrl-C reaches every process in the terminal's foreground group, a
+    /// `/shell` command and this one alike. The command deals with it; here
+    /// it's dropped, rather than queued behind the command and acted on after.
+    private func interruptRequested() {
+        guard !shellRunning else { return }
+        feed.yield(.interrupt)
     }
 
     private func interrupt() async {
@@ -597,13 +619,16 @@ final class Session {
 
     // MARK: Commands
 
+    /// Name, arguments, what it does: as `/help` lists them.
     static let commands = [
-        ("/model [provider/model]", "show the models, or switch this conversation's"),
-        ("/folders [add|remove <path>]", "show the attached folders, or change them (add --read-only <path>)"),
-        ("/compact", "summarise the conversation to make room"),
-        ("/retry", "answer the last message again"),
-        ("/new", "start a new conversation"),
-        ("/exit", "quit (Ctrl-D does too)"),
+        ("/model", "[provider/model]", "show the models, or switch this conversation's"),
+        ("/folders", "[add|remove <path>]", "show the attached folders, or change them (add --read-only <path>)"),
+        ("/shell", "<command>", "run a command in your own shell, in this folder"),
+        ("/compact", "", "summarise the conversation to make room"),
+        ("/retry", "", "answer the last message again"),
+        ("/new", "", "start a new conversation"),
+        ("/clear", "", "clear the screen; the conversation goes on"),
+        ("/exit", "", "quit (Ctrl-D does too)"),
     ]
 
     private func command(_ text: String) async {
@@ -615,10 +640,16 @@ final class Session {
             switch name {
             case "/help":
                 begin(.activity, on: answer)
-                let width = Self.commands.map(\.0.count).max() ?? 0
-                for (usage, summary) in Self.commands {
-                    answer.line(usage.padding(toLength: width, withPad: " ", startingAt: 0) + "   " + answer.style(summary, .dim))
+                let width = Self.commands.map { $0.0.count + 1 + $0.1.count }.max() ?? 0
+                for (name, arguments, summary) in Self.commands {
+                    let padding = String(repeating: " ", count: width - name.count - 1 - arguments.count + 3)
+                    answer.line(command(name) + " " + arguments + padding + answer.style(summary, .dim))
                 }
+            case "/clear":
+                await showHeader(lastExchange: false)
+            case "/shell":
+                guard let argument, !argument.isEmpty else { throw UsageError(message: "Usage: /shell <command>") }
+                await runShell(argument)
             case "/exit", "/quit":
                 done = true
                 return
@@ -716,6 +747,32 @@ final class Session {
         note(folders.isEmpty ? "No folders attached." : "Folders: " + folders.map(Folders.describe).joined(separator: ", "))
     }
 
+    /// Runs `command` with your login shell's binary, in this folder, on the
+    /// terminal itself: its output isn't captured and it can be interactive
+    /// (an editor, a pager). Nothing of it goes into the conversation.
+    /// Engine events wait meanwhile, so a running turn's output can't land
+    /// in the middle of the command's.
+    private func runShell(_ command: String) async {
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        answer.blankLine()
+        reader?.pause()
+        shellRunning = true
+        let ending = await ForegroundCommand.run([shell, "-c", command], in: Folders.current)
+        shellRunning = false
+        reader?.resume()
+        answer.othersWrote()
+        switch ending {
+        case nil:
+            failure("Couldn't start \(shell).")
+        case .signalled(SIGINT):
+            note("Interrupted.")
+        case .signalled(let signal):
+            failure("Ended by signal \(signal).")
+        case .exited(let status):
+            if status != 0 { failure("exit \(status)") }
+        }
+    }
+
     // MARK: Output
 
     /// A blank line between an answer and the activity around it.
@@ -746,7 +803,8 @@ final class Session {
     }
 
     private func showPrompt() {
-        guard !oneTurn, typing, !done else { return }
+        // During a turn its end shows the prompt.
+        guard !oneTurn, typing, !done, !running else { return }
         answer.blankLine()
         answer.write(answer.style("›", .bold) + " ")
         lastBlock = nil

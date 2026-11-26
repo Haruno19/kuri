@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Synchronization
 
 /// stdout or stderr. Styles reach only a terminal, and never with
 /// `NO_COLOR` set (no-color.org), so piped output stays plain text.
@@ -64,12 +65,53 @@ final class Stream {
 
     func style(_ text: String, _ styles: Style...) -> String {
         guard styled, !styles.isEmpty, !text.isEmpty else { return text }
-        return "\u{1B}[\(styles.map(\.rawValue).joined(separator: ";"))m\(text)\u{1B}[0m"
+        return "\u{1B}[\(styles.map(\.code).joined(separator: ";"))m\(text)\u{1B}[0m"
+    }
+
+    /// Scrolls what's on screen up into the scrollback and starts again at
+    /// the top: like `clear`, without throwing the terminal's history away.
+    func clearScreen() {
+        guard isTerminal else { return }
+        var size = winsize()
+        let rows = withUnsafeMutablePointer(to: &size) { ioctl(fd, TIOCGWINSZ, $0) } == 0 && size.ws_row > 0
+            ? Int(size.ws_row) : 24
+        write("\u{1B}[\(rows);1H" + String(repeating: "\n", count: rows) + "\u{1B}[H")
+        trailingNewlines = 2
+    }
+
+    /// Something else wrote to the terminal (a `/shell` command): assume it
+    /// ended its line, as commands do.
+    func othersWrote() {
+        trailingNewlines = 1
     }
 }
 
-enum Style: String {
-    case bold = "1", dim = "2", italic = "3", red = "31", green = "32", yellow = "33"
+enum Style {
+    case bold, dim, italic, red, green, yellow
+    /// Kuri's chestnut, for commands.
+    case accent
+
+    var code: String {
+        switch self {
+        case .bold: "1"
+        case .dim: "2"
+        case .italic: "3"
+        case .red: "31"
+        case .green: "32"
+        case .yellow: "33"
+        case .accent: Self.accentCode
+        }
+    }
+
+    /// Between the app's light and dark accents (#A4693D, #C08452), since a
+    /// terminal's background may be either; terminals without 24-bit colour
+    /// get the nearest of the 256 (#AF875F).
+    static let accentRGB = (red: 0xB2, green: 0x77, blue: 0x48)
+    static let accentCode: String = {
+        let colorterm = ProcessInfo.processInfo.environment["COLORTERM"] ?? ""
+        guard colorterm == "truecolor" || colorterm == "24bit" else { return "38;5;137" }
+        return "38;2;\(accentRGB.red);\(accentRGB.green);\(accentRGB.blue)"
+    }()
 }
 
 /// The session's opening lines. The left column belongs to a hero, a small
@@ -82,32 +124,127 @@ enum Header {
         "│   │",
         "╰───╯",
     ]
+    /// Space around the header: lines above it, columns before it.
+    static let topMargin = 1
+    static let leftMargin = 2
     static let gap = "   "
 
-    static func lines(_ text: [String], on stream: Stream) -> [String] {
-        let rows = max(hero.count, text.count)
+    /// The header as text to write, margins included.
+    static func text(_ lines: [String], on stream: Stream) -> String {
+        let rows = max(hero.count, lines.count)
         let width = hero.map(\.count).max() ?? 0
-        return (0..<rows).map { row in
+        let margin = String(repeating: " ", count: leftMargin)
+        let body = (0..<rows).map { row in
             let art = row < hero.count ? hero[row] : ""
             let padded = art.padding(toLength: width, withPad: " ", startingAt: 0)
-            let words = row < text.count ? text[row] : ""
-            return stream.style(padded, .dim) + gap + words
+            let words = row < lines.count ? lines[row] : ""
+            return margin + stream.style(padded, .dim) + gap + words
         }
+        return String(repeating: "\n", count: topMargin) + body.joined(separator: "\n") + "\n"
     }
 }
 
-/// Lines of a file, read on a thread of their own: a read blocks until a
-/// line is typed, and the main actor has events to handle meanwhile.
-enum LineReader {
-    nonisolated static func stdin() -> AsyncStream<String> {
-        AsyncStream { continuation in
-            let thread = Thread {
-                while let line = readLine(strippingNewline: true) {
-                    continuation.yield(line)
-                }
-                continuation.finish()
+/// Typed lines, read on a thread of their own: a read blocks until a line
+/// is typed, and the main actor has events to handle meanwhile. It can be
+/// paused, so that a command run with `/shell` has the terminal's input to
+/// itself instead of racing this thread for every key.
+nonisolated final class InputReader: Sendable {
+    /// How often a paused or idle reader looks again.
+    static let pollInterval: Int32 = 50
+
+    let lines: AsyncStream<String>
+    private let paused = Mutex(false)
+
+    init() {
+        let (lines, continuation) = AsyncStream.makeStream(of: String.self)
+        self.lines = lines
+        Thread { [self] in read(into: continuation) }.start()
+    }
+
+    func pause() { paused.withLock { $0 = true } }
+    func resume() { paused.withLock { $0 = false } }
+
+    private func read(into continuation: AsyncStream<String>.Continuation) {
+        var pending: [UInt8] = []
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while true {
+            if paused.withLock({ $0 }) {
+                usleep(useconds_t(Self.pollInterval) * 1000)
+                continue
             }
-            thread.start()
+            var descriptor = pollfd(fd: STDIN_FILENO, events: Int16(POLLIN), revents: 0)
+            let ready = poll(&descriptor, 1, Self.pollInterval)
+            if ready < 0, errno != EINTR { break }
+            guard ready > 0 else { continue }
+            // Checked again under the lock: once `pause` returns, no read is
+            // under way or about to start.
+            let count = paused.withLock { isPaused in
+                isPaused ? nil : buffer.withUnsafeMutableBytes { Darwin.read(STDIN_FILENO, $0.baseAddress, $0.count) }
+            }
+            guard let count else { continue }
+            if count < 0, errno == EINTR { continue }
+            guard count > 0 else { break }
+            pending += buffer[..<count]
+            while let end = pending.firstIndex(of: UInt8(ascii: "\n")) {
+                continuation.yield(String(decoding: pending[..<end], as: UTF8.self))
+                pending.removeSubrange(...end)
+            }
+        }
+        if !pending.isEmpty { continuation.yield(String(decoding: pending, as: UTF8.self)) }
+        continuation.finish()
+    }
+}
+
+/// A command run on the terminal itself, as a shell runs a foreground job.
+/// Foundation's `Process` won't do: it puts the child in a process group of
+/// its own, which the terminal treats as a background job, so the
+/// command's first read of a key stops it (SIGTTIN) and Ctrl-C never
+/// reaches it.
+nonisolated enum ForegroundCommand {
+    enum Ending: Equatable {
+        case exited(Int32)
+        case signalled(Int32)
+    }
+
+    /// Runs `arguments` (the first is the program) in `directory`, sharing
+    /// this process's group, terminal and environment. `nil` if it couldn't
+    /// start.
+    static func run(_ arguments: [String], in directory: String) async -> Ending? {
+        var attributes: posix_spawnattr_t?
+        posix_spawnattr_init(&attributes)
+        defer { posix_spawnattr_destroy(&attributes) }
+        // kuri ignores SIGINT, SIGTERM and SIGHUP to handle them itself, and
+        // an ignored signal stays ignored across exec: give them back their
+        // defaults, and an empty mask, so Ctrl-C stops the command.
+        var defaults = sigset_t()
+        sigemptyset(&defaults)
+        for number in [SIGINT, SIGTERM, SIGHUP, SIGQUIT] { sigaddset(&defaults, number) }
+        posix_spawnattr_setsigdefault(&attributes, &defaults)
+        var mask = sigset_t()
+        sigemptyset(&mask)
+        posix_spawnattr_setsigmask(&attributes, &mask)
+        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK))
+
+        var actions: posix_spawn_file_actions_t?
+        posix_spawn_file_actions_init(&actions)
+        defer { posix_spawn_file_actions_destroy(&actions) }
+        posix_spawn_file_actions_addchdir(&actions, directory)
+
+        let argv = arguments.map { strdup($0) } + [nil]
+        defer { for argument in argv { free(argument) } }
+        var pid: pid_t = 0
+        guard posix_spawn(&pid, arguments[0], &actions, &attributes, argv, environ) == 0 else {
+            return nil
+        }
+        let child = pid
+        return await withCheckedContinuation { continuation in
+            Thread {
+                var status: Int32 = 0
+                while waitpid(child, &status, 0) < 0, errno == EINTR {}
+                // The wait status: the low 7 bits are the signal that ended it, if any.
+                let signal = status & 0x7F
+                continuation.resume(returning: signal == 0 ? .exited((status >> 8) & 0xFF) : .signalled(signal))
+            }.start()
         }
     }
 }
