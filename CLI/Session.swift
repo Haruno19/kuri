@@ -185,11 +185,15 @@ final class Session {
         let model = conversation?.model ?? newModel ?? config.defaultModel
         let folders = (try? await currentFolders()) ?? []
         if answer.isTerminal {
-            let place = folders.isEmpty ? "no folder" : folders.map(Folders.describe).joined(separator: ", ")
+            var place = folders.isEmpty ? "no folder" : folders.map(Folders.describe).joined(separator: ", ")
+            let modelName = model?.description ?? "no model: set defaultModel in config.json"
+            // Kept on its line: wrapped, it would run back under the hero.
+            let room = answer.columns - Header.indent - modelName.count - 3
+            if place.count > room { place = "…" + place.suffix(max(1, room - 1)) }
             answer.clearScreen()
             answer.write(Header.text([
                 answer.style("Kuri", .bold) + " " + answer.style(Main.version, .dim),
-                (model?.description ?? "no model: set defaultModel in config.json") + answer.style(" · ", .dim) + place,
+                modelName + answer.style(" · ", .dim) + place,
                 command("/help") + answer.style(" for commands · Ctrl-C stops a turn · Ctrl-D quits", .dim),
             ], on: answer))
         }

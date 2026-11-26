@@ -139,7 +139,7 @@ enum Style {
     /// Between #C18A5B and #D6A06F, the same way; else #D7875F.
     static let accentLightCode = color(red: 0xCB, green: 0x95, blue: 0x65, else: 173)
 
-    private static let truecolor: Bool = {
+    static let truecolor: Bool = {
         let colorterm = ProcessInfo.processInfo.environment["COLORTERM"] ?? ""
         return colorterm == "truecolor" || colorterm == "24bit"
     }()
@@ -149,31 +149,91 @@ enum Style {
     }
 }
 
-/// The session's opening lines. The left column belongs to a hero, a small
-/// drawing that says Kuri at a glance (a chestnut shell, one day); until
-/// it's drawn, a plain frame holds its place, so the text beside it won't
-/// move when it lands.
+/// The session's opening lines: the hero on the left, three lines of text
+/// level with its middle.
 enum Header {
+    /// A chestnut burr split open, the nut rising out of it, in the meadow's
+    /// colours (sketched in Sketches/Hero.swift). One letter a pixel, `.`
+    /// for none; drawn in half blocks, two pixels to a cell, one above the
+    /// other, so they come out about square.
     static let hero = [
-        "╭───╮",
-        "│   │",
-        "╰───╯",
+        ".....hN.....",
+        "...ghNNng...",
+        "..GNNNNNng..",
+        ".GGnNNNNngg.",
+        "..GGccccgg..",
+        ".GGGGGggggg.",
+        "..GGGggggg..",
+        ".G.GGgggg.g.",
+        "....G..g....",
+        "............",
     ]
+
+    /// Each pixel's colour, and the nearest of the 256 for terminals
+    /// without 24-bit colour.
+    static let colours: [Character: (red: Int, green: Int, blue: Int, fallback: Int)] = [
+        "G": (0xA4, 0xAE, 0x58, 143),  // burr, light
+        "g": (0x7E, 0x8A, 0x3C, 101),  // burr, dark
+        "N": (0xB0, 0x70, 0x3F, 131),  // nut
+        "n": (0x8A, 0x4F, 0x2A, 94),   // nut, in shadow
+        "h": (0xD9, 0xA0, 0x6F, 179),  // nut, lit
+        "c": (0xE6, 0xD3, 0xA3, 187),  // the nut's pale base
+    ]
+
     /// Space around the header: lines above it, columns before it.
     static let topMargin = 1
     static let leftMargin = 2
     static let gap = "   "
+    /// Where the text starts: past the margin, the hero and the gap.
+    static var indent: Int { leftMargin + (hero.map(\.count).max() ?? 0) + gap.count }
+
+    /// The hero as rows of text. In colour where styles reach; otherwise
+    /// its silhouette, in the terminal's own colour.
+    static func drawing(on stream: Stream) -> [String] {
+        let width = hero.map(\.count).max() ?? 0
+        let pixels = hero.map { Array($0.padding(toLength: width, withPad: ".", startingAt: 0)) }
+        return stride(from: 0, to: pixels.count, by: 2).map { row in
+            let top = pixels[row]
+            let bottom = row + 1 < pixels.count ? pixels[row + 1] : Array(repeating: ".", count: width)
+            return (0..<width).map { x in
+                cell(top: colours[top[x]], bottom: colours[bottom[x]], styled: stream.styled)
+            }.joined()
+        }
+    }
+
+    private static func cell(top: (red: Int, green: Int, blue: Int, fallback: Int)?,
+                             bottom: (red: Int, green: Int, blue: Int, fallback: Int)?, styled: Bool) -> String {
+        guard styled else {
+            switch (top, bottom) {
+            case (nil, nil): return " "
+            case (.some, nil): return "▀"
+            case (nil, .some): return "▄"
+            case (.some, .some): return "█"
+            }
+        }
+        func code(_ colour: (red: Int, green: Int, blue: Int, fallback: Int), _ layer: Int) -> String {
+            Style.truecolor ? "\(layer);2;\(colour.red);\(colour.green);\(colour.blue)" : "\(layer);5;\(colour.fallback)"
+        }
+        switch (top, bottom) {
+        case (nil, nil): return " "
+        case (let top?, nil): return "\u{1B}[\(code(top, 38))m▀\u{1B}[0m"
+        case (nil, let bottom?): return "\u{1B}[\(code(bottom, 38))m▄\u{1B}[0m"
+        case (let top?, let bottom?): return "\u{1B}[\(code(top, 38));\(code(bottom, 48))m▀\u{1B}[0m"
+        }
+    }
 
     /// The header as text to write, margins included.
     static func text(_ lines: [String], on stream: Stream) -> String {
-        let rows = max(hero.count, lines.count)
+        let drawing = drawing(on: stream)
         let width = hero.map(\.count).max() ?? 0
+        let rows = max(drawing.count, lines.count)
+        let textTop = (rows - lines.count) / 2
         let margin = String(repeating: " ", count: leftMargin)
         let body = (0..<rows).map { row in
-            let art = row < hero.count ? hero[row] : ""
-            let padded = art.padding(toLength: width, withPad: " ", startingAt: 0)
-            let words = row < lines.count ? lines[row] : ""
-            return margin + stream.style(padded, .dim) + gap + words
+            let art = row < drawing.count ? drawing[row] : String(repeating: " ", count: width)
+            let line = row - textTop
+            let words = lines.indices.contains(line) ? lines[line] : ""
+            return (margin + art + (words.isEmpty ? "" : gap + words))
         }
         return String(repeating: "\n", count: topMargin) + body.joined(separator: "\n") + "\n"
     }
