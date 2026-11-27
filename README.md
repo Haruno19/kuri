@@ -42,6 +42,7 @@ Kuri runs offline with local models, talks to any hosted provider when you want 
 Kuri needs a Mac with Apple silicon and macOS 26. Download the `.dmg` from [Releases](https://github.com/Haruno19/kuri/releases), open it and drag Kuri to Applications. Or install it with [Homebrew](https://brew.sh), which also puts `kuri` on your `PATH`:
 
 ```bash
+brew tap haruno19/tap
 brew install --cask haruno19/tap/kuri
 ```
 
