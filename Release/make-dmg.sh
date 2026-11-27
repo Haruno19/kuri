@@ -1,6 +1,7 @@
 #!/bin/bash
 # Builds Kuri in Release and packs it into build/release/Kuri-<version>.dmg:
-# the app and a link to Applications on a still frame of the meadow.
+# the app and a link to Applications on a still frame of the meadow. It ends
+# with the version and checksum for the Homebrew cask (decision 0027).
 #
 #   Release/make-dmg.sh
 #
@@ -130,6 +131,13 @@ if [ -n "${KURI_SIGN_IDENTITY:-}" ]; then
 fi
 
 rm -rf "$OUT/stage" "$OUT/work"
+
+# The cask in Haruno19/homebrew-tap points at this release by version and
+# checksum; once the image is uploaded, these two lines go into Casks/kuri.rb.
+step "For the Homebrew cask"
+echo "  version \"$VERSION\""
+echo "  sha256 \"$(shasum -a 256 "$DMG" | cut -d ' ' -f 1)\""
+
 step "Done"
 echo "$DMG"
 shasum -a 256 "$DMG"
